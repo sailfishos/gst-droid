@@ -24,6 +24,13 @@ main(int argc, char *argv[]) {
   assert(GST_MEMORY_IS_PHYSICALLY_CONTIGUOUS(mem) == FALSE);
   assert(GST_MEMORY_IS_NOT_MAPPABLE(mem) == TRUE);
 
+  gsize size, offset, maxsize;
+  size = gst_memory_get_sizes (mem, &offset, &maxsize);
+
+  assert(size == -1);
+  assert(offset == 0);
+  assert(maxsize == -1);
+
   gst_memory_unref(mem);
   gst_object_unref(GST_OBJECT(allocator));
 
