@@ -59,6 +59,7 @@ typedef struct
 
 } GstGrallocMemory;
 
+#define gralloc_mem_allocator_parent_class parent_class
 G_DEFINE_TYPE (GstGrallocAllocator, gralloc_mem_allocator, GST_TYPE_ALLOCATOR);
 
 #define GST_TYPE_GRALLOC_ALLOCATOR    (gralloc_mem_allocator_get_type())
@@ -67,6 +68,7 @@ G_DEFINE_TYPE (GstGrallocAllocator, gralloc_mem_allocator, GST_TYPE_ALLOCATOR);
 
 static gboolean gst_gralloc_mem_is_span (GstMemory * mem1, GstMemory * mem2, gsize * offset);
 static GstMemory * gst_gralloc_mem_copy (GstMemory * mem, gssize offset, gssize size);
+static void gst_gralloc_allocator_free (GstAllocator * allocator, GstMemory * mem);
 
 static void
 incRef(struct android_native_base_t* base)
@@ -87,7 +89,8 @@ decRef(struct android_native_base_t* base)
 }
 
 
-GstAllocator * gst_gralloc_allocator_new (void)
+GstAllocator *
+gst_gralloc_allocator_new (void)
 {
   GST_DEBUG_CATEGORY_INIT (gralloc_debug, "gralloc", 0, "gralloc memory");
 
@@ -114,12 +117,29 @@ gralloc_mem_allocator_init (GstGrallocAllocator * allocator)
 }
 
 static void
+gst_gralloc_allocator_finalize (GObject * obj)
+{
+  GstGrallocAllocator *alloc = GST_GRALLOC_ALLOCATOR (obj);
+
+  if (alloc->alloc) {
+    gralloc_close (alloc->alloc);
+  }
+
+  g_mutex_clear (&alloc->mutex);
+
+  G_OBJECT_CLASS (parent_class)->finalize (obj);
+}
+
+static void
 gralloc_mem_allocator_class_init (GstGrallocAllocatorClass * klass)
 {
+  GObjectClass *gobject_class = (GObjectClass *) klass;
   GstAllocatorClass *allocator_class = (GstAllocatorClass *) klass;
 
+  gobject_class->finalize = gst_gralloc_allocator_finalize;
+
   allocator_class->alloc = NULL;
-  // TODO: free
+  allocator_class->free = gst_gralloc_allocator_free;
 }
 
 GstMemory *
@@ -203,4 +223,15 @@ static GstMemory *
 gst_gralloc_mem_copy (GstMemory * mem, gssize offset, gssize size)
 {
   return NULL;
+}
+
+static void
+gst_gralloc_allocator_free (GstAllocator * allocator, GstMemory * mem)
+{
+  GstGrallocMemory *m = (GstGrallocMemory *) mem;
+  GstGrallocAllocator *alloc = GST_GRALLOC_ALLOCATOR(allocator);
+
+  alloc->alloc->free(alloc->alloc, m->buff.handle);
+
+  g_slice_free (GstGrallocMemory, m);
 }
