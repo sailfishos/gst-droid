@@ -2,14 +2,6 @@
 
 plugin_LTLIBRARIES = libgstdroid.la
 
-##############################################################################
-# TODO: for the next set of variables, name the prefix if you named the .la, #
-#  e.g. libmysomething.la => libmysomething_la_SOURCES                       #
-#                            libmysomething_la_CFLAGS                        #
-#                            libmysomething_la_LIBADD                        #
-#                            libmysomething_la_LDFLAGS                       #
-##############################################################################
-
 # sources used to compile this plug-in
 libgstdroid_la_SOURCES = plugin.c
 

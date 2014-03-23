@@ -19,13 +19,19 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef __PLUGIN_H__
-#define __PLUGIN_H__
+#ifndef __GST_GRALLOC_H__
+#define __GST_GRALLOC_H__
+
+#include <gst/gst.h>
 
 G_BEGIN_DECLS
 
-GST_DEBUG_CATEGORY_EXTERN (gst_droid_debug);
+#define GST_ALLOCATOR_GRALLOC "gralloc"
+
+GstAllocator * gst_gralloc_allocator_new (void);
+
+gboolean       gst_is_gralloc_memory (GstMemory * mem);
 
 G_END_DECLS
 
-#endif /* __PLUGIN_H__ */
+#endif /* __GST_GRALLOC_H__ */
