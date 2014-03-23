@@ -65,6 +65,9 @@ G_DEFINE_TYPE (GstGrallocAllocator, gralloc_mem_allocator, GST_TYPE_ALLOCATOR);
 #define GST_IS_GRALLOC_ALLOCATOR(obj) (G_TYPE_CHECK_INSTANCE_TYPE ((obj), GST_TYPE_GRALLOC_ALLOCATOR))
 #define GST_GRALLOC_ALLOCATOR(obj)    (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_GRALLOC_ALLOCATOR,GstGrallocAllocator))
 
+static gboolean gst_gralloc_mem_is_span (GstMemory * mem1, GstMemory * mem2, gsize * offset);
+static GstMemory * gst_gralloc_mem_copy (GstMemory * mem, gssize offset, gssize size);
+
 static void
 incRef(struct android_native_base_t* base)
 {
@@ -101,15 +104,11 @@ gralloc_mem_allocator_init (GstGrallocAllocator * allocator)
   g_mutex_init(&allocator->mutex);
   alloc->mem_type = GST_ALLOCATOR_GRALLOC;
 
-  // TODO:
-  /*
-  GstMemoryMapFunction      mem_map;
-  GstMemoryUnmapFunction    mem_unmap;
-
-  GstMemoryCopyFunction     mem_copy;
-  GstMemoryShareFunction    mem_share;
-  GstMemoryIsSpanFunction   mem_is_span;
-  */
+  alloc->mem_map = NULL;
+  alloc->mem_unmap = NULL;
+  alloc->mem_copy = gst_gralloc_mem_copy;
+  alloc->mem_share = NULL;
+  alloc->mem_is_span = gst_gralloc_mem_is_span;
 
   GST_OBJECT_FLAG_SET (allocator, GST_ALLOCATOR_FLAG_CUSTOM_ALLOC);
 }
@@ -192,4 +191,16 @@ gboolean
 gst_is_gralloc_memory (GstMemory * mem)
 {
   return gst_memory_is_type (mem, GST_ALLOCATOR_GRALLOC);
+}
+
+static gboolean
+gst_gralloc_mem_is_span (GstMemory * mem1, GstMemory * mem2, gsize * offset)
+{
+  return FALSE;
+}
+
+static GstMemory *
+gst_gralloc_mem_copy (GstMemory * mem, gssize offset, gssize size)
+{
+  return NULL;
 }
