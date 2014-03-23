@@ -82,6 +82,17 @@ dnl set proper LDFLAGS for plugins
 GST_PLUGIN_LDFLAGS='-module -avoid-version -export-symbols-regex [_]*\(gst_\|Gst\|GST_\).*'
 AC_SUBST(GST_PLUGIN_LDFLAGS)
 
-AC_CONFIG_FILES([Makefile gst/Makefile])
+dnl our libraries and install dirs use GST_API_VERSION in the filename
+dnl to allow side-by-side installation of different API versions
+GST_API_VERSION=1.0
+AC_SUBST(GST_API_VERSION)
+AC_DEFINE_UNQUOTED(GST_API_VERSION, "$GST_API_VERSION",
+   [GStreamer API Version])
+
+AC_CONFIG_FILES([Makefile
+		gst-libs/Makefile
+		gst-libs/gst/Makefile
+		gst-libs/gst/memory/Makefile
+		gst/Makefile])
 AC_OUTPUT
 
