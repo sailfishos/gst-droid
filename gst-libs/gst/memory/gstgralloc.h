@@ -30,6 +30,9 @@ G_BEGIN_DECLS
 
 GstAllocator * gst_gralloc_allocator_new (void);
 
+GstMemory    * gst_gralloc_allocator_alloc (GstAllocator * allocator, gint width, gint height,
+					    int format, int usage);
+
 gboolean       gst_is_gralloc_memory (GstMemory * mem);
 
 G_END_DECLS
