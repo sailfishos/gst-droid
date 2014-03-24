@@ -70,6 +70,17 @@ PKG_CHECK_MODULES(CHECK, [
   ])
 ])
 
+PKG_CHECK_MODULES(NGI, [
+  nemo-gstreamer-interfaces-1.0
+], [
+  AC_SUBST(NGI_CFLAGS)
+  AC_SUBST(NGI_LIBS)
+], [
+  AC_MSG_ERROR([
+      nemo-gstreamer-interfaces not found
+  ])
+])
+
 PKG_CHECK_MODULES(DROID, [
   android-headers
 ], [
