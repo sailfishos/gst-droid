@@ -46,7 +46,6 @@ dnl etc.
 PKG_CHECK_MODULES(GST, [
   gstreamer-1.0 >= $GST_REQUIRED
   gstreamer-base-1.0 >= $GST_REQUIRED
-  gstreamer-controller-1.0 >= $GST_REQUIRED
 ], [
   AC_SUBST(GST_CFLAGS)
   AC_SUBST(GST_LIBS)
@@ -57,6 +56,17 @@ PKG_CHECK_MODULES(GST, [
       libgstreamer1.0-dev and libgstreamer-plugins-base1.0-dev.
       on RPM-based systems gstreamer1.0-devel, libgstreamer1.0-devel
       or similar. The minimum version required is $GST_REQUIRED.
+  ])
+])
+
+PKG_CHECK_MODULES(CHECK, [
+  gstreamer-check-1.0 >= $GST_REQUIRED
+], [
+  AC_SUBST(CHECK_CFLAGS)
+  AC_SUBST(CHECK_LIBS)
+], [
+  AC_MSG_ERROR([
+      gstreamer-check not found
   ])
 ])
 
