@@ -25,12 +25,17 @@
 
 #include "gstdroideglsink.h"
 #include <gst/video/video.h>
+#include <gst/interfaces/nemovideotexture.h>
 
 GST_DEBUG_CATEGORY_STATIC (gst_droid_egl_sink_debug);
 #define GST_CAT_DEFAULT gst_droid_egl_sink_debug
 
+static void gst_droideglsink_video_texture_init (NemoGstVideoTextureClass * iface);
+
 #define gst_droideglsink_parent_class parent_class
-G_DEFINE_TYPE (GstDroidEglSink, gst_droideglsink, GST_TYPE_VIDEO_SINK);
+G_DEFINE_TYPE_WITH_CODE (GstDroidEglSink, gst_droideglsink, GST_TYPE_VIDEO_SINK,
+    G_IMPLEMENT_INTERFACE (NEMO_GST_TYPE_VIDEO_TEXTURE,
+        gst_droideglsink_video_texture_init));
 
 static GstStaticPadTemplate gst_droideglsink_sink_template_factory =
   GST_STATIC_PAD_TEMPLATE ("sink",
@@ -41,7 +46,6 @@ static GstStaticPadTemplate gst_droideglsink_sink_template_factory =
 	  "width = (int) [ 1, MAX ], " "height = (int) [ 1, MAX ], "
 	  "format = {NV12}")
       );
-
 
 static GstCaps *
 gst_droideglsink_get_caps (GstBaseSink * bsink, GstCaps * filter)
@@ -210,6 +214,62 @@ gst_droideglsink_class_init (GstDroidEglSinkClass * klass)
   gstbasesink_class->event = GST_DEBUG_FUNCPTR (gst_droideglsink_event);
 
   videosink_class->show_frame = GST_DEBUG_FUNCPTR (gst_droideglsink_show_frame);
+}
+
+/* interfaces */
+static gboolean
+gst_droidcamsrc_acquire_frame (NemoGstVideoTexture * iface)
+{
+  // TODO:
+
+  return TRUE;
+}
+
+static gboolean
+gst_droidcamsrc_bind_frame (NemoGstVideoTexture * iface, EGLImageKHR *image)
+{
+  // TODO:
+
+  return TRUE;
+}
+
+static void
+gst_droidcamsrc_unbind_frame (NemoGstVideoTexture * iface)
+{
+
+}
+
+static void
+gst_droidcamsrc_release_frame (NemoGstVideoTexture * iface, EGLSyncKHR sync)
+{
+
+}
+
+static gboolean
+gst_droidcamsrc_get_frame_info (NemoGstVideoTexture * iface, NemoGstVideoTextureFrameInfo *info)
+{
+  // TODO:
+
+  return TRUE;
+}
+
+static GstMeta *
+gst_droidcamsrc_get_frame_meta (NemoGstVideoTexture * iface, GType api)
+{
+  // TODO:
+
+  return NULL;
+}
+
+static void
+gst_droideglsink_video_texture_init (NemoGstVideoTextureClass * iface)
+{
+  iface->acquire_frame = gst_droidcamsrc_acquire_frame;
+  iface->bind_frame = gst_droidcamsrc_bind_frame;
+  iface->unbind_frame = gst_droidcamsrc_unbind_frame;
+  iface->release_frame = gst_droidcamsrc_release_frame;
+  iface->get_frame_info = gst_droidcamsrc_get_frame_info;
+  iface->get_frame_meta = gst_droidcamsrc_get_frame_meta;
 }
 
 static gboolean
