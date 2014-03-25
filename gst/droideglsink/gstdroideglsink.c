@@ -24,6 +24,7 @@
 #endif
 
 #include "gstdroideglsink.h"
+#include <gst/video/video.h>
 
 GST_DEBUG_CATEGORY_STATIC (gst_droid_egl_sink_debug);
 #define GST_CAT_DEFAULT gst_droid_egl_sink_debug
@@ -41,6 +42,57 @@ static GstStaticPadTemplate gst_droideglsink_sink_template_factory =
 	  "format = {NV12}")
       );
 
+
+static GstCaps *
+gst_droideglsink_get_caps (GstBaseSink * bsink, GstCaps * filter)
+{
+  GstDroidEglSink *sink;
+  GstCaps *caps;
+
+  sink = GST_DROIDEGLSINK (bsink);
+
+  GST_DEBUG_OBJECT (sink, "get caps called with filter caps %" GST_PTR_FORMAT, filter);
+  caps = gst_pad_get_pad_template_caps (GST_VIDEO_SINK_PAD (sink));
+
+  if (filter) {
+    GstCaps *intersection;
+    intersection =
+      gst_caps_intersect_full (filter, caps, GST_CAPS_INTERSECT_FIRST);
+    gst_caps_unref (caps);
+    caps = intersection;
+  }
+
+  GST_DEBUG_OBJECT (bsink, "returning caps %" GST_PTR_FORMAT, caps);
+
+  return caps;
+}
+
+static gboolean
+gst_droideglsink_set_caps (GstBaseSink * bsink, GstCaps * caps)
+{
+  GstDroidEglSink *sink;
+  GstVideoSink *vsink;
+  GstVideoInfo info;
+
+  sink = GST_DROIDEGLSINK (bsink);
+  vsink = GST_VIDEO_SINK (bsink);
+
+  GST_DEBUG_OBJECT (sink, "set caps with %" GST_PTR_FORMAT, caps);
+
+  if (!gst_video_info_from_caps (&info, caps)) {
+    GST_DEBUG_OBJECT (sink,
+		      "Could not locate image format from caps %" GST_PTR_FORMAT, caps);
+    return FALSE;
+  }
+
+  sink->fps_n = info.fps_n;
+  sink->fps_d = info.fps_d;
+
+  GST_VIDEO_SINK_WIDTH (vsink) = info.width;
+  GST_VIDEO_SINK_HEIGHT (vsink) = info.height;
+  // TODO:
+  return TRUE;
+}
 
 static void
 gst_droideglsink_get_times (GstBaseSink * bsink, GstBuffer * buf,
@@ -67,6 +119,15 @@ gst_droideglsink_get_times (GstBaseSink * bsink, GstBuffer * buf,
 static gboolean
 gst_droideglsink_start (GstBaseSink * bsink)
 {
+  GstDroidEglSink *sink;
+
+  sink = GST_DROIDEGLSINK (bsink);
+
+  GST_DEBUG_OBJECT (sink, "start");
+
+  sink->fps_n = 0;
+  sink->fps_d = 1;
+
   // TODO:
 
   return TRUE;
@@ -75,6 +136,12 @@ gst_droideglsink_start (GstBaseSink * bsink)
 static gboolean
 gst_droideglsink_stop (GstBaseSink * bsink)
 {
+  GstDroidEglSink *sink;
+
+  sink = GST_DROIDEGLSINK (bsink);
+
+  GST_DEBUG_OBJECT (sink, "stop");
+
   // TODO:
 
   return TRUE;
@@ -83,6 +150,9 @@ gst_droideglsink_stop (GstBaseSink * bsink)
 static GstFlowReturn
 gst_droideglsink_show_frame (GstVideoSink * vsink, GstBuffer * buf)
 {
+  GstDroidEglSink *sink = GST_DROIDEGLSINK (vsink);
+
+  GST_DEBUG_OBJECT (sink, "show frame");
   // TODO:
 
   return GST_FLOW_OK;
@@ -132,6 +202,8 @@ gst_droideglsink_class_init (GstDroidEglSinkClass * klass)
 
   gobject_class->finalize = gst_droideglsink_finalize;
 
+  gstbasesink_class->get_caps = GST_DEBUG_FUNCPTR (gst_droideglsink_get_caps);
+  gstbasesink_class->set_caps = GST_DEBUG_FUNCPTR (gst_droideglsink_set_caps);
   gstbasesink_class->get_times = GST_DEBUG_FUNCPTR (gst_droideglsink_get_times);
   gstbasesink_class->start = GST_DEBUG_FUNCPTR (gst_droideglsink_start);
   gstbasesink_class->stop = GST_DEBUG_FUNCPTR (gst_droideglsink_stop);
