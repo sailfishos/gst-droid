@@ -26,6 +26,7 @@
 #include "gstdroideglsink.h"
 #include <gst/video/video.h>
 #include <gst/interfaces/nemovideotexture.h>
+#include "gst/memory/gstgralloc.h"
 
 GST_DEBUG_CATEGORY_STATIC (gst_droid_egl_sink_debug);
 #define GST_CAT_DEFAULT gst_droid_egl_sink_debug
@@ -46,6 +47,12 @@ static GstStaticPadTemplate gst_droideglsink_sink_template_factory =
 	  "width = (int) [ 1, MAX ], " "height = (int) [ 1, MAX ], "
 	  "format = {NV12}")
       );
+
+enum
+{
+  PROP_0,
+  PROP_EGL_DISPLAY
+};
 
 static GstCaps *
 gst_droideglsink_get_caps (GstBaseSink * bsink, GstCaps * filter)
@@ -154,34 +161,117 @@ gst_droideglsink_stop (GstBaseSink * bsink)
 static GstFlowReturn
 gst_droideglsink_show_frame (GstVideoSink * vsink, GstBuffer * buf)
 {
-  GstDroidEglSink *sink = GST_DROIDEGLSINK (vsink);
+  GstDroidEglSink *sink;
+
+  sink = GST_DROIDEGLSINK (vsink);
 
   GST_DEBUG_OBJECT (sink, "show frame");
-  // TODO:
+
+  g_mutex_lock (&sink->lock);
+  if (sink->acquired_buffer) {
+    GST_INFO_OBJECT (sink, "acquired buffer exists. Not replacing current buffer");
+    g_mutex_unlock (&sink->lock);
+    return GST_FLOW_OK;
+  }
+
+  g_mutex_unlock (&sink->lock);
+
+  gst_buffer_replace (&sink->last_buffer, buf);
+
+  nemo_gst_video_texture_frame_ready (NEMO_GST_VIDEO_TEXTURE (sink), 0);
 
   return GST_FLOW_OK;
 }
 
 static gboolean
-gst_droideglsink_event (GstBaseSink * sink, GstEvent * event)
+gst_droideglsink_event (GstBaseSink * bsink, GstEvent * event)
 {
-  // TODO:
+  GstDroidEglSink *sink;
 
-  return GST_BASE_SINK_CLASS (parent_class)->event (sink, event);
+  sink = GST_DROIDEGLSINK (bsink);
+
+  switch (GST_EVENT_TYPE (event)) {
+  case GST_EVENT_FLUSH_START:
+  case GST_EVENT_EOS:
+    GST_INFO_OBJECT (sink, "emitting frame-ready with -1 after %" GST_PTR_FORMAT, event);
+    nemo_gst_video_texture_frame_ready (NEMO_GST_VIDEO_TEXTURE (sink), -1);
+    break;
+
+  default:
+    break;
+  }
+
+  return GST_BASE_SINK_CLASS (parent_class)->event (bsink, event);
+}
+
+static void
+gst_droideglsink_set_property (GObject * object, guint prop_id,
+			      const GValue * value, GParamSpec * pspec)
+{
+  GstDroidEglSink *sink;
+
+  g_return_if_fail (GST_IS_DROIDEGLSINK (object));
+
+  sink = GST_DROIDEGLSINK (object);
+
+  switch (prop_id) {
+  case PROP_EGL_DISPLAY:
+    g_mutex_lock (&sink->lock);
+    sink->dpy = g_value_get_pointer (value);
+    g_mutex_unlock (&sink->lock);
+    break;
+  default:
+    G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+    break;
+  }
+}
+
+static void
+gst_droideglsink_get_property (GObject * object, guint prop_id,
+			      GValue * value, GParamSpec * pspec)
+{
+  GstDroidEglSink *sink;
+
+  g_return_if_fail (GST_IS_DROIDEGLSINK (object));
+
+  sink = GST_DROIDEGLSINK (object);
+
+  switch (prop_id) {
+  case PROP_EGL_DISPLAY:
+    g_mutex_lock (&sink->lock);
+    g_value_set_pointer (value, sink->dpy);
+    g_mutex_unlock (&sink->lock);
+    break;
+
+  default:
+    G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+    break;
+  }
 }
 
 static void
 gst_droideglsink_finalize (GObject * object)
 {
+  GstDroidEglSink *sink;
+
+  sink = GST_DROIDEGLSINK (object);
+
+  g_mutex_clear (&sink->lock);
+
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
 
 static void
 gst_droideglsink_init (GstDroidEglSink * sink)
 {
+  gst_base_sink_set_last_sample_enabled (GST_BASE_SINK (sink), FALSE);
+
   sink->fps_n = 0;
   sink->fps_d = 0;
-  // TODO:
+  sink->acquired_buffer = NULL;
+  sink->last_buffer = NULL;
+  sink->dpy = EGL_NO_DISPLAY;
+  g_mutex_init (&sink->lock);
 }
 
 static void
@@ -205,6 +295,8 @@ gst_droideglsink_class_init (GstDroidEglSinkClass * klass)
       gst_static_pad_template_get (&gst_droideglsink_sink_template_factory));
 
   gobject_class->finalize = gst_droideglsink_finalize;
+  gobject_class->set_property = gst_droideglsink_set_property;
+  gobject_class->get_property = gst_droideglsink_get_property;
 
   gstbasesink_class->get_caps = GST_DEBUG_FUNCPTR (gst_droideglsink_get_caps);
   gstbasesink_class->set_caps = GST_DEBUG_FUNCPTR (gst_droideglsink_set_caps);
@@ -214,40 +306,159 @@ gst_droideglsink_class_init (GstDroidEglSinkClass * klass)
   gstbasesink_class->event = GST_DEBUG_FUNCPTR (gst_droideglsink_event);
 
   videosink_class->show_frame = GST_DEBUG_FUNCPTR (gst_droideglsink_show_frame);
+
+  g_object_class_override_property (gobject_class, PROP_EGL_DISPLAY, "egl-display");
 }
 
 /* interfaces */
 static gboolean
 gst_droidcamsrc_acquire_frame (NemoGstVideoTexture * iface)
 {
-  // TODO:
+  GstDroidEglSink *sink;
+  gboolean ret = TRUE;
 
-  return TRUE;
+  sink = GST_DROIDEGLSINK (iface);
+
+  GST_DEBUG_OBJECT (sink, "acquire frame");
+
+  g_mutex_lock (&sink->lock);
+  if (sink->acquired_buffer) {
+    GST_WARNING_OBJECT (sink, "buffer %p already acquired", sink->acquired_buffer);
+    ret = FALSE;
+    goto unlock_and_out;
+  }
+
+  if (!sink->last_buffer) {
+    GST_WARNING_OBJECT (sink, "no buffers available for acquisition");
+    ret = FALSE;
+    goto unlock_and_out;
+  }
+
+  sink->acquired_buffer = gst_buffer_ref (sink->last_buffer);
+
+unlock_and_out:
+  g_mutex_unlock (&sink->lock);
+  return ret;
 }
 
 static gboolean
 gst_droidcamsrc_bind_frame (NemoGstVideoTexture * iface, EGLImageKHR *image)
 {
+  GstDroidEglSink *sink;
+  int num, x;
+  GstMemory *mem = NULL;
+  gboolean ret = FALSE;
+
+  sink = GST_DROIDEGLSINK (iface);
+
+  GST_DEBUG_OBJECT (sink, "bind frame");
+
+  g_mutex_lock (&sink->lock);
+
+  if (sink->dpy == EGL_NO_DISPLAY) {
+    GST_WARNING_OBJECT (sink, "can not bind a frame without an EGLDisplay");
+    ret = FALSE;
+    goto unlock_and_out;
+  }
+
+  if (!sink->acquired_buffer) {
+    GST_WARNING_OBJECT (sink, "no frames have been acquired");
+    ret = FALSE;
+    goto unlock_and_out;
+  }
+
+  gst_buffer_ref (sink->acquired_buffer);
+
+  /* Buffer will not go anywhere so we should be safe to unlock. */
+  g_mutex_unlock (&sink->lock);
+
+  /* Here is what we do:
+   * - get GstMemory from GstBuffer.
+   * - if allocator is gralloc, ask memory for its EGLImage
+   * - if allocator is not gralloc, wrap it then ask the wrapper for its EGLImage
+   */
+  num = gst_buffer_n_memory (sink->acquired_buffer);
+  if (num == 0) {
+    /* Fail. */
+    GST_WARNING_OBJECT (sink, "buffer has no memory");
+    gst_buffer_unref (sink->acquired_buffer);
+    ret = FALSE;
+    goto out;
+  }
+
+  for (x = 0; x < num; x++) {
+    mem = gst_buffer_get_memory (sink->acquired_buffer, x);
+    if (gst_memory_is_type (mem, GST_ALLOCATOR_GRALLOC)) {
+      break;
+    }
+    else {
+      mem = NULL;
+    }
+  }
+
+  if (!mem) {
+    GST_INFO_OBJECT (sink, "no gralloc memory found");
+    /* wrap our memory */
+    // TODO:
+  }
+
+  if (!mem) {
+    ret = FALSE;
+    goto out;
+  }
+
+  /* Now we are ready */
   // TODO:
 
-  return TRUE;
+  ret = TRUE;
+  goto out;
+
+unlock_and_out:
+  g_mutex_unlock (&sink->lock);
+
+out:
+  return ret;
 }
 
 static void
 gst_droidcamsrc_unbind_frame (NemoGstVideoTexture * iface)
 {
+  GstDroidEglSink *sink;
 
+  sink = GST_DROIDEGLSINK (iface);
+
+  GST_DEBUG_OBJECT (sink, "unbind frame");
+
+  g_mutex_lock (&sink->lock);
+
+  if (sink->acquired_buffer) {
+    gst_buffer_unref (sink->acquired_buffer);
+  }
+
+  g_mutex_unlock (&sink->lock);
 }
 
 static void
 gst_droidcamsrc_release_frame (NemoGstVideoTexture * iface, EGLSyncKHR sync)
 {
+  GstDroidEglSink *sink;
 
+  sink = GST_DROIDEGLSINK (iface);
+
+  GST_DEBUG_OBJECT (sink, "release frame");
+
+  // TODO:
 }
 
 static gboolean
 gst_droidcamsrc_get_frame_info (NemoGstVideoTexture * iface, NemoGstVideoTextureFrameInfo *info)
 {
+  GstDroidEglSink *sink;
+
+  sink = GST_DROIDEGLSINK (iface);
+
+  GST_DEBUG_OBJECT (sink, "get frame info");
+
   // TODO:
 
   return TRUE;
@@ -256,9 +467,22 @@ gst_droidcamsrc_get_frame_info (NemoGstVideoTexture * iface, NemoGstVideoTexture
 static GstMeta *
 gst_droidcamsrc_get_frame_meta (NemoGstVideoTexture * iface, GType api)
 {
-  // TODO:
+  GstDroidEglSink *sink;
+  GstMeta *meta = NULL;
 
-  return NULL;
+  sink = GST_DROIDEGLSINK (iface);
+
+  GST_DEBUG_OBJECT (sink, "get frame meta");
+
+  g_mutex_lock (&sink->lock);
+
+  if (sink->acquired_buffer) {
+    meta = gst_buffer_get_meta (sink->acquired_buffer, api);
+  }
+
+  g_mutex_unlock (&sink->lock);
+
+  return meta;
 }
 
 static void

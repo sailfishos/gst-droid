@@ -104,6 +104,17 @@ PKG_CHECK_MODULES(HARDWARE, [
   ])
 ])
 
+PKG_CHECK_MODULES(EGL, [
+  egl
+], [
+  AC_SUBST(EGL_CFLAGS)
+  AC_SUBST(EGL_LIBS)
+], [
+  AC_MSG_ERROR([
+      egl not found
+  ])
+])
+
 dnl check if compiler understands -Wall (if yes, add -Wall to GST_CFLAGS)
 AC_MSG_CHECKING([to see if compiler understands -Wall])
 save_CFLAGS="$CFLAGS"
