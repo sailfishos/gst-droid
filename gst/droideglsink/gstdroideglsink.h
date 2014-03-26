@@ -25,6 +25,7 @@
 #include <gst/gst.h>
 #include <gst/video/gstvideosink.h>
 #include <EGL/egl.h>
+#include <EGL/eglext.h>
 
 G_BEGIN_DECLS
 
@@ -52,7 +53,13 @@ struct _GstDroidEglSink
   GstBuffer *acquired_buffer;
   GstBuffer *last_buffer;
   EGLDisplay dpy;
+  EGLImageKHR image;
   GMutex lock;
+
+  PFNEGLCREATEIMAGEKHRPROC eglCreateImageKHR;
+  PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageKHR;
+  PFNEGLCLIENTWAITSYNCKHRPROC eglClientWaitSyncKHR;
+  PFNEGLDESTROYSYNCKHRPROC eglDestroySyncKHR;
 };
 
 struct _GstDroidEglSinkClass

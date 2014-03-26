@@ -101,7 +101,7 @@ gst_droideglsink_set_caps (GstBaseSink * bsink, GstCaps * caps)
 
   GST_VIDEO_SINK_WIDTH (vsink) = info.width;
   GST_VIDEO_SINK_HEIGHT (vsink) = info.height;
-  // TODO:
+
   return TRUE;
 }
 
@@ -139,7 +139,12 @@ gst_droideglsink_start (GstBaseSink * bsink)
   sink->fps_n = 0;
   sink->fps_d = 1;
 
-  // TODO:
+  sink->dpy = EGL_NO_DISPLAY;
+  sink->image = EGL_NO_IMAGE_KHR;
+  sink->eglCreateImageKHR = NULL;
+  sink->eglDestroyImageKHR = NULL;
+  sink->eglClientWaitSyncKHR = NULL;
+  sink->eglDestroySyncKHR = NULL;
 
   return TRUE;
 }
@@ -272,6 +277,10 @@ gst_droideglsink_init (GstDroidEglSink * sink)
   sink->last_buffer = NULL;
   sink->dpy = EGL_NO_DISPLAY;
   g_mutex_init (&sink->lock);
+  sink->eglCreateImageKHR = NULL;
+  sink->eglDestroyImageKHR = NULL;
+  sink->eglClientWaitSyncKHR = NULL;
+  sink->eglDestroySyncKHR = NULL;
 }
 
 static void
@@ -310,6 +319,121 @@ gst_droideglsink_class_init (GstDroidEglSinkClass * klass)
   g_object_class_override_property (gobject_class, PROP_EGL_DISPLAY, "egl-display");
 }
 
+static gboolean
+gst_droideglsink_has_gralloc_memory (GstDroidEglSink * sink, GstBuffer * buffer)
+{
+  int x, num;
+
+  num = gst_buffer_n_memory (buffer);
+
+  for (x = 0; x < num; x++) {
+    GstMemory *mem = gst_buffer_get_memory (buffer, x);
+
+    if (gst_memory_is_type (mem, GST_ALLOCATOR_GRALLOC)) {
+      gst_memory_unref (mem);
+      return TRUE;
+    }
+
+    gst_memory_unref (mem);
+  }
+
+  return FALSE;
+}
+
+static GstBuffer *
+gst_droidcamsrc_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
+{
+  GstMapInfo info;
+  GstVideoInfo format;
+  GstBuffer *buff = gst_buffer_new ();
+  GstMemory *mem = NULL;
+  GstAllocator *allocator = gst_gralloc_allocator_new ();
+  GstCaps *caps = NULL;
+
+  if (!allocator) {
+    gst_buffer_unref (buff);
+    return NULL;
+  }
+
+  if (!gst_pad_has_current_caps (GST_BASE_SINK_PAD (sink))) {
+    gst_buffer_unref (buff);
+    gst_object_unref (allocator);
+    return NULL;
+  }
+
+  if (!gst_buffer_copy_into (buff, buffer,
+			     GST_BUFFER_COPY_FLAGS |
+			     GST_BUFFER_COPY_TIMESTAMPS |
+			     GST_BUFFER_COPY_META, 0, -1)) {
+    gst_buffer_unref (buff);
+    gst_object_unref (allocator);
+    return NULL;
+  }
+
+  if (!gst_buffer_map (buffer, &info, GST_MAP_READ)) {
+    gst_buffer_unref (buff);
+    gst_object_unref (allocator);
+    return NULL;
+  }
+
+  caps = gst_pad_get_current_caps (GST_BASE_SINK_PAD (sink));
+  if (!gst_video_info_from_caps (&format, caps)) {
+    gst_buffer_unref (buff);
+    gst_object_unref (allocator);
+    gst_caps_unref (caps);
+    return NULL;
+  }
+
+  mem = gst_gralloc_allocator_wrap (allocator, format.width, format.height,
+				    GST_GRALLOC_USAGE_HW_TEXTURE, info.data, info.size,
+				    GST_VIDEO_FORMAT_INFO_FORMAT(format.finfo));
+
+  gst_buffer_append_memory (buff, mem);
+  gst_buffer_unmap (buffer, &info);
+
+  gst_object_unref (allocator);
+  gst_caps_unref (caps);
+  return buff;
+}
+
+static gboolean
+gst_droideglsink_populate_egl_proc (GstDroidEglSink * sink)
+{
+  if (G_UNLIKELY (!sink->eglCreateImageKHR)) {
+    sink->eglCreateImageKHR = (PFNEGLCREATEIMAGEKHRPROC)eglGetProcAddress ("eglCreateImageKHR");
+  }
+
+  if (G_UNLIKELY (!sink->eglCreateImageKHR)) {
+    return FALSE;
+  }
+
+  if (G_UNLIKELY (!sink->eglDestroyImageKHR)) {
+    sink->eglDestroyImageKHR = (PFNEGLDESTROYIMAGEKHRPROC)eglGetProcAddress ("eglDestroyImageKHR");
+  }
+
+  if (G_UNLIKELY (!sink->eglDestroyImageKHR)) {
+    return FALSE;
+  }
+
+  if (G_UNLIKELY (!sink->eglClientWaitSyncKHR)) {
+    sink->eglClientWaitSyncKHR = (PFNEGLCLIENTWAITSYNCKHRPROC)eglGetProcAddress ("eglClientWaitSyncKHR");
+  }
+
+  if (G_UNLIKELY (!sink->eglClientWaitSyncKHR)) {
+    return FALSE;
+  }
+
+  if (G_UNLIKELY (!sink->eglDestroySyncKHR)) {
+    sink->eglDestroySyncKHR = (PFNEGLDESTROYSYNCKHRPROC)eglGetProcAddress ("eglDestroySyncKHR");
+  }
+
+  if (G_UNLIKELY (!sink->eglDestroySyncKHR)) {
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
 /* interfaces */
 static gboolean
 gst_droidcamsrc_acquire_frame (NemoGstVideoTexture * iface)
@@ -322,6 +446,7 @@ gst_droidcamsrc_acquire_frame (NemoGstVideoTexture * iface)
   GST_DEBUG_OBJECT (sink, "acquire frame");
 
   g_mutex_lock (&sink->lock);
+
   if (sink->acquired_buffer) {
     GST_WARNING_OBJECT (sink, "buffer %p already acquired", sink->acquired_buffer);
     ret = FALSE;
@@ -334,7 +459,17 @@ gst_droidcamsrc_acquire_frame (NemoGstVideoTexture * iface)
     goto unlock_and_out;
   }
 
-  sink->acquired_buffer = gst_buffer_ref (sink->last_buffer);
+  if (gst_droideglsink_has_gralloc_memory (sink, sink->last_buffer)) {
+    sink->acquired_buffer = gst_buffer_ref (sink->last_buffer);
+  }
+  else {
+    /* Construct a new buffer */
+    sink->acquired_buffer = gst_droidcamsrc_copy_buffer (sink, sink->last_buffer);
+  }
+
+  if (!sink->acquired_buffer) {
+    ret = FALSE;
+  }
 
 unlock_and_out:
   g_mutex_unlock (&sink->lock);
@@ -345,9 +480,8 @@ static gboolean
 gst_droidcamsrc_bind_frame (NemoGstVideoTexture * iface, EGLImageKHR *image)
 {
   GstDroidEglSink *sink;
-  int num, x;
-  GstMemory *mem = NULL;
   gboolean ret = FALSE;
+  EGLint eglImgAttrs[] = { EGL_IMAGE_PRESERVED_KHR, EGL_TRUE, EGL_NONE, EGL_NONE };
 
   sink = GST_DROIDEGLSINK (iface);
 
@@ -361,6 +495,12 @@ gst_droidcamsrc_bind_frame (NemoGstVideoTexture * iface, EGLImageKHR *image)
     goto unlock_and_out;
   }
 
+  if (!gst_droideglsink_populate_egl_proc (sink)) {
+    GST_WARNING_OBJECT (sink, "failed to get needed EGL function pointers");
+    ret = FALSE;
+    goto unlock_and_out;
+  }
+
   if (!sink->acquired_buffer) {
     GST_WARNING_OBJECT (sink, "no frames have been acquired");
     ret = FALSE;
@@ -369,46 +509,17 @@ gst_droidcamsrc_bind_frame (NemoGstVideoTexture * iface, EGLImageKHR *image)
 
   gst_buffer_ref (sink->acquired_buffer);
 
+  /* Now we are ready */
+  /* TODO: this assumes the first buffer memory is a gralloc memory */
+  sink->image = sink->eglCreateImageKHR (sink->dpy, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID,
+					 (EGLClientBuffer)gst_memory_get_native_buffer
+					 (gst_buffer_get_memory (sink->acquired_buffer, 0)),
+					 eglImgAttrs);
+
   /* Buffer will not go anywhere so we should be safe to unlock. */
   g_mutex_unlock (&sink->lock);
 
-  /* Here is what we do:
-   * - get GstMemory from GstBuffer.
-   * - if allocator is gralloc, ask memory for its EGLImage
-   * - if allocator is not gralloc, wrap it then ask the wrapper for its EGLImage
-   */
-  num = gst_buffer_n_memory (sink->acquired_buffer);
-  if (num == 0) {
-    /* Fail. */
-    GST_WARNING_OBJECT (sink, "buffer has no memory");
-    gst_buffer_unref (sink->acquired_buffer);
-    ret = FALSE;
-    goto out;
-  }
-
-  for (x = 0; x < num; x++) {
-    mem = gst_buffer_get_memory (sink->acquired_buffer, x);
-    if (gst_memory_is_type (mem, GST_ALLOCATOR_GRALLOC)) {
-      break;
-    }
-    else {
-      mem = NULL;
-    }
-  }
-
-  if (!mem) {
-    GST_INFO_OBJECT (sink, "no gralloc memory found");
-    /* wrap our memory */
-    // TODO:
-  }
-
-  if (!mem) {
-    ret = FALSE;
-    goto out;
-  }
-
-  /* Now we are ready */
-  // TODO:
+  *image = sink->image;
 
   ret = TRUE;
   goto out;
@@ -434,6 +545,9 @@ gst_droidcamsrc_unbind_frame (NemoGstVideoTexture * iface)
   if (sink->acquired_buffer) {
     gst_buffer_unref (sink->acquired_buffer);
   }
+
+  sink->eglDestroyImageKHR (sink->dpy, sink->image);
+  sink->image = EGL_NO_IMAGE_KHR;
 
   g_mutex_unlock (&sink->lock);
 }
