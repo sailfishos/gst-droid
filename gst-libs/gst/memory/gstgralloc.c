@@ -76,7 +76,7 @@ incRef(struct android_native_base_t* base)
   struct ANativeWindowBuffer *self = container_of(base, struct ANativeWindowBuffer, common);
   GstGrallocMemory *mem = container_of(self, GstGrallocMemory, buff);
 
-  g_object_ref (mem);
+  gst_memory_ref (GST_MEMORY_CAST (mem));
 }
 
 static void
@@ -85,7 +85,7 @@ decRef(struct android_native_base_t* base)
   struct ANativeWindowBuffer *self = container_of(base, struct ANativeWindowBuffer, common);
   GstGrallocMemory *mem = container_of(self, GstGrallocMemory, buff);
 
-  g_object_unref (mem);
+  gst_memory_unref (GST_MEMORY_CAST (mem));
 }
 
 
