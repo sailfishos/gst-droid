@@ -42,6 +42,7 @@ GST_START_TEST (test_memory)
   GstMemory *mem = gst_gralloc_allocator_alloc (allocator, 640, 480, 0x32315659, GST_GRALLOC_USAGE_SW_READ_MASK | GST_GRALLOC_USAGE_SW_WRITE_MASK | GST_GRALLOC_USAGE_HW_TEXTURE);
 
   fail_unless(mem != NULL);
+  fail_unless(gst_memory_get_native_buffer (mem) != NULL);
   fail_unless_equals_int (gst_is_gralloc_memory(mem), TRUE);
   fail_unless_equals_int (GST_MEMORY_IS_READONLY(mem), FALSE);
   fail_unless_equals_int (GST_MEMORY_IS_NO_SHARE(mem), TRUE);

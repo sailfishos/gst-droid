@@ -95,6 +95,8 @@ GstMemory    * gst_gralloc_allocator_wrap (GstAllocator * allocator, gint width,
 					   int usage, guint8 * data,
 					   gsize size, GstVideoFormat format);
 
+struct ANativeWindowBuffer * gst_memory_get_native_buffer (GstMemory *mem);
+
 G_END_DECLS
 
 #endif /* __GST_GRALLOC_H__ */

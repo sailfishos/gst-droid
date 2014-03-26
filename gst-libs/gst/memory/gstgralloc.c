@@ -287,3 +287,13 @@ gst_gralloc_allocator_free (GstAllocator * allocator, GstMemory * mem)
 
   g_slice_free (GstGrallocMemory, m);
 }
+
+struct ANativeWindowBuffer *
+gst_memory_get_native_buffer (GstMemory *mem)
+{
+  if (!gst_is_gralloc_memory (mem)) {
+    return NULL;
+  }
+
+  return &((GstGrallocMemory *)mem)->buff;
+}
