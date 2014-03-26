@@ -63,6 +63,32 @@ GST_START_TEST (test_memory)
 }
 GST_END_TEST;
 
+GST_START_TEST (test_wrap)
+{
+  GstAllocator *allocator = gst_gralloc_allocator_new();
+
+  fail_unless(allocator != NULL);
+
+  gsize size = 16 * 16;
+  guint8 data[size];
+
+  GstMemory *mem = gst_gralloc_allocator_wrap (allocator, 16, 16,
+					       GST_GRALLOC_USAGE_HW_TEXTURE,
+					       data, size, GST_VIDEO_FORMAT_I420);
+
+  fail_unless(mem == NULL);
+
+  mem = gst_gralloc_allocator_wrap (allocator, 16, 16, GST_GRALLOC_USAGE_HW_TEXTURE,
+				    data, size, GST_VIDEO_FORMAT_NV12);
+
+  fail_unless(mem != NULL);
+
+  gst_memory_unref(mem);
+
+  gst_object_unref(GST_OBJECT(allocator));
+}
+GST_END_TEST;
+
 static Suite *
 allocator_suite (void)
 {
@@ -74,6 +100,7 @@ allocator_suite (void)
   tcase_add_test (tc_chain, test_create_destroy);
   tcase_add_test (tc_chain, test_create_alloc_destroy);
   tcase_add_test (tc_chain, test_memory);
+  tcase_add_test (tc_chain, test_wrap);
 
   return s;
 }

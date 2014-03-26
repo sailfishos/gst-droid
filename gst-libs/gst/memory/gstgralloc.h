@@ -23,6 +23,7 @@
 #define __GST_GRALLOC_H__
 
 #include <gst/gst.h>
+#include <gst/video/video.h>
 
 G_BEGIN_DECLS
 
@@ -89,6 +90,10 @@ GstMemory    * gst_gralloc_allocator_alloc (GstAllocator * allocator, gint width
 					    int format, int usage);
 
 gboolean       gst_is_gralloc_memory (GstMemory * mem);
+
+GstMemory    * gst_gralloc_allocator_wrap (GstAllocator * allocator, gint width, gint height,
+					   int usage, guint8 * data,
+					   gsize size, GstVideoFormat format);
 
 G_END_DECLS
 

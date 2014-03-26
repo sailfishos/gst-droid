@@ -207,6 +207,58 @@ gst_gralloc_allocator_alloc (GstAllocator * allocator, gint width, gint height,
   return GST_MEMORY_CAST (mem);
 }
 
+GstMemory *
+gst_gralloc_allocator_wrap (GstAllocator * allocator, gint width, gint height, int usage,
+			    guint8 * data, gsize size, GstVideoFormat format)
+{
+  GstGrallocAllocator *alloc;
+  int err;
+  void *addr = NULL;
+
+  if (!GST_IS_GRALLOC_ALLOCATOR (allocator)) {
+    return NULL;
+  }
+
+  alloc = GST_GRALLOC_ALLOCATOR (allocator);
+
+  switch (format) {
+  case GST_VIDEO_FORMAT_NV12:
+    break;
+  default:
+    return NULL;
+  }
+
+  GstMemory *mem = gst_gralloc_allocator_alloc (allocator, width, height, HAL_PIXEL_FORMAT_YV12,
+						usage);
+
+  if (!mem) {
+    return NULL;
+  }
+
+  /* lock */
+  err = alloc->gralloc->lock (alloc->gralloc, ((GstGrallocMemory *)mem)->buff.handle,
+			      GRALLOC_USAGE_SW_READ_NEVER | GRALLOC_USAGE_SW_WRITE_RARELY,
+			      0, 0, width, height, &addr);
+  if (err != 0) {
+    gst_memory_unref (mem);
+    GST_ERROR ("failed to lock the buffer: %d", err);
+    return NULL;
+  }
+
+  /* copy */
+  memcpy (addr, data, size);
+
+  /* unlock */
+  err = alloc->gralloc->unlock (alloc->gralloc, ((GstGrallocMemory *)mem)->buff.handle);
+  if (err != 0) {
+    gst_memory_unref (mem);
+    GST_ERROR ("failed to unlock the buffer: %d", err);
+    return NULL;
+  }
+
+  return mem;
+}
+
 gboolean
 gst_is_gralloc_memory (GstMemory * mem)
 {
