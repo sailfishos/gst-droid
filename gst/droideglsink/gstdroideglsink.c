@@ -575,8 +575,6 @@ gst_droidcamsrc_bind_frame (NemoGstVideoTexture * iface, EGLImageKHR *image)
     goto unlock_and_out;
   }
 
-  gst_buffer_ref (sink->acquired_buffer);
-
   /* Now we are ready */
   /* TODO: this assumes the first buffer memory is a gralloc memory */
   sink->image = sink->eglCreateImageKHR (sink->dpy, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID,
@@ -610,11 +608,10 @@ gst_droidcamsrc_unbind_frame (NemoGstVideoTexture * iface)
 
   g_mutex_lock (&sink->lock);
 
-  if (sink->acquired_buffer) {
-    gst_buffer_unref (sink->acquired_buffer);
+  if (sink->eglDestroyImageKHR (sink->dpy, sink->image) != EGL_TRUE) {
+    GST_WARNING_OBJECT (sink, "failed to destroy EGLImageKHR %p", sink->image);
   }
 
-  sink->eglDestroyImageKHR (sink->dpy, sink->image);
   sink->image = EGL_NO_IMAGE_KHR;
 
   g_mutex_unlock (&sink->lock);
