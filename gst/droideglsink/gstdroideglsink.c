@@ -141,6 +141,7 @@ gst_droideglsink_start (GstBaseSink * bsink)
 
   sink->dpy = EGL_NO_DISPLAY;
   sink->image = EGL_NO_IMAGE_KHR;
+  sink->sync = NULL;
   sink->eglCreateImageKHR = NULL;
   sink->eglDestroyImageKHR = NULL;
   sink->eglClientWaitSyncKHR = NULL;
@@ -276,6 +277,8 @@ gst_droideglsink_init (GstDroidEglSink * sink)
   sink->acquired_buffer = NULL;
   sink->last_buffer = NULL;
   sink->dpy = EGL_NO_DISPLAY;
+  sink->image = EGL_NO_IMAGE_KHR;
+  sink->sync = NULL;
   g_mutex_init (&sink->lock);
   sink->eglCreateImageKHR = NULL;
   sink->eglDestroyImageKHR = NULL;
@@ -434,6 +437,32 @@ gst_droideglsink_populate_egl_proc (GstDroidEglSink * sink)
   return TRUE;
 }
 
+
+static void
+gst_droideglsink_destroy_sync (GstDroidEglSink * sink)
+{
+  if (sink->sync) {
+    sink->eglDestroySyncKHR (sink->dpy, sink->sync);
+    sink->sync = NULL;
+  }
+}
+
+static void
+gst_droideglsink_wait_sync (GstDroidEglSink * sink)
+{
+  if (sink->sync) {
+    /* We will behave like Android does */
+    EGLint result = sink->eglClientWaitSyncKHR (sink->dpy, sink->sync, 0, EGL_FOREVER_KHR);
+    if (result == EGL_FALSE) {
+      GST_WARNING_OBJECT (sink, "error 0x%x waiting for fence", eglGetError());
+    } else if (result == EGL_TIMEOUT_EXPIRED_KHR) {
+      GST_WARNING_OBJECT (sink, "timeout waiting for fence");
+    }
+
+    gst_droideglsink_destroy_sync (sink);
+  }
+}
+
 /* interfaces */
 static gboolean
 gst_droidcamsrc_acquire_frame (NemoGstVideoTexture * iface)
@@ -561,7 +590,11 @@ gst_droidcamsrc_release_frame (NemoGstVideoTexture * iface, EGLSyncKHR sync)
 
   GST_DEBUG_OBJECT (sink, "release frame");
 
-  // TODO:
+  /* Destroy any previous fence */
+  gst_droideglsink_wait_sync (sink);
+
+  /* move on */
+  sink->sync = sync;
 }
 
 static gboolean

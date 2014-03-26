@@ -54,6 +54,7 @@ struct _GstDroidEglSink
   GstBuffer *last_buffer;
   EGLDisplay dpy;
   EGLImageKHR image;
+  EGLSyncKHR sync;
   GMutex lock;
 
   PFNEGLCREATEIMAGEKHRPROC eglCreateImageKHR;
