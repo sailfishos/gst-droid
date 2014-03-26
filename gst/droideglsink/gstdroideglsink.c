@@ -223,9 +223,9 @@ gst_droideglsink_show_frame (GstVideoSink * vsink, GstBuffer * buf)
     return GST_FLOW_OK;
   }
 
-  g_mutex_unlock (&sink->lock);
-
   gst_buffer_replace (&sink->last_buffer, buf);
+
+  g_mutex_unlock (&sink->lock);
 
   nemo_gst_video_texture_frame_ready (NEMO_GST_VIDEO_TEXTURE (sink), 0);
 
