@@ -54,6 +54,31 @@ enum
   PROP_EGL_DISPLAY
 };
 
+static void
+gst_droideglsink_destroy_sync (GstDroidEglSink * sink)
+{
+  if (sink->sync) {
+    sink->eglDestroySyncKHR (sink->dpy, sink->sync);
+    sink->sync = NULL;
+  }
+}
+
+static void
+gst_droideglsink_wait_sync (GstDroidEglSink * sink)
+{
+  if (sink->sync) {
+    /* We will behave like Android does */
+    EGLint result = sink->eglClientWaitSyncKHR (sink->dpy, sink->sync, 0, EGL_FOREVER_KHR);
+    if (result == EGL_FALSE) {
+      GST_WARNING_OBJECT (sink, "error 0x%x waiting for fence", eglGetError());
+    } else if (result == EGL_TIMEOUT_EXPIRED_KHR) {
+      GST_WARNING_OBJECT (sink, "timeout waiting for fence");
+    }
+
+    gst_droideglsink_destroy_sync (sink);
+  }
+}
+
 static GstCaps *
 gst_droideglsink_get_caps (GstBaseSink * bsink, GstCaps * filter)
 {
@@ -159,7 +184,25 @@ gst_droideglsink_stop (GstBaseSink * bsink)
 
   GST_DEBUG_OBJECT (sink, "stop");
 
-  // TODO:
+  if (sink->sync) {
+    gst_droideglsink_destroy_sync (sink);
+  }
+
+  if (sink->image) {
+    GST_WARNING_OBJECT (sink, "destroying leftover EGLImageKHR");
+    sink->eglDestroyImageKHR (sink->dpy, sink->image);
+    sink->image = EGL_NO_IMAGE_KHR;
+  }
+
+  if (sink->acquired_buffer) {
+    GST_WARNING_OBJECT (sink, "leaking leftover acquired buffer");
+    sink->acquired_buffer = NULL;
+  }
+
+  if (sink->last_buffer) {
+    GST_WARNING_OBJECT (sink, "leaking leftover last buffer");
+    sink->last_buffer = NULL;
+  }
 
   return TRUE;
 }
@@ -435,32 +478,6 @@ gst_droideglsink_populate_egl_proc (GstDroidEglSink * sink)
   }
 
   return TRUE;
-}
-
-
-static void
-gst_droideglsink_destroy_sync (GstDroidEglSink * sink)
-{
-  if (sink->sync) {
-    sink->eglDestroySyncKHR (sink->dpy, sink->sync);
-    sink->sync = NULL;
-  }
-}
-
-static void
-gst_droideglsink_wait_sync (GstDroidEglSink * sink)
-{
-  if (sink->sync) {
-    /* We will behave like Android does */
-    EGLint result = sink->eglClientWaitSyncKHR (sink->dpy, sink->sync, 0, EGL_FOREVER_KHR);
-    if (result == EGL_FALSE) {
-      GST_WARNING_OBJECT (sink, "error 0x%x waiting for fence", eglGetError());
-    } else if (result == EGL_TIMEOUT_EXPIRED_KHR) {
-      GST_WARNING_OBJECT (sink, "timeout waiting for fence");
-    }
-
-    gst_droideglsink_destroy_sync (sink);
-  }
 }
 
 /* interfaces */
