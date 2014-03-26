@@ -438,6 +438,13 @@ gst_droidcamsrc_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
 				    GST_GRALLOC_USAGE_HW_TEXTURE, info.data, info.size,
 				    GST_VIDEO_FORMAT_INFO_FORMAT(format.finfo));
 
+  if (!mem) {
+    gst_buffer_unref (buff);
+    gst_object_unref (allocator);
+    gst_caps_unref (caps);
+    return NULL;
+  }
+
   gst_buffer_append_memory (buff, mem);
   gst_buffer_unmap (buffer, &info);
 
