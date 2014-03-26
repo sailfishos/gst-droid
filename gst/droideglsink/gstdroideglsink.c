@@ -578,9 +578,10 @@ gst_droidcamsrc_bind_frame (NemoGstVideoTexture * iface, EGLImageKHR *image)
 
   /* Now we are ready */
   /* TODO: this assumes the first buffer memory is a gralloc memory */
+  /* We can safely use peek here because we have an extra ref to the buffer */
   sink->image = sink->eglCreateImageKHR (sink->dpy, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID,
 					 (EGLClientBuffer)gst_memory_get_native_buffer
-					 (gst_buffer_get_memory (sink->acquired_buffer, 0)),
+					 (gst_buffer_peek_memory (sink->acquired_buffer, 0)),
 					 eglImgAttrs);
 
   /* Buffer will not go anywhere so we should be safe to unlock. */
