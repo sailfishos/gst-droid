@@ -611,6 +611,15 @@ gst_droidcamsrc_release_frame (NemoGstVideoTexture * iface, EGLSyncKHR sync)
 
   GST_DEBUG_OBJECT (sink, "release frame");
 
+  g_mutex_lock (&sink->lock);
+
+  if (sink->acquired_buffer) {
+    gst_buffer_unref (sink->acquired_buffer);
+    sink->acquired_buffer = NULL;
+  }
+
+  g_mutex_unlock (&sink->lock);
+
   /* Destroy any previous fence */
   gst_droideglsink_wait_sync (sink);
 
