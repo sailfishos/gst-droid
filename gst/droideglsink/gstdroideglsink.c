@@ -407,37 +407,27 @@ gst_droidcamsrc_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
 
   GST_DEBUG_OBJECT (sink, "copy buffer");
   if (!allocator) {
-    gst_buffer_unref (buff);
-    return NULL;
+    goto free_and_out;
   }
 
   if (!gst_pad_has_current_caps (GST_BASE_SINK_PAD (sink))) {
-    gst_buffer_unref (buff);
-    gst_object_unref (allocator);
-    return NULL;
+    goto free_and_out;
   }
 
   if (!gst_buffer_copy_into (buff, buffer,
 			     GST_BUFFER_COPY_FLAGS |
 			     GST_BUFFER_COPY_TIMESTAMPS |
 			     GST_BUFFER_COPY_META, 0, -1)) {
-    gst_buffer_unref (buff);
-    gst_object_unref (allocator);
-    return NULL;
+    goto free_and_out;
   }
 
   if (!gst_buffer_map (buffer, &info, GST_MAP_READ)) {
-    gst_buffer_unref (buff);
-    gst_object_unref (allocator);
-    return NULL;
+    goto free_and_out;
   }
 
   caps = gst_pad_get_current_caps (GST_BASE_SINK_PAD (sink));
   if (!gst_video_info_from_caps (&format, caps)) {
-    gst_buffer_unref (buff);
-    gst_object_unref (allocator);
-    gst_caps_unref (caps);
-    return NULL;
+    goto free_and_out;
   }
 
   mem = gst_gralloc_allocator_wrap (allocator, format.width, format.height,
@@ -445,10 +435,7 @@ gst_droidcamsrc_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
 				    GST_VIDEO_FORMAT_INFO_FORMAT(format.finfo));
 
   if (!mem) {
-    gst_buffer_unref (buff);
-    gst_object_unref (allocator);
-    gst_caps_unref (caps);
-    return NULL;
+    goto free_and_out;
   }
 
   gst_buffer_append_memory (buff, mem);
@@ -456,6 +443,23 @@ gst_droidcamsrc_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
   gst_object_unref (allocator);
   gst_caps_unref (caps);
   return buff;
+
+free_and_out:
+  gst_buffer_unref (buff);
+
+  if (mem) {
+    gst_memory_unref (mem);
+  }
+
+  if (allocator) {
+    gst_object_unref (allocator);
+  }
+
+  if (caps) {
+    gst_caps_unref (caps);
+  }
+
+  return NULL;
 }
 
 static gboolean
