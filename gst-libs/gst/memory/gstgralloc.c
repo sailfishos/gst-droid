@@ -102,6 +102,8 @@ gralloc_mem_allocator_init (GstGrallocAllocator * allocator)
 {
   GstAllocator *alloc = GST_ALLOCATOR_CAST (allocator);
 
+  GST_DEBUG_OBJECT (alloc, "init");
+
   allocator->gralloc = NULL;
   allocator->alloc = NULL;
   g_mutex_init(&allocator->mutex);
@@ -120,6 +122,8 @@ static void
 gst_gralloc_allocator_finalize (GObject * obj)
 {
   GstGrallocAllocator *alloc = GST_GRALLOC_ALLOCATOR (obj);
+
+  GST_DEBUG_OBJECT (alloc, "finalize");
 
   if (alloc->alloc) {
     gralloc_close (alloc->alloc);
@@ -204,6 +208,8 @@ gst_gralloc_allocator_alloc (GstAllocator * allocator, gint width, gint height,
   gst_memory_init (GST_MEMORY_CAST (mem), GST_MEMORY_FLAG_NO_SHARE | GST_MEMORY_FLAG_NOT_MAPPABLE,
 		   allocator, NULL, -1, -1, 0, -1);
 
+  GST_DEBUG_OBJECT (alloc, "alloc %p", mem);
+
   return GST_MEMORY_CAST (mem);
 }
 
@@ -256,6 +262,8 @@ gst_gralloc_allocator_wrap (GstAllocator * allocator, gint width, gint height, i
     return NULL;
   }
 
+  GST_DEBUG_OBJECT (alloc, "wrapped %p of size %d in %p", data, size, mem);
+
   return mem;
 }
 
@@ -282,6 +290,8 @@ gst_gralloc_allocator_free (GstAllocator * allocator, GstMemory * mem)
 {
   GstGrallocMemory *m = (GstGrallocMemory *) mem;
   GstGrallocAllocator *alloc = GST_GRALLOC_ALLOCATOR(allocator);
+
+  GST_DEBUG_OBJECT (alloc, "free %p", m);
 
   alloc->alloc->free(alloc->alloc, m->buff.handle);
 

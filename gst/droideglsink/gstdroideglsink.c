@@ -57,6 +57,8 @@ enum
 static void
 gst_droideglsink_destroy_sync (GstDroidEglSink * sink)
 {
+  GST_DEBUG_OBJECT (sink, "destroy sync %p", sink->sync);
+
   if (sink->sync) {
     sink->eglDestroySyncKHR (sink->dpy, sink->sync);
     sink->sync = NULL;
@@ -66,6 +68,8 @@ gst_droideglsink_destroy_sync (GstDroidEglSink * sink)
 static void
 gst_droideglsink_wait_sync (GstDroidEglSink * sink)
 {
+  GST_DEBUG_OBJECT (sink, "wait sync %p", sink->sync);
+
   if (sink->sync) {
     /* We will behave like Android does */
     EGLint result = sink->eglClientWaitSyncKHR (sink->dpy, sink->sync, 0, EGL_FOREVER_KHR);
@@ -374,7 +378,11 @@ gst_droideglsink_has_gralloc_memory (GstDroidEglSink * sink, GstBuffer * buffer)
 {
   int x, num;
 
+  GST_DEBUG_OBJECT (sink, "has gralloc memory");
+
   num = gst_buffer_n_memory (buffer);
+
+  GST_DEBUG_OBJECT (sink, "examining %d memory items", num);
 
   for (x = 0; x < num; x++) {
     GstMemory *mem = gst_buffer_get_memory (buffer, x);
@@ -400,6 +408,7 @@ gst_droidcamsrc_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
   GstAllocator *allocator = gst_gralloc_allocator_new ();
   GstCaps *caps = NULL;
 
+  GST_DEBUG_OBJECT (sink, "copy buffer");
   if (!allocator) {
     gst_buffer_unref (buff);
     return NULL;
@@ -447,7 +456,6 @@ gst_droidcamsrc_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
 
   gst_buffer_append_memory (buff, mem);
   gst_buffer_unmap (buffer, &info);
-
   gst_object_unref (allocator);
   gst_caps_unref (caps);
   return buff;
@@ -456,6 +464,8 @@ gst_droidcamsrc_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
 static gboolean
 gst_droideglsink_populate_egl_proc (GstDroidEglSink * sink)
 {
+  GST_DEBUG_OBJECT (sink, "populate egl proc");
+
   if (G_UNLIKELY (!sink->eglCreateImageKHR)) {
     sink->eglCreateImageKHR = (PFNEGLCREATEIMAGEKHRPROC)eglGetProcAddress ("eglCreateImageKHR");
   }
@@ -526,6 +536,7 @@ gst_droidcamsrc_acquire_frame (NemoGstVideoTexture * iface)
 
   if (!sink->acquired_buffer) {
     ret = FALSE;
+    GST_INFO_OBJECT (sink, "failed to acquire a buffer");
   }
 
 unlock_and_out:
