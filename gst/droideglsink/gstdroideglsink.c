@@ -379,7 +379,7 @@ gst_droideglsink_has_gralloc_memory (GstDroidEglSink * sink, GstBuffer * buffer)
   for (x = 0; x < num; x++) {
     GstMemory *mem = gst_buffer_get_memory (buffer, x);
 
-    if (gst_memory_is_type (mem, GST_ALLOCATOR_GRALLOC)) {
+    if (mem && gst_memory_is_type (mem, GST_ALLOCATOR_GRALLOC)) {
       gst_memory_unref (mem);
       return TRUE;
     }
