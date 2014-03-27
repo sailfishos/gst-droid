@@ -199,12 +199,14 @@ gst_droideglsink_stop (GstBaseSink * bsink)
   }
 
   if (sink->acquired_buffer) {
-    GST_WARNING_OBJECT (sink, "leaking leftover acquired buffer");
+    GST_WARNING_OBJECT (sink, "freeing leftover acquired buffer");
+    gst_buffer_unref (sink->acquired_buffer);
     sink->acquired_buffer = NULL;
   }
 
   if (sink->last_buffer) {
-    GST_WARNING_OBJECT (sink, "leaking leftover last buffer");
+    GST_INFO_OBJECT (sink, "freeing leftover last buffer");
+    gst_buffer_unref (sink->last_buffer);
     sink->last_buffer = NULL;
   }
 
