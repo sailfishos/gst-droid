@@ -192,6 +192,8 @@ gst_droideglsink_stop (GstBaseSink * bsink)
     gst_droideglsink_destroy_sync (sink);
   }
 
+  g_mutex_lock (&sink->lock);
+
   if (sink->image) {
     GST_WARNING_OBJECT (sink, "destroying leftover EGLImageKHR");
     sink->eglDestroyImageKHR (sink->dpy, sink->image);
@@ -203,6 +205,8 @@ gst_droideglsink_stop (GstBaseSink * bsink)
     gst_buffer_unref (sink->acquired_buffer);
     sink->acquired_buffer = NULL;
   }
+
+  g_mutex_unlock (&sink->lock);
 
   if (sink->last_buffer) {
     GST_INFO_OBJECT (sink, "freeing leftover last buffer");
