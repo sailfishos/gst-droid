@@ -48,6 +48,8 @@ static GstStaticPadTemplate gst_droideglsink_sink_template_factory =
 	  "format = {NV12}")
       );
 
+// TODO: get the formats from gralloc instead of hardcoding them.
+
 enum
 {
   PROP_0,
@@ -415,6 +417,8 @@ gst_droidcamsrc_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
   GstBuffer *buff = gst_buffer_new ();
   GstMemory *mem = NULL;
   GstCaps *caps = NULL;
+
+  // TODO: use a buffer pool for that.
 
   GST_DEBUG_OBJECT (sink, "copy buffer");
 

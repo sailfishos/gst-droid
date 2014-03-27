@@ -95,6 +95,7 @@ GstMemory    * gst_gralloc_allocator_wrap (GstAllocator * allocator, gint width,
 					   int usage, guint8 * data,
 					   gsize size, GstVideoFormat format);
 
+// TODO: use GstContext to wrap this android specific struct
 struct ANativeWindowBuffer * gst_memory_get_native_buffer (GstMemory *mem);
 
 G_END_DECLS
