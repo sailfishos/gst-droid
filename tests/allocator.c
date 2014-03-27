@@ -88,7 +88,7 @@ GST_START_TEST (test_wrap)
 
   mem =
       gst_gralloc_allocator_wrap (allocator, 16, 16,
-      GST_GRALLOC_USAGE_HW_TEXTURE, data, size, GST_VIDEO_FORMAT_NV12);
+      GST_GRALLOC_USAGE_HW_TEXTURE, data, size, GST_VIDEO_FORMAT_YV12);
 
   fail_unless (mem != NULL);
 
