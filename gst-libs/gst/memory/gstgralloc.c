@@ -32,8 +32,8 @@
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
 	(type *)( (char *)__mptr - offsetof(type,member) );})
 
-GST_DEBUG_CATEGORY_STATIC (gralloc_debug);
-#define GST_CAT_DEFAULT gralloc_debug
+GST_DEBUG_CATEGORY_STATIC (droid_memory_debug);
+#define GST_CAT_DEFAULT droid_memory_debug
 
 typedef struct
 {
@@ -97,7 +97,8 @@ decRef (struct android_native_base_t *base)
 GstAllocator *
 gst_gralloc_allocator_new (void)
 {
-  GST_DEBUG_CATEGORY_INIT (gralloc_debug, "gralloc", 0, "gralloc memory");
+  GST_DEBUG_CATEGORY_INIT (droid_memory_debug, "droidmemory", 0,
+      "droid memory allocator");
 
   return g_object_new (GST_TYPE_GRALLOC_ALLOCATOR, NULL);
 }
