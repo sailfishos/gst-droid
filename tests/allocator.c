@@ -8,48 +8,54 @@
 
 GST_START_TEST (test_create_destroy)
 {
-  GstAllocator *allocator = gst_gralloc_allocator_new();
+  GstAllocator *allocator = gst_gralloc_allocator_new ();
 
-  fail_unless(allocator != NULL);
+  fail_unless (allocator != NULL);
 
-  gst_object_unref(GST_OBJECT(allocator));
+  gst_object_unref (GST_OBJECT (allocator));
 }
+
 GST_END_TEST;
 
 GST_START_TEST (test_create_alloc_destroy)
 {
-  GstAllocator *allocator = gst_gralloc_allocator_new();
+  GstAllocator *allocator = gst_gralloc_allocator_new ();
 
-  fail_unless(allocator != NULL);
+  fail_unless (allocator != NULL);
 
-  GstMemory *mem = gst_gralloc_allocator_alloc (allocator, 640, 480, 0x32315659, GST_GRALLOC_USAGE_SW_READ_MASK | GST_GRALLOC_USAGE_SW_WRITE_MASK | GST_GRALLOC_USAGE_HW_TEXTURE);
+  GstMemory *mem = gst_gralloc_allocator_alloc (allocator, 640, 480, 0x32315659,
+      GST_GRALLOC_USAGE_SW_READ_MASK | GST_GRALLOC_USAGE_SW_WRITE_MASK |
+      GST_GRALLOC_USAGE_HW_TEXTURE);
 
-  fail_unless(mem != NULL);
+  fail_unless (mem != NULL);
 
-  ASSERT_CAPS_REFCOUNT(allocator, "allocator", 2);
-  gst_memory_unref(mem);
+  ASSERT_CAPS_REFCOUNT (allocator, "allocator", 2);
+  gst_memory_unref (mem);
 
-  gst_object_unref(GST_OBJECT(allocator));
+  gst_object_unref (GST_OBJECT (allocator));
 }
+
 GST_END_TEST;
 
 GST_START_TEST (test_memory)
 {
-  GstAllocator *allocator = gst_gralloc_allocator_new();
+  GstAllocator *allocator = gst_gralloc_allocator_new ();
 
-  fail_unless(allocator != NULL);
+  fail_unless (allocator != NULL);
 
-  GstMemory *mem = gst_gralloc_allocator_alloc (allocator, 640, 480, 0x32315659, GST_GRALLOC_USAGE_SW_READ_MASK | GST_GRALLOC_USAGE_SW_WRITE_MASK | GST_GRALLOC_USAGE_HW_TEXTURE);
+  GstMemory *mem = gst_gralloc_allocator_alloc (allocator, 640, 480, 0x32315659,
+      GST_GRALLOC_USAGE_SW_READ_MASK | GST_GRALLOC_USAGE_SW_WRITE_MASK |
+      GST_GRALLOC_USAGE_HW_TEXTURE);
 
-  fail_unless(mem != NULL);
-  fail_unless(gst_memory_get_native_buffer (mem) != NULL);
-  fail_unless_equals_int (gst_is_gralloc_memory(mem), TRUE);
-  fail_unless_equals_int (GST_MEMORY_IS_READONLY(mem), FALSE);
-  fail_unless_equals_int (GST_MEMORY_IS_NO_SHARE(mem), TRUE);
-  fail_unless_equals_int (GST_MEMORY_IS_ZERO_PADDED(mem), FALSE);
-  fail_unless_equals_int (GST_MEMORY_IS_ZERO_PREFIXED(mem), FALSE);
-  fail_unless_equals_int (GST_MEMORY_IS_PHYSICALLY_CONTIGUOUS(mem), FALSE);
-  fail_unless_equals_int (GST_MEMORY_IS_NOT_MAPPABLE(mem), TRUE);
+  fail_unless (mem != NULL);
+  fail_unless (gst_memory_get_native_buffer (mem) != NULL);
+  fail_unless_equals_int (gst_is_gralloc_memory (mem), TRUE);
+  fail_unless_equals_int (GST_MEMORY_IS_READONLY (mem), FALSE);
+  fail_unless_equals_int (GST_MEMORY_IS_NO_SHARE (mem), TRUE);
+  fail_unless_equals_int (GST_MEMORY_IS_ZERO_PADDED (mem), FALSE);
+  fail_unless_equals_int (GST_MEMORY_IS_ZERO_PREFIXED (mem), FALSE);
+  fail_unless_equals_int (GST_MEMORY_IS_PHYSICALLY_CONTIGUOUS (mem), FALSE);
+  fail_unless_equals_int (GST_MEMORY_IS_NOT_MAPPABLE (mem), TRUE);
 
   gsize size, offset, maxsize;
   size = gst_memory_get_sizes (mem, &offset, &maxsize);
@@ -58,36 +64,39 @@ GST_START_TEST (test_memory)
   fail_unless_equals_int (offset, 0);
   fail_unless_equals_int (maxsize, -1);
 
-  gst_memory_unref(mem);
+  gst_memory_unref (mem);
 
-  gst_object_unref(GST_OBJECT(allocator));
+  gst_object_unref (GST_OBJECT (allocator));
 }
+
 GST_END_TEST;
 
 GST_START_TEST (test_wrap)
 {
-  GstAllocator *allocator = gst_gralloc_allocator_new();
+  GstAllocator *allocator = gst_gralloc_allocator_new ();
 
-  fail_unless(allocator != NULL);
+  fail_unless (allocator != NULL);
 
   gsize size = 16 * 16;
   guint8 data[size];
 
   GstMemory *mem = gst_gralloc_allocator_wrap (allocator, 16, 16,
-					       GST_GRALLOC_USAGE_HW_TEXTURE,
-					       data, size, GST_VIDEO_FORMAT_I420);
+      GST_GRALLOC_USAGE_HW_TEXTURE,
+      data, size, GST_VIDEO_FORMAT_I420);
 
-  fail_unless(mem == NULL);
+  fail_unless (mem == NULL);
 
-  mem = gst_gralloc_allocator_wrap (allocator, 16, 16, GST_GRALLOC_USAGE_HW_TEXTURE,
-				    data, size, GST_VIDEO_FORMAT_NV12);
+  mem =
+      gst_gralloc_allocator_wrap (allocator, 16, 16,
+      GST_GRALLOC_USAGE_HW_TEXTURE, data, size, GST_VIDEO_FORMAT_NV12);
 
-  fail_unless(mem != NULL);
+  fail_unless (mem != NULL);
 
-  gst_memory_unref(mem);
+  gst_memory_unref (mem);
 
-  gst_object_unref(GST_OBJECT(allocator));
+  gst_object_unref (GST_OBJECT (allocator));
 }
+
 GST_END_TEST;
 
 static Suite *
