@@ -176,6 +176,8 @@ gst_droideglsink_start (GstBaseSink * bsink)
   sink->eglClientWaitSyncKHR = NULL;
   sink->eglDestroySyncKHR = NULL;
 
+  sink->alloc = gst_gralloc_allocator_new ();
+
   return TRUE;
 }
 
@@ -213,6 +215,9 @@ gst_droideglsink_stop (GstBaseSink * bsink)
     gst_buffer_unref (sink->last_buffer);
     sink->last_buffer = NULL;
   }
+
+  gst_object_unref (sink->alloc);
+  sink->alloc = NULL;
 
   return TRUE;
 }
@@ -336,6 +341,7 @@ gst_droideglsink_init (GstDroidEglSink * sink)
   sink->dpy = EGL_NO_DISPLAY;
   sink->image = EGL_NO_IMAGE_KHR;
   sink->sync = NULL;
+  sink->alloc = NULL;
   g_mutex_init (&sink->lock);
   sink->eglCreateImageKHR = NULL;
   sink->eglDestroyImageKHR = NULL;
@@ -408,13 +414,9 @@ gst_droidcamsrc_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
   GstVideoInfo format;
   GstBuffer *buff = gst_buffer_new ();
   GstMemory *mem = NULL;
-  GstAllocator *allocator = gst_gralloc_allocator_new ();
   GstCaps *caps = NULL;
 
   GST_DEBUG_OBJECT (sink, "copy buffer");
-  if (!allocator) {
-    goto free_and_out;
-  }
 
   if (!gst_pad_has_current_caps (GST_BASE_SINK_PAD (sink))) {
     goto free_and_out;
@@ -436,7 +438,7 @@ gst_droidcamsrc_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
     goto free_and_out;
   }
 
-  mem = gst_gralloc_allocator_wrap (allocator, format.width, format.height,
+  mem = gst_gralloc_allocator_wrap (sink->alloc, format.width, format.height,
 				    GST_GRALLOC_USAGE_HW_TEXTURE, info.data, info.size,
 				    GST_VIDEO_FORMAT_INFO_FORMAT(format.finfo));
 
@@ -446,7 +448,6 @@ gst_droidcamsrc_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
 
   gst_buffer_append_memory (buff, mem);
   gst_buffer_unmap (buffer, &info);
-  gst_object_unref (allocator);
   gst_caps_unref (caps);
   return buff;
 
@@ -455,10 +456,6 @@ free_and_out:
 
   if (mem) {
     gst_memory_unref (mem);
-  }
-
-  if (allocator) {
-    gst_object_unref (allocator);
   }
 
   if (caps) {
