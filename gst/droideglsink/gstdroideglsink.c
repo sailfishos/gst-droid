@@ -43,9 +43,9 @@ static GstStaticPadTemplate gst_droideglsink_sink_template_factory =
       GST_PAD_SINK,
       GST_PAD_ALWAYS,
       GST_STATIC_CAPS (
-          GST_VIDEO_CAPS_MAKE ("NV12") "; "
+          GST_VIDEO_CAPS_MAKE ("NV21") "; "
           GST_VIDEO_CAPS_MAKE_WITH_FEATURES (
-	      GST_CAPS_FEATURE_MEMORY_DROID_SURFACE, "{ENCODED, NV12}")));
+	      GST_CAPS_FEATURE_MEMORY_DROID_SURFACE, "{ENCODED, NV21}")));
 // TODO: get the formats from gralloc instead of hardcoding them.
 
 enum

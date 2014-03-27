@@ -228,14 +228,15 @@ gst_gralloc_allocator_wrap (GstAllocator * allocator, gint width, gint height, i
   alloc = GST_GRALLOC_ALLOCATOR (allocator);
 
   switch (format) {
-  case GST_VIDEO_FORMAT_NV12:
+  case GST_VIDEO_FORMAT_NV21:
     break;
   default:
     return NULL;
   }
 
-  GstMemory *mem = gst_gralloc_allocator_alloc (allocator, width, height, HAL_PIXEL_FORMAT_YV12,
-						usage);
+  GstMemory *mem =
+    gst_gralloc_allocator_alloc (allocator, width, height, HAL_PIXEL_FORMAT_YCrCb_420_SP,
+				 usage);
 
   if (!mem) {
     return NULL;
