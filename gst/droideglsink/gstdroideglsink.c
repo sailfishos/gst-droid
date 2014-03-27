@@ -651,14 +651,33 @@ static gboolean
 gst_droidcamsrc_get_frame_info (NemoGstVideoTexture * iface, NemoGstVideoTextureFrameInfo *info)
 {
   GstDroidEglSink *sink;
+  gboolean ret;
 
   sink = GST_DROIDEGLSINK (iface);
 
   GST_DEBUG_OBJECT (sink, "get frame info");
 
-  // TODO:
+  g_mutex_lock (&sink->lock);
 
-  return TRUE;
+  if (!sink->acquired_buffer->pts) {
+    GST_INFO_OBJECT (sink, "no buffer has been acquired");
+
+    ret = FALSE;
+    goto unlock_and_out;
+  }
+
+  info->pts = sink->acquired_buffer->pts;
+  info->dts = sink->acquired_buffer->dts;
+  info->duration = sink->acquired_buffer->duration;
+  info->offset = sink->acquired_buffer->offset;
+  info->offset_end = sink->acquired_buffer->offset_end;
+
+  ret = TRUE;
+
+unlock_and_out:
+  g_mutex_unlock (&sink->lock);
+
+  return ret;
 }
 
 static GstMeta *
