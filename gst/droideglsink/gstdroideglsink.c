@@ -373,12 +373,12 @@ gst_droideglsink_class_init (GstDroidEglSinkClass * klass)
   g_object_class_override_property (gobject_class, PROP_EGL_DISPLAY, "egl-display");
 }
 
-static gboolean
-gst_droideglsink_has_gralloc_memory (GstDroidEglSink * sink, GstBuffer * buffer)
+static GstMemory *
+gst_droideglsink_get_gralloc_memory (GstDroidEglSink * sink, GstBuffer * buffer)
 {
   int x, num;
 
-  GST_DEBUG_OBJECT (sink, "has gralloc memory");
+  GST_DEBUG_OBJECT (sink, "get gralloc memory");
 
   num = gst_buffer_n_memory (buffer);
 
@@ -388,11 +388,11 @@ gst_droideglsink_has_gralloc_memory (GstDroidEglSink * sink, GstBuffer * buffer)
     GstMemory *mem = gst_buffer_peek_memory (buffer, x);
 
     if (mem && gst_memory_is_type (mem, GST_ALLOCATOR_GRALLOC)) {
-      return TRUE;
+      return mem;
     }
   }
 
-  return FALSE;
+  return NULL;
 }
 
 static GstBuffer *
@@ -508,6 +508,7 @@ gst_droidcamsrc_acquire_frame (NemoGstVideoTexture * iface)
 {
   GstDroidEglSink *sink;
   gboolean ret = TRUE;
+  GstMemory *mem;
 
   sink = GST_DROIDEGLSINK (iface);
 
@@ -527,7 +528,8 @@ gst_droidcamsrc_acquire_frame (NemoGstVideoTexture * iface)
     goto unlock_and_out;
   }
 
-  if (gst_droideglsink_has_gralloc_memory (sink, sink->last_buffer)) {
+  mem = gst_droideglsink_get_gralloc_memory (sink, sink->last_buffer);
+  if (mem) {
     sink->acquired_buffer = gst_buffer_ref (sink->last_buffer);
   }
   else {
@@ -551,6 +553,7 @@ gst_droidcamsrc_bind_frame (NemoGstVideoTexture * iface, EGLImageKHR *image)
   GstDroidEglSink *sink;
   gboolean ret = FALSE;
   EGLint eglImgAttrs[] = { EGL_IMAGE_PRESERVED_KHR, EGL_TRUE, EGL_NONE, EGL_NONE };
+  GstMemory *mem;
 
   sink = GST_DROIDEGLSINK (iface);
 
@@ -577,11 +580,11 @@ gst_droidcamsrc_bind_frame (NemoGstVideoTexture * iface, EGLImageKHR *image)
   }
 
   /* Now we are ready */
-  /* TODO: this assumes the first buffer memory is a gralloc memory */
+
   /* We can safely use peek here because we have an extra ref to the buffer */
+  mem = gst_droideglsink_get_gralloc_memory (sink, sink->acquired_buffer);
   sink->image = sink->eglCreateImageKHR (sink->dpy, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID,
-					 (EGLClientBuffer)gst_memory_get_native_buffer
-					 (gst_buffer_peek_memory (sink->acquired_buffer, 0)),
+					 (EGLClientBuffer)gst_memory_get_native_buffer (mem),
 					 eglImgAttrs);
 
   /* Buffer will not go anywhere so we should be safe to unlock. */
