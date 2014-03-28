@@ -151,6 +151,7 @@ AC_CONFIG_FILES([Makefile
 		gst-libs/gst/memory/Makefile
 		gst/Makefile
 		gst/droideglsink/Makefile
+		gst/droidcodec/Makefile
 		tests/Makefile])
 AC_OUTPUT
 
