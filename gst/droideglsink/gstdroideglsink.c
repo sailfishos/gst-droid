@@ -732,7 +732,7 @@ static gboolean
 plugin_init (GstPlugin * plugin)
 {
   GST_DEBUG_CATEGORY_INIT (gst_droid_egl_sink_debug, "droideglsink",
-      0, "Android HAL plugin");
+      0, "Android EGL sink");
 
   return gst_element_register (plugin, "droideglsink", GST_RANK_PRIMARY,
       GST_TYPE_DROIDEGLSINK);
