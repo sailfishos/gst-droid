@@ -23,7 +23,9 @@
 #define HYBRIS_BINDING_H_
 
 /* floating_point_abi.h defines FP_ATTRIB */
+#if 0
 #include <hybris/internal/floating_point_abi.h>
+#endif
 
 void *android_dlopen(const char *filename, int flag);
 void *android_dlsym(void *name, const char *symbol);
@@ -32,7 +34,7 @@ const char *android_dlerror(void);
 int android_dladdr(const void *addr, void *info);
 
 
-
+#if 0
 /**
  *         XXX AUTO-GENERATED FILE XXX
  *
@@ -443,6 +445,7 @@ int android_dladdr(const void *addr, void *info);
  *         XXX AUTO-GENERATED FILE XXX
  **/
 
+#endif
 
 #endif /* HYBRIS_BINDING_H_ */
 
