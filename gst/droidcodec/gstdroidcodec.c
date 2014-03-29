@@ -41,55 +41,67 @@ struct _GstDroidCodecHandle
 
   int count;
 
+  gchar *type;
+  gchar *role;
+  gchar *name;
+
     OMX_ERRORTYPE (*init) (void);
     OMX_ERRORTYPE (*deinit) (void);
+    OMX_ERRORTYPE (*get_handle) (OMX_HANDLETYPE * handle,
+      OMX_STRING name, OMX_PTR data, OMX_CALLBACKTYPE * callbacks);
+    OMX_ERRORTYPE (*free_handle) (OMX_HANDLETYPE handle);
 };
 
 static void
-gst_droid_codec_destroy_component (GstDroidComponent * component)
+gst_droid_codec_destroy_handle (GstDroidCodecHandle * handle)
 {
   OMX_ERRORTYPE err;
 
+  if (handle->type) {
+    g_free (handle->type);
+  }
+
+  if (handle->role) {
+    g_free (handle->role);
+  }
+
+  if (handle->name) {
+    g_free (handle->name);
+  }
+
   /* deinit */
-  if (component->handle->deinit) {
-    err = component->handle->deinit ();
+  if (handle->deinit) {
+    err = handle->deinit ();
     if (err != OMX_ErrorNone) {
       // TODO:
     }
   }
 
   /* unload */
-  if (component->handle) {
-    android_dlclose (component->handle);
-    component->handle = NULL;
+  if (handle->handle) {
+    /* TODO: this is crashing */
+    /*    android_dlclose (handle->handle); */
+    handle->handle = NULL;
   }
 
   /* free */
-  g_slice_free (GstDroidCodecHandle, component->handle);
-  g_slice_free (GstDroidComponent, component);
+  g_slice_free (GstDroidCodecHandle, handle);
 }
 
-GstDroidComponent *
-gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type)
+static GstDroidCodecHandle *
+gst_droid_codec_create_and_insert_handle_locked (GstDroidCodec * codec,
+    const gchar * type)
 {
   OMX_ERRORTYPE err;
   gboolean res;
-  GstDroidCodecHandle *handle = NULL;
-  GstDroidComponent *component = NULL;
   gchar *path = NULL;
   GKeyFile *file = NULL;
   gchar *core_path = NULL;
   int in_port = 0;
   int out_port = 0;
   gchar *name = NULL;
-
-  g_mutex_lock (&codec->lock);
-
-  if (g_hash_table_contains (codec->cores, type)) {
-    component = (GstDroidComponent *) g_hash_table_lookup (codec->cores, type);
-    component->handle->count++;
-    goto unlock_and_out;
-  }
+  gchar *role = NULL;
+  GstDroidCodecHandle *handle = NULL;
 
   file = g_key_file_new ();
   path = g_strdup_printf ("%s/%s.conf", CONFIG_DIR, type);
@@ -97,76 +109,74 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type)
   /* read info from configuration */
   res = g_key_file_load_from_file (file, path, 0, NULL);
   if (!res) {
-    goto unlock_and_out;
+    goto error;
   }
 
   core_path = g_key_file_get_string (file, "droidcodec", "core", NULL);
   if (!core_path) {
-    goto unlock_and_out;
+    goto error;
   }
 
   name = g_key_file_get_string (file, "droidcodec", "component", NULL);
   if (!name) {
-    goto unlock_and_out;
+    goto error;
+  }
+
+  role = g_key_file_get_string (file, "droidcodec", "role", NULL);
+  if (!role) {
+    goto error;
   }
 
   in_port = g_key_file_get_integer (file, "droidcodec", "in-port", NULL);
   out_port = g_key_file_get_integer (file, "droidcodec", "out-port", NULL);
 
   if (in_port == out_port) {
-    goto unlock_and_out;
+    goto error;
   }
 
-  /* allocate */
   handle = g_slice_new0 (GstDroidCodecHandle);
-  component = g_slice_new0 (GstDroidComponent);
-  component->handle = handle;
+  handle->count = 1;
+  handle->type = g_strdup (type);
+  handle->role = g_strdup (role);
+  handle->name = g_strdup (name);
 
-  /* dlopen */
   handle->handle = android_dlopen (core_path, RTLD_NOW);
   if (!handle->handle) {
-    goto cleanup;
+    goto error;
   }
 
   /* dlsym */
-  component->handle->init = android_dlsym (handle->handle, "OMX_Init");
-  component->handle->deinit = android_dlsym (handle->handle, "OMX_Deinit");
-  component->get_handle = android_dlsym (handle->handle, "OMX_GetHandle");
-  component->free_handle = android_dlsym (handle->handle, "OMX_FreeHandle");
+  handle->init = android_dlsym (handle->handle, "OMX_Init");
+  handle->deinit = android_dlsym (handle->handle, "OMX_Deinit");
+  handle->get_handle = android_dlsym (handle->handle, "OMX_GetHandle");
+  handle->free_handle = android_dlsym (handle->handle, "OMX_FreeHandle");
 
-  if (!component->handle->init) {
-    goto cleanup;
+  if (!handle->init) {
+    goto error;
   }
 
-  if (!component->handle->deinit) {
-    goto cleanup;
+  if (!handle->deinit) {
+    goto error;
   }
 
-  if (!component->get_handle) {
-    goto cleanup;
+  if (!handle->get_handle) {
+    goto error;
   }
 
-  if (!component->free_handle) {
-    goto cleanup;
+  if (!handle->free_handle) {
+    goto error;
   }
 
-  /* init */
-  err = component->handle->init ();
+  err = handle->init ();
   if (err != OMX_ErrorNone) {
-    goto cleanup;
+    goto error;
   }
 
-  /* insert */
-  g_hash_table_insert (codec->cores, (gpointer) g_strdup (type), component);
-  goto unlock_and_out;
+  g_hash_table_insert (codec->cores, (gpointer) g_strdup (type), handle);
 
-cleanup:
-  gst_droid_codec_destroy_component (component);
-  component = NULL;
+  return handle;
 
-unlock_and_out:
-  g_mutex_unlock (&codec->lock);
-
+error:
   if (file) {
     g_key_file_unref (file);
   }
@@ -183,25 +193,72 @@ unlock_and_out:
     g_free (core_path);
   }
 
+  if (role) {
+    g_free (role);
+  }
+
+  /* unset deinit to prevent calling it from _destroy_handle */
+  handle->deinit = NULL;
+  gst_droid_codec_destroy_handle (handle);
+  return NULL;
+}
+
+static void
+gst_droid_codec_destroy_component (GstDroidComponent * component)
+{
+  /* free */
+  g_slice_free (GstDroidComponent, component);
+}
+
+GstDroidComponent *
+gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type)
+{
+  GstDroidComponent *component = NULL;
+  GstDroidCodecHandle *handle;
+
+  g_mutex_lock (&codec->lock);
+
+  if (g_hash_table_contains (codec->cores, type)) {
+    handle = (GstDroidCodecHandle *) g_hash_table_lookup (codec->cores, type);
+    handle->count++;
+  } else {
+    handle = gst_droid_codec_create_and_insert_handle_locked (codec, type);
+    if (!handle) {
+      goto error;
+    }
+  }
+
+  /* allocate */
+  component = g_slice_new0 (GstDroidComponent);
+  component->handle = handle;
+
+  goto unlock_and_out;
+
+error:
+  gst_droid_codec_destroy_component (component);
+  component = NULL;
+
+unlock_and_out:
+  g_mutex_unlock (&codec->lock);
+
   return component;
 }
 
 void
-gst_droid_codec_put_component (GstDroidCodec * codec, const gchar * type)
+gst_droid_codec_put_component (GstDroidCodec * codec,
+    GstDroidComponent * component)
 {
-  GstDroidComponent *component;
-
   g_mutex_lock (&codec->lock);
-
-  component = (GstDroidComponent *) g_hash_table_lookup (codec->cores, type);
 
   if (component->handle->count > 1) {
     component->handle->count--;
   } else {
-    g_hash_table_remove (codec->cores, type);
+    g_hash_table_remove (codec->cores, component->handle->type);
   }
 
   g_mutex_unlock (&codec->lock);
+
+  gst_droid_codec_destroy_component (component);
 }
 
 static void
@@ -225,7 +282,7 @@ gst_droid_codec_get (void)
   if (!codec) {
     codec = g_slice_new (GstDroidCodec);
     codec->cores = g_hash_table_new_full (g_str_hash, g_str_equal, g_free,
-        (GDestroyNotify) gst_droid_codec_destroy_component);
+        (GDestroyNotify) gst_droid_codec_destroy_handle);
     g_mutex_init (&codec->lock);
     gst_mini_object_init (GST_MINI_OBJECT_CAST (codec), 0, GST_TYPE_DROID_CODEC,
         NULL, NULL, (GstMiniObjectFreeFunction) gst_droid_codec_free);

@@ -38,12 +38,10 @@ typedef struct _GstDroidCodecHandle GstDroidCodecHandle;
 struct _GstDroidComponent
 {
   GstDroidCodecHandle *handle;
+  OMX_HANDLETYPE omx;
 
   int in_port;
   int out_port;
-  OMX_ERRORTYPE (*get_handle) (OMX_HANDLETYPE * handle,
-			       OMX_STRING name, OMX_PTR data, OMX_CALLBACKTYPE * callbacks);
-  OMX_ERRORTYPE (*free_handle) (OMX_HANDLETYPE handle);
 };
 
 struct _GstDroidCodec
@@ -57,7 +55,7 @@ struct _GstDroidCodec
 GstDroidCodec *gst_droid_codec_get (void);
 
 GstDroidComponent *gst_droid_codec_get_component (GstDroidCodec * codec, const gchar *type);
-void gst_droid_codec_put_component (GstDroidCodec * codec, const gchar * type);
+void gst_droid_codec_put_component (GstDroidCodec * codec, GstDroidComponent * component);
 
 G_END_DECLS
 
