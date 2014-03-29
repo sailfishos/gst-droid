@@ -312,6 +312,35 @@ gst_droid_codec_enable_android_native_buffers (GstDroidComponent * comp,
   return TRUE;
 }
 
+static gboolean
+gst_droid_codec_enable_metadata_in_buffers (GstDroidComponent * comp,
+    GstDroidComponentPort * port)
+{
+  OMX_ERRORTYPE err;
+  OMX_INDEXTYPE extension;
+  struct StoreMetaDataInBuffersParams param;
+
+  err =
+      OMX_GetExtensionIndex (comp->omx,
+      (OMX_STRING) "OMX.google.android.index.storeMetaDataInBuffers",
+      &extension);
+
+  if (err != OMX_ErrorNone) {
+    return FALSE;
+  }
+
+  GST_OMX_INIT_STRUCT (&param);
+  param.nPortIndex = port->def.nPortIndex;
+  param.bStoreMetaData = OMX_TRUE;
+
+  err = gst_droid_codec_set_param (comp, extension, &param);
+  if (err != OMX_ErrorNone) {
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
 GstDroidComponent *
 gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type)
 {
@@ -358,6 +387,12 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type)
     /* enable usage of android native buffers on output port */
     if (!gst_droid_codec_enable_android_native_buffers (component,
             component->out_port)) {
+      goto error;
+    }
+  } else {
+    /* encoders get meta data usage enabled */
+    if (!gst_droid_codec_enable_metadata_in_buffers (component,
+            component->in_port)) {
       goto error;
     }
   }
