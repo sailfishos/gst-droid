@@ -52,6 +52,36 @@ struct _GstDroidCodecHandle
     OMX_ERRORTYPE (*free_handle) (OMX_HANDLETYPE handle);
 };
 
+static OMX_ERRORTYPE
+EventHandler (OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_EVENTTYPE eEvent,
+    OMX_U32 nData1, OMX_U32 nData2, OMX_PTR pEventData)
+{
+  // TODO:
+
+  return OMX_ErrorNone;
+}
+
+static OMX_ERRORTYPE
+EmptyBufferDone (OMX_HANDLETYPE hComponent, OMX_PTR pAppData,
+    OMX_BUFFERHEADERTYPE * pBuffer)
+{
+  // TODO:
+
+  return OMX_ErrorNone;
+}
+
+static OMX_ERRORTYPE
+FillBufferDone (OMX_HANDLETYPE hComponent, OMX_PTR pAppData,
+    OMX_BUFFERHEADERTYPE * pBuffer)
+{
+  // TODO:
+
+  return OMX_ErrorNone;
+}
+
+static OMX_CALLBACKTYPE callbacks =
+    { EventHandler, EmptyBufferDone, FillBufferDone };
+
 static void
 gst_droid_codec_destroy_handle (GstDroidCodecHandle * handle)
 {
@@ -206,6 +236,15 @@ error:
 static void
 gst_droid_codec_destroy_component (GstDroidComponent * component)
 {
+  OMX_ERRORTYPE err;
+
+  if (component->omx) {
+    err = component->handle->free_handle (component->omx);
+    if (err != OMX_ErrorNone) {
+      // TODO:
+    }
+  }
+
   /* free */
   g_slice_free (GstDroidComponent, component);
 }
@@ -215,6 +254,7 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type)
 {
   GstDroidComponent *component = NULL;
   GstDroidCodecHandle *handle;
+  OMX_ERRORTYPE err;
 
   g_mutex_lock (&codec->lock);
 
@@ -231,6 +271,12 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type)
   /* allocate */
   component = g_slice_new0 (GstDroidComponent);
   component->handle = handle;
+
+  err =
+      handle->get_handle (&component->omx, handle->name, component, &callbacks);
+  if (err != OMX_ErrorNone) {
+    goto error;
+  }
 
   goto unlock_and_out;
 
