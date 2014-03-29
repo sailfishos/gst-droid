@@ -18,14 +18,17 @@
 
 #define HARDWARE_API_H_
 
+#if 0
 #include <media/hardware/OMXPluginBase.h>
 #include <media/hardware/MetadataBufferType.h>
 #include <system/window.h>
 #include <utils/RefBase.h>
+#endif
 
 #include <OMX_Component.h>
-
+#if 0
 namespace android {
+#endif
 
 // A pointer to this struct is passed to the OMX_SetParameter when the extension
 // index for the 'OMX.google.android.index.enableAndroidNativeBuffers' extension
@@ -82,12 +85,14 @@ struct StoreMetaDataInBuffersParams {
     OMX_BOOL bStoreMetaData;
 };
 
+#if 0
 // Meta data buffer layout used to transport output frames to the decoder for
 // dynamic buffer handling.
 struct VideoDecoderOutputMetaData {
   MetadataBufferType eType;
   buffer_handle_t pHandle;
 };
+#endif
 
 // A pointer to this struct is passed to OMX_SetParameter() when the extension
 // index "OMX.google.android.index.prepareForAdaptivePlayback" is given.
@@ -119,6 +124,7 @@ struct PrepareForAdaptivePlaybackParams {
 // given.  This call will only be performed if a prior call was made with the
 // 'OMX.google.android.index.enableAndroidNativeBuffers' extension index,
 // enabling use of Android native buffers.
+#if 0
 struct UseAndroidNativeBufferParams {
     OMX_U32 nSize;
     OMX_VERSIONTYPE nVersion;
@@ -127,6 +133,7 @@ struct UseAndroidNativeBufferParams {
     OMX_BUFFERHEADERTYPE **bufferHeader;
     const sp<ANativeWindowBuffer>& nativeBuffer;
 };
+#endif
 
 // A pointer to this struct is passed to OMX_GetParameter when the extension
 // index for the 'OMX.google.android.index.getAndroidNativeBufferUsage'
@@ -157,8 +164,10 @@ struct PrependSPSPPSToIDRFramesParams {
     OMX_BOOL bEnable;
 };
 
+#if 0
 }  // namespace android
 
 extern android::OMXPluginBase *createOMXPlugin();
+#endif
 
 #endif  // HARDWARE_API_H_
