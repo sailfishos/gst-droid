@@ -26,6 +26,8 @@
 #include "gstdroidcodec.h"
 #include "binding.h"
 #include <dlfcn.h>
+#include <string.h>
+#include "HardwareAPI.h"
 
 GST_DEFINE_MINI_OBJECT_TYPE (GstDroidCodec, gst_droid_codec);
 
@@ -44,6 +46,11 @@ struct _GstDroidCodecHandle
   gchar *type;
   gchar *role;
   gchar *name;
+
+  gboolean is_decoder;
+
+  int in_port;
+  int out_port;
 
     OMX_ERRORTYPE (*init) (void);
     OMX_ERRORTYPE (*deinit) (void);
@@ -132,6 +139,7 @@ gst_droid_codec_create_and_insert_handle_locked (GstDroidCodec * codec,
   gchar *name = NULL;
   gchar *role = NULL;
   GstDroidCodecHandle *handle = NULL;
+  gboolean is_decoder;
 
   file = g_key_file_new ();
   path = g_strdup_printf ("%s/%s.conf", CONFIG_DIR, type);
@@ -152,6 +160,8 @@ gst_droid_codec_create_and_insert_handle_locked (GstDroidCodec * codec,
     goto error;
   }
 
+  is_decoder = strstr (name, "decoder") != NULL;
+
   role = g_key_file_get_string (file, "droidcodec", "role", NULL);
   if (!role) {
     goto error;
@@ -169,7 +179,9 @@ gst_droid_codec_create_and_insert_handle_locked (GstDroidCodec * codec,
   handle->type = g_strdup (type);
   handle->role = g_strdup (role);
   handle->name = g_strdup (name);
-
+  handle->in_port = in_port;
+  handle->out_port = out_port;
+  handle->is_decoder = is_decoder;
   handle->handle = android_dlopen (core_path, RTLD_NOW);
   if (!handle->handle) {
     goto error;
@@ -246,7 +258,58 @@ gst_droid_codec_destroy_component (GstDroidComponent * component)
   }
 
   /* free */
+  g_slice_free (GstDroidComponentPort, component->in_port);
+  g_slice_free (GstDroidComponentPort, component->out_port);
   g_slice_free (GstDroidComponent, component);
+}
+
+static gboolean
+gst_droid_codec_enable_android_native_buffers (GstDroidComponent * comp,
+    GstDroidComponentPort * port)
+{
+  OMX_ERRORTYPE err;
+  OMX_INDEXTYPE extension;
+  struct EnableAndroidNativeBuffersParams param;
+  struct GetAndroidNativeBufferUsageParams usage_param;
+
+  /* enable */
+  err =
+      OMX_GetExtensionIndex (comp->omx,
+      (OMX_STRING) "OMX.google.android.index.enableAndroidNativeBuffers2",
+      &extension);
+
+  if (err != OMX_ErrorNone) {
+    return FALSE;
+  }
+
+  GST_OMX_INIT_STRUCT (&param);
+  param.nPortIndex = port->def.nPortIndex;
+  param.enable = OMX_TRUE;
+  err = gst_droid_codec_set_param (comp, extension, &param);
+  if (err != OMX_ErrorNone) {
+    return FALSE;
+  }
+
+  /* get usage for gralloc allocation */
+  err =
+      OMX_GetExtensionIndex (comp->omx,
+      (OMX_STRING) "OMX.google.android.index.getAndroidNativeBufferUsage",
+      &extension);
+
+  if (err != OMX_ErrorNone) {
+    return FALSE;
+  }
+
+  GST_OMX_INIT_STRUCT (&usage_param);
+  usage_param.nPortIndex = port->def.nPortIndex;
+  err = gst_droid_codec_get_param (comp, extension, &param);
+  if (err != OMX_ErrorNone) {
+    return FALSE;
+  }
+
+  port->usage = usage_param.nUsage;
+
+  return TRUE;
 }
 
 GstDroidComponent *
@@ -270,10 +333,45 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type)
 
   /* allocate */
   component = g_slice_new0 (GstDroidComponent);
+  component->in_port = g_slice_new0 (GstDroidComponentPort);
+  component->out_port = g_slice_new0 (GstDroidComponentPort);
   component->handle = handle;
 
   err =
       handle->get_handle (&component->omx, handle->name, component, &callbacks);
+  if (err != OMX_ErrorNone) {
+    goto error;
+  }
+
+  /* Now create our ports. */
+  component->in_port->dir = OMX_DirInput;
+  component->in_port->usage = -1;
+  GST_OMX_INIT_STRUCT (&component->in_port->def);
+  component->in_port->def.nPortIndex = component->handle->in_port;
+
+  component->out_port->dir = OMX_DirOutput;
+  component->out_port->usage = -1;
+  GST_OMX_INIT_STRUCT (&component->out_port->def);
+  component->out_port->def.nPortIndex = component->handle->out_port;
+
+  if (component->handle->is_decoder) {
+    /* enable usage of android native buffers on output port */
+    if (!gst_droid_codec_enable_android_native_buffers (component,
+            component->out_port)) {
+      goto error;
+    }
+  }
+
+  err =
+      gst_droid_codec_get_param (component, OMX_IndexParamPortDefinition,
+      &component->in_port->def);
+  if (err != OMX_ErrorNone) {
+    goto error;
+  }
+
+  err =
+      gst_droid_codec_get_param (component, OMX_IndexParamPortDefinition,
+      &component->out_port->def);
   if (err != OMX_ErrorNone) {
     goto error;
   }
@@ -337,4 +435,18 @@ gst_droid_codec_get (void)
   G_UNLOCK (codec);
 
   return codec;
+}
+
+OMX_ERRORTYPE
+gst_droid_codec_get_param (GstDroidComponent * comp, OMX_INDEXTYPE index,
+    gpointer param)
+{
+  return OMX_GetParameter (comp->omx, index, param);
+}
+
+OMX_ERRORTYPE
+gst_droid_codec_set_param (GstDroidComponent * comp, OMX_INDEXTYPE index,
+    gpointer param)
+{
+  return OMX_SetParameter (comp->omx, index, param);
 }

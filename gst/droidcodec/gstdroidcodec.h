@@ -31,17 +31,26 @@ G_BEGIN_DECLS
 
 #define GST_TYPE_DROID_CODEC (gst_droid_codec_get_type())
 
+/* stolen from gst-omx */
+#define GST_OMX_INIT_STRUCT(st) G_STMT_START { \
+  memset ((st), 0, sizeof (*(st))); \
+  (st)->nSize = sizeof (*(st)); \
+  (st)->nVersion.s.nVersionMajor = 1; \
+  (st)->nVersion.s.nVersionMinor = 1; \
+  } G_STMT_END
+
 typedef struct _GstDroidCodec GstDroidCodec;
 typedef struct _GstDroidComponent GstDroidComponent;
 typedef struct _GstDroidCodecHandle GstDroidCodecHandle;
+typedef struct _GstDroidComponentPort GstDroidComponentPort;
 
 struct _GstDroidComponent
 {
   GstDroidCodecHandle *handle;
   OMX_HANDLETYPE omx;
 
-  int in_port;
-  int out_port;
+  GstDroidComponentPort *in_port;
+  GstDroidComponentPort *out_port;
 };
 
 struct _GstDroidCodec
@@ -52,10 +61,25 @@ struct _GstDroidCodec
   GHashTable *cores;
 };
 
+struct _GstDroidComponentPort
+{
+  OMX_DIRTYPE dir;
+  int usage;
+  //  GMutex lock;
+  //  GCond cond;
+  OMX_PARAM_PORTDEFINITIONTYPE def;
+};
+
 GstDroidCodec *gst_droid_codec_get (void);
 
 GstDroidComponent *gst_droid_codec_get_component (GstDroidCodec * codec, const gchar *type);
 void gst_droid_codec_put_component (GstDroidCodec * codec, GstDroidComponent * component);
+
+
+OMX_ERRORTYPE gst_droid_codec_get_param (GstDroidComponent * comp,
+					 OMX_INDEXTYPE index, gpointer param);
+OMX_ERRORTYPE gst_droid_codec_set_param (GstDroidComponent * comp,
+					 OMX_INDEXTYPE index, gpointer param);
 
 G_END_DECLS
 
