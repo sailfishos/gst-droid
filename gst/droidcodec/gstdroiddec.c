@@ -25,6 +25,7 @@
 
 #include "gstdroiddec.h"
 #include "gst/memory/gstgralloc.h"
+#include "gstdroidcodectype.h"
 
 #define gst_droiddec_parent_class parent_class
 G_DEFINE_TYPE (GstDroidDec, gst_droiddec, GST_TYPE_VIDEO_DECODER);
@@ -52,6 +53,7 @@ gst_droiddec_finalize (GObject * object)
 
   GST_DEBUG_OBJECT (dec, "finalize");
 
+  gst_mini_object_unref (GST_MINI_OBJECT (dec->codec));
   // TODO:
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
@@ -109,10 +111,20 @@ gst_droiddec_stop (GstVideoDecoder * decoder)
 static gboolean
 gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 {
+  const gchar *type;
   GstDroidDec *dec = GST_DROIDDEC (decoder);
 
   GST_DEBUG_OBJECT (dec, "set format %" GST_PTR_FORMAT, state->caps);
 
+  type = gst_droid_codec_type_from_caps (state->caps);
+  if (!type) {
+    return FALSE;
+  }
+
+  dec->comp = gst_droid_codec_get_component (dec->codec, type);
+  if (!dec->comp) {
+    return FALSE;
+  }
   // TODO:
 
   return TRUE;
@@ -155,6 +167,7 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   return GST_FLOW_OK;
 }
 
+#if 0
 static gboolean
 gst_droiddec_sink_event (GstVideoDecoder * decoder, GstEvent * event)
 {
@@ -178,6 +191,7 @@ gst_droiddec_src_event (GstVideoDecoder * decoder, GstEvent * event)
 
   return TRUE;
 }
+#endif
 
 static gboolean
 gst_droiddec_negotiate (GstVideoDecoder * decoder)
@@ -230,6 +244,9 @@ gst_droiddec_flush (GstVideoDecoder * decoder)
 static void
 gst_droiddec_init (GstDroidDec * dec)
 {
+  dec->codec = gst_droid_codec_get ();
+  dec->comp = NULL;
+
   // TODO:
 }
 
@@ -265,9 +282,11 @@ gst_droiddec_class_init (GstDroidDecClass * klass)
   gstvideodecoder_class->finish = GST_DEBUG_FUNCPTR (gst_droiddec_finish);
   gstvideodecoder_class->handle_frame =
       GST_DEBUG_FUNCPTR (gst_droiddec_handle_frame);
-  gstvideodecoder_class->sink_event =
-      GST_DEBUG_FUNCPTR (gst_droiddec_sink_event);
-  gstvideodecoder_class->src_event = GST_DEBUG_FUNCPTR (gst_droiddec_src_event);
+  /*
+     gstvideodecoder_class->sink_event =
+     GST_DEBUG_FUNCPTR (gst_droiddec_sink_event);
+     gstvideodecoder_class->src_event = GST_DEBUG_FUNCPTR (gst_droiddec_src_event);
+   */
   gstvideodecoder_class->negotiate = GST_DEBUG_FUNCPTR (gst_droiddec_negotiate);
   gstvideodecoder_class->decide_allocation =
       GST_DEBUG_FUNCPTR (gst_droiddec_decide_allocation);

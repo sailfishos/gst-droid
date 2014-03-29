@@ -9,5 +9,5 @@ libgstdroidcodec_la_LIBADD = $(GST_LIBS) $(NGI_LIBS) $(EGL_LIBS) \
 libgstdroidcodec_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstdroidcodec_la_LIBTOOLFLAGS = --tag=disable-static
 
-libgstdroidcodec_la_SOURCES = gstdroiddec.c gstdroidcodec.c
-noinst_HEADERS = gstdroiddec.h gstdroidcodec.h
+libgstdroidcodec_la_SOURCES = gstdroiddec.c gstdroidcodec.c gstdroidcodectype.c
+noinst_HEADERS = gstdroiddec.h gstdroidcodec.h gstdroidcodectype.h

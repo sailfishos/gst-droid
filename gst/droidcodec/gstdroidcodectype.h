@@ -19,42 +19,15 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef __GST_DROID_DEC_H__
-#define __GST_DROID_DEC_H__
+#ifndef __GST_DROID_CODEC_TYPE_H__
+#define __GST_DROID_CODEC_TYPE_H__
 
 #include <gst/gst.h>
-#include <gst/video/gstvideodecoder.h>
-#include "gstdroidcodec.h"
 
 G_BEGIN_DECLS
 
-#define GST_TYPE_DROIDDEC \
-  (gst_droiddec_get_type())
-#define GST_DROIDDEC(obj) \
-  (G_TYPE_CHECK_INSTANCE_CAST((obj), GST_TYPE_DROIDDEC, GstDroidDec))
-#define GST_DROIDDEC_CLASS(klass) \
-  (G_TYPE_CHECK_CLASS_CAST((klass), GST_TYPE_DROIDDEC, GstDroidDecClass))
-#define GST_IS_DROIDDEC(obj) \
-  (G_TYPE_CHECK_INSTANCE_TYPE((obj), GST_TYPE_DROIDDEC))
-#define GST_IS_DROIDDEC_CLASS(klass) \
-  (G_TYPE_CHECK_CLASS_TYPE((klass), GST_TYPE_DROIDDEC))
-
-typedef struct _GstDroidDec GstDroidDec;
-typedef struct _GstDroidDecClass GstDroidDecClass;
-
-struct _GstDroidDec
-{
-  GstVideoDecoder parent;
-
-  GstDroidCodec *codec;
-  GstDroidComponent *comp;
-};
-
-struct _GstDroidDecClass
-{
-  GstVideoDecoderClass parent_class;
-};
+const gchar *gst_droid_codec_type_from_caps (GstCaps * caps);
 
 G_END_DECLS
 
-#endif /* __GST_DROID_DEC_H__ */
+#endif /* __GST_DROID_CODEC_TYPE_H__ */
