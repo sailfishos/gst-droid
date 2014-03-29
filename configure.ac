@@ -115,6 +115,10 @@ PKG_CHECK_MODULES(EGL, [
   ])
 ])
 
+AC_SEARCH_LIBS([android_dlopen], [hybris-common], [ ],
+  AC_MSG_ERROR([libhybris not found])
+)
+
 dnl check if compiler understands -Wall (if yes, add -Wall to GST_CFLAGS)
 AC_MSG_CHECKING([to see if compiler understands -Wall])
 save_CFLAGS="$CFLAGS"

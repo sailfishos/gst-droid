@@ -111,7 +111,7 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 {
   GstDroidDec *dec = GST_DROIDDEC (decoder);
 
-  GST_DEBUG_OBJECT (dec, "set format %" GST_PTR_FORMAT, state);
+  GST_DEBUG_OBJECT (dec, "set format %" GST_PTR_FORMAT, state->caps);
 
   // TODO:
 

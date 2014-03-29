@@ -33,14 +33,14 @@ G_BEGIN_DECLS
 
 typedef struct _GstDroidCodec GstDroidCodec;
 typedef struct _GstDroidComponent GstDroidComponent;
+typedef struct _GstDroidCodecHandle GstDroidCodecHandle;
 
 struct _GstDroidComponent
 {
-  void *dl_handle;
-  int count;
+  GstDroidCodecHandle *handle;
 
-  OMX_ERRORTYPE (*init) (void);
-  OMX_ERRORTYPE (*deinit) (void);
+  int in_port;
+  int out_port;
   OMX_ERRORTYPE (*get_handle) (OMX_HANDLETYPE * handle,
 			       OMX_STRING name, OMX_PTR data, OMX_CALLBACKTYPE * callbacks);
   OMX_ERRORTYPE (*free_handle) (OMX_HANDLETYPE handle);

@@ -24,46 +24,164 @@
 #endif
 
 #include "gstdroidcodec.h"
+#include "binding.h"
+#include <dlfcn.h>
 
 GST_DEFINE_MINI_OBJECT_TYPE (GstDroidCodec, gst_droid_codec);
 
 static GstDroidCodec *codec = NULL;
 G_LOCK_DEFINE_STATIC (codec);
 
+// TODO: hardcoded
+#define CONFIG_DIR   "/etc/gst-droid/droidcodec.d"
+
+struct _GstDroidCodecHandle
+{
+  void *handle;
+
+  int count;
+
+    OMX_ERRORTYPE (*init) (void);
+    OMX_ERRORTYPE (*deinit) (void);
+};
+
 static void
 gst_droid_codec_destroy_component (GstDroidComponent * component)
 {
-  /* close */
+  OMX_ERRORTYPE err;
+
+  /* deinit */
+  if (component->handle->deinit) {
+    err = component->handle->deinit ();
+    if (err != OMX_ErrorNone) {
+      // TODO:
+    }
+  }
 
   /* unload */
+  if (component->handle) {
+    android_dlclose (component->handle);
+    component->handle = NULL;
+  }
 
   /* free */
+  g_slice_free (GstDroidCodecHandle, component->handle);
   g_slice_free (GstDroidComponent, component);
 }
 
 GstDroidComponent *
 gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type)
 {
-  GstDroidComponent *component;
+  OMX_ERRORTYPE err;
+  gboolean res;
+  GstDroidCodecHandle *handle = NULL;
+  GstDroidComponent *component = NULL;
+  gchar *path = NULL;
+  GKeyFile *file = NULL;
+  gchar *core_path = NULL;
+  int in_port = 0;
+  int out_port = 0;
+  gchar *name = NULL;
 
   g_mutex_lock (&codec->lock);
 
   if (g_hash_table_contains (codec->cores, type)) {
     component = (GstDroidComponent *) g_hash_table_lookup (codec->cores, type);
-    component->count++;
-  } else {
-    /* read info from configuration */
-
-    /* allocate */
-    component = g_slice_new (GstDroidComponent);
-
-    /* dlopen */
-
-    /* init */
-
+    component->handle->count++;
+    goto unlock_and_out;
   }
 
+  file = g_key_file_new ();
+  path = g_strdup_printf ("%s/%s.conf", CONFIG_DIR, type);
+
+  /* read info from configuration */
+  res = g_key_file_load_from_file (file, path, 0, NULL);
+  if (!res) {
+    goto unlock_and_out;
+  }
+
+  core_path = g_key_file_get_string (file, "droidcodec", "core", NULL);
+  if (!core_path) {
+    goto unlock_and_out;
+  }
+
+  name = g_key_file_get_string (file, "droidcodec", "component", NULL);
+  if (!name) {
+    goto unlock_and_out;
+  }
+
+  in_port = g_key_file_get_integer (file, "droidcodec", "in-port", NULL);
+  out_port = g_key_file_get_integer (file, "droidcodec", "out-port", NULL);
+
+  if (in_port == out_port) {
+    goto unlock_and_out;
+  }
+
+  /* allocate */
+  handle = g_slice_new0 (GstDroidCodecHandle);
+  component = g_slice_new0 (GstDroidComponent);
+  component->handle = handle;
+
+  /* dlopen */
+  handle->handle = android_dlopen (core_path, RTLD_NOW);
+  if (!handle->handle) {
+    goto cleanup;
+  }
+
+  /* dlsym */
+  component->handle->init = android_dlsym (handle->handle, "OMX_Init");
+  component->handle->deinit = android_dlsym (handle->handle, "OMX_Deinit");
+  component->get_handle = android_dlsym (handle->handle, "OMX_GetHandle");
+  component->free_handle = android_dlsym (handle->handle, "OMX_FreeHandle");
+
+  if (!component->handle->init) {
+    goto cleanup;
+  }
+
+  if (!component->handle->deinit) {
+    goto cleanup;
+  }
+
+  if (!component->get_handle) {
+    goto cleanup;
+  }
+
+  if (!component->free_handle) {
+    goto cleanup;
+  }
+
+  /* init */
+  err = component->handle->init ();
+  if (err != OMX_ErrorNone) {
+    goto cleanup;
+  }
+
+  /* insert */
+  g_hash_table_insert (codec->cores, (gpointer) g_strdup (type), component);
+  goto unlock_and_out;
+
+cleanup:
+  gst_droid_codec_destroy_component (component);
+  component = NULL;
+
+unlock_and_out:
   g_mutex_unlock (&codec->lock);
+
+  if (file) {
+    g_key_file_unref (file);
+  }
+
+  if (path) {
+    g_free (path);
+  }
+
+  if (name) {
+    g_free (name);
+  }
+
+  if (core_path) {
+    g_free (core_path);
+  }
 
   return component;
 }
@@ -77,8 +195,8 @@ gst_droid_codec_put_component (GstDroidCodec * codec, const gchar * type)
 
   component = (GstDroidComponent *) g_hash_table_lookup (codec->cores, type);
 
-  if (component->count > 1) {
-    component->count--;
+  if (component->handle->count > 1) {
+    component->handle->count--;
   } else {
     g_hash_table_remove (codec->cores, type);
   }
