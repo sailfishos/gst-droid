@@ -1,7 +1,8 @@
 plugin_LTLIBRARIES = libgstdroidcodec.la
 libgstdroidcodec_la_CFLAGS = $(GST_CFLAGS) $(NGI_CFLAGS) $(EGL_CFLAGS) \
 			       -I$(top_builddir)/gst-libs/ \
-			       -I$(top_builddir)/inc/omx/
+			       -I$(top_builddir)/inc/omx/ \
+                               -I$(top_builddir)/inc/hybris/
 
 libgstdroidcodec_la_LIBADD = $(GST_LIBS) $(NGI_LIBS) $(EGL_LIBS) \
                              $(top_builddir)/gst-libs/gst/memory/libgstdroidmemory-@GST_API_VERSION@.la
