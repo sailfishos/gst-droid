@@ -204,3 +204,13 @@ gralloc_mem_allocator_class_init (GstDroidCodecGrallocAllocatorClass * klass)
   allocator_class->alloc = gst_droid_codec_gralloc_allocator_alloc;
   allocator_class->free = gst_droid_codec_gralloc_allocator_free;
 }
+
+OMX_BUFFERHEADERTYPE *
+gst_droid_codec_gralloc_allocator_get_omx_buffer (GstMemory * mem)
+{
+  if (!gst_memory_is_type (mem, GST_ALLOCATOR_DROID_CODEC_GRALLOC)) {
+    return NULL;
+  }
+
+  return ((GstDroidCodecGrallocMemory *) mem)->omx_buf;
+}

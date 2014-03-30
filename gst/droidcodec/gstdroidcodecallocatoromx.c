@@ -188,7 +188,7 @@ omx_mem_allocator_class_init (GstDroidCodecOmxAllocatorClass * klass)
 }
 
 OMX_BUFFERHEADERTYPE *
-gst_droid_omx_allocator_get_omx_buffer (GstMemory * mem)
+gst_droid_codec_omx_allocator_get_omx_buffer (GstMemory * mem)
 {
   if (!gst_memory_is_type (mem, GST_ALLOCATOR_DROID_CODEC_OMX)) {
     return NULL;

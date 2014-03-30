@@ -191,7 +191,15 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
 
   GST_DEBUG_OBJECT (dec, "handle frame");
 
+  frame->system_frame_number = 1;
   // TODO:
+
+  // TODO: sync frame flag
+  if (!gst_droid_codec_consume_frame (dec->comp, OMX_BUFFERFLAG_ENDOFFRAME,
+          frame)) {
+    // TODO: error
+    return GST_FLOW_ERROR;
+  }
 
   return GST_FLOW_OK;
 }

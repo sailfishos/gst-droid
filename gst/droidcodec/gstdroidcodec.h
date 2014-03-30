@@ -88,6 +88,8 @@ gboolean gst_droid_codec_configure_component (GstDroidComponent *comp,
 					      const GstVideoInfo * info);
 gboolean gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink, GstCaps * src);
 gboolean gst_droid_codec_set_codec_data (GstDroidComponent * comp, GstBuffer * codec_data);
+gboolean gst_droid_codec_consume_frame (GstDroidComponent * comp, OMX_U32 flags,
+					GstVideoCodecFrame * frame);
 
 const gchar *gst_omx_error_to_string (OMX_ERRORTYPE err);
 const gchar *gst_omx_state_to_string (OMX_STATETYPE state);

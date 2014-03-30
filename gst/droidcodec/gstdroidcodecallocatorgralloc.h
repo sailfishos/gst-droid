@@ -30,6 +30,7 @@ G_BEGIN_DECLS
 #define GST_ALLOCATOR_DROID_CODEC_GRALLOC                   "droidcodecgralloc"
 
 GstAllocator * gst_droid_codec_allocator_gralloc_new (GstDroidComponentPort * port);
+OMX_BUFFERHEADERTYPE * gst_droid_codec_gralloc_allocator_get_omx_buffer (GstMemory * mem);
 
 G_END_DECLS
 
