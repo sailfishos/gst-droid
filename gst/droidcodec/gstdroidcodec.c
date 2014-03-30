@@ -373,12 +373,10 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type)
   }
 
   /* Now create our ports. */
-  component->in_port->dir = OMX_DirInput;
   component->in_port->usage = -1;
   GST_OMX_INIT_STRUCT (&component->in_port->def);
   component->in_port->def.nPortIndex = component->handle->in_port;
 
-  component->out_port->dir = OMX_DirOutput;
   component->out_port->usage = -1;
   GST_OMX_INIT_STRUCT (&component->out_port->def);
   component->out_port->def.nPortIndex = component->handle->out_port;
@@ -484,4 +482,100 @@ gst_droid_codec_set_param (GstDroidComponent * comp, OMX_INDEXTYPE index,
     gpointer param)
 {
   return OMX_SetParameter (comp->omx, index, param);
+}
+
+gboolean
+gst_droid_codec_configure_component (GstDroidComponent * comp,
+    const GstVideoInfo * info)
+{
+  OMX_ERRORTYPE err;
+  OMX_PARAM_PORTDEFINITIONTYPE def = comp->in_port->def;
+  def.format.video.nFrameWidth = info->width;
+  def.format.video.nFrameHeight = info->height;
+
+  if (info->fps_n == 0) {
+    def.format.video.xFramerate = 0;
+  } else {
+    def.format.video.xFramerate = (info->fps_n << 16) / (info->fps_d);
+  }
+
+  err = gst_droid_codec_set_param (comp, OMX_IndexParamPortDefinition, &def);
+  if (err != OMX_ErrorNone) {
+    return FALSE;
+  }
+
+  err =
+      gst_droid_codec_get_param (comp, OMX_IndexParamPortDefinition,
+      &comp->in_port->def);
+  if (err != OMX_ErrorNone) {
+    return FALSE;
+  }
+
+  err =
+      gst_droid_codec_get_param (comp, OMX_IndexParamPortDefinition,
+      &comp->out_port->def);
+  if (err != OMX_ErrorNone) {
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+static gboolean
+gst_droid_codec_allocate_port_buffers (GstDroidComponent * comp,
+    GstDroidComponentPort * port)
+{
+  int x = 0;
+  for (x = 0; x < port->def.nBufferCountActual; x++) {
+    //    OMX_AllocateBuffer ();
+
+  }
+
+  return FALSE;
+}
+
+gboolean
+gst_droid_codec_start_component (GstDroidComponent * comp)
+{
+  OMX_STATETYPE state;
+  OMX_ERRORTYPE err;
+
+  /* TODO: locking */
+
+  err = OMX_GetState (comp->omx, &state);
+  if (err != OMX_ErrorNone) {
+    return FALSE;
+  }
+
+  if (state == OMX_StateExecuting) {
+    return TRUE;
+  }
+
+  if (state <= OMX_StateInvalid || state > OMX_StateExecuting) {
+    return FALSE;
+  }
+
+  if (state != OMX_StateLoaded) {
+    return FALSE;
+  }
+
+  err = OMX_SendCommand (comp->omx, OMX_CommandStateSet, OMX_StateIdle, NULL);
+
+  if (err != OMX_ErrorNone) {
+    return FALSE;
+  }
+
+  /* Let's allocate our buffers. */
+  if (!gst_droid_codec_allocate_port_buffers (comp, comp->in_port)) {
+    return FALSE;
+  }
+
+  if (!gst_droid_codec_allocate_port_buffers (comp, comp->out_port)) {
+    return FALSE;
+  }
+
+  /* TODO: */
+
+
+  return TRUE;
 }

@@ -23,6 +23,7 @@
 #define __GST_DROID_CODEC_H__
 
 #include <gst/gst.h>
+#include <gst/video/video.h>
 
 #include <OMX_Core.h>
 #include <OMX_Component.h>
@@ -48,7 +49,6 @@ struct _GstDroidComponent
 {
   GstDroidCodecHandle *handle;
   OMX_HANDLETYPE omx;
-
   GstDroidComponentPort *in_port;
   GstDroidComponentPort *out_port;
 };
@@ -63,7 +63,6 @@ struct _GstDroidCodec
 
 struct _GstDroidComponentPort
 {
-  OMX_DIRTYPE dir;
   int usage;
   //  GMutex lock;
   //  GCond cond;
@@ -80,6 +79,9 @@ OMX_ERRORTYPE gst_droid_codec_get_param (GstDroidComponent * comp,
 					 OMX_INDEXTYPE index, gpointer param);
 OMX_ERRORTYPE gst_droid_codec_set_param (GstDroidComponent * comp,
 					 OMX_INDEXTYPE index, gpointer param);
+gboolean gst_droid_codec_configure_component (GstDroidComponent *comp,
+					      const GstVideoInfo * info);
+gboolean gst_droid_codec_start_component (GstDroidComponent *comp);
 
 G_END_DECLS
 

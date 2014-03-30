@@ -116,6 +116,10 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 
   GST_DEBUG_OBJECT (dec, "set format %" GST_PTR_FORMAT, state->caps);
 
+  if (dec->comp) {
+    return FALSE;
+  }
+
   type = gst_droid_codec_type_from_caps (state->caps);
   if (!type) {
     return FALSE;
@@ -123,6 +127,22 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 
   dec->comp = gst_droid_codec_get_component (dec->codec, type);
   if (!dec->comp) {
+    return FALSE;
+  }
+
+  dec->in_state = gst_video_codec_state_ref (state);
+
+  /* configure codec */
+  if (!gst_droid_codec_configure_component (dec->comp, &state->info)) {
+    return FALSE;
+  }
+
+  gst_video_decoder_set_output_state (GST_VIDEO_DECODER (dec),
+      GST_VIDEO_FORMAT_ENCODED, state->info.width, state->info.height,
+      dec->in_state);
+
+  /* now start */
+  if (!gst_droid_codec_start_component (dec->comp)) {
     return FALSE;
   }
   // TODO:
@@ -246,6 +266,8 @@ gst_droiddec_init (GstDroidDec * dec)
 {
   dec->codec = gst_droid_codec_get ();
   dec->comp = NULL;
+  dec->in_state = NULL;
+  dec->out_state = NULL;
 
   // TODO:
 }

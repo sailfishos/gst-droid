@@ -48,6 +48,8 @@ struct _GstDroidDec
 
   GstDroidCodec *codec;
   GstDroidComponent *comp;
+  GstVideoCodecState *in_state;
+  GstVideoCodecState *out_state;
 };
 
 struct _GstDroidDecClass
