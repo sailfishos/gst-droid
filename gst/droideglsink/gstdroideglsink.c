@@ -262,8 +262,12 @@ gst_droideglsink_event (GstBaseSink * bsink, GstEvent * event)
       GST_INFO_OBJECT (sink,
           "emitting frame-ready with -1 after %" GST_PTR_FORMAT, event);
       g_mutex_lock (&sink->lock);
-      gst_buffer_unref (sink->last_buffer);
-      sink->last_buffer = NULL;
+
+      if (sink->last_buffer) {
+        gst_buffer_unref (sink->last_buffer);
+        sink->last_buffer = NULL;
+      }
+
       g_mutex_unlock (&sink->lock);
       nemo_gst_video_texture_frame_ready (NEMO_GST_VIDEO_TEXTURE (sink), -1);
       break;
