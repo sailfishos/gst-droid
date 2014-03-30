@@ -147,7 +147,14 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
           dec->out_state->caps)) {
     return FALSE;
   }
-  // TODO:
+
+  if (state->codec_data) {
+    GST_DEBUG_OBJECT (dec, "passing codec_data to decoder");
+
+    if (!gst_droid_codec_set_codec_data (dec->comp, state->codec_data)) {
+      return FALSE;
+    }
+  }
 
   return TRUE;
 }
