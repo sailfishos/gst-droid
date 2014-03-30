@@ -69,6 +69,7 @@ struct _GstDroidComponentPort
   //  GCond cond;
   OMX_PARAM_PORTDEFINITIONTYPE def;
   GstBufferPool *buffers;
+  GstAllocator *allocator;
   GstDroidComponent *comp;
 };
 
@@ -85,7 +86,7 @@ OMX_ERRORTYPE gst_droid_codec_set_param (GstDroidComponent * comp,
 					 OMX_INDEXTYPE index, gpointer param);
 gboolean gst_droid_codec_configure_component (GstDroidComponent *comp,
 					      const GstVideoInfo * info);
-gboolean gst_droid_codec_start_component (GstDroidComponent *comp);
+gboolean gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink, GstCaps * src);
 
 const gchar *gst_omx_error_to_string (OMX_ERRORTYPE err);
 const gchar *gst_omx_state_to_string (OMX_STATETYPE state);

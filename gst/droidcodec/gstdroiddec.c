@@ -138,12 +138,13 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     return FALSE;
   }
 
-  gst_video_decoder_set_output_state (GST_VIDEO_DECODER (dec),
+  dec->out_state = gst_video_decoder_set_output_state (GST_VIDEO_DECODER (dec),
       GST_VIDEO_FORMAT_ENCODED, state->info.width, state->info.height,
       dec->in_state);
 
   /* now start */
-  if (!gst_droid_codec_start_component (dec->comp)) {
+  if (!gst_droid_codec_start_component (dec->comp, dec->in_state->caps,
+          dec->out_state->caps)) {
     return FALSE;
   }
   // TODO:

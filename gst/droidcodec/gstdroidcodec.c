@@ -28,6 +28,8 @@
 #include <dlfcn.h>
 #include <string.h>
 #include "HardwareAPI.h"
+#include "gstdroidcodecallocatoromx.h"
+#include "gstdroidcodecallocatorgralloc.h"
 
 GST_DEFINE_MINI_OBJECT_TYPE (GstDroidCodec, gst_droid_codec);
 
@@ -611,19 +613,43 @@ gst_droid_codec_configure_component (GstDroidComponent * comp,
 
 static gboolean
 gst_droid_codec_allocate_port_buffers (GstDroidComponent * comp,
-    GstDroidComponentPort * port)
+    GstDroidComponentPort * port, GstCaps * caps)
 {
-  int x = 0;
-  for (x = 0; x < port->def.nBufferCountActual; x++) {
-    //    OMX_AllocateBuffer ();
+  GstStructure *config;
 
+  GST_DEBUG_OBJECT (comp->parent, "allocate port %li buffers",
+      port->def.nPortIndex);
+
+  if (port->usage == -1) {
+    port->allocator = gst_droid_codec_allocator_omx_new (port);
+    port->buffers = gst_buffer_pool_new ();
+  } else {
+    port->allocator = gst_droid_codec_allocator_gralloc_new (port);
+    port->buffers = gst_buffer_pool_new ();
   }
 
-  return FALSE;
+  config = gst_buffer_pool_get_config (port->buffers);
+  gst_buffer_pool_config_set_params (config, caps, port->def.nBufferSize,
+      port->def.nBufferCountActual, port->def.nBufferCountActual);
+  gst_buffer_pool_config_set_allocator (config, port->allocator, NULL);
+
+  if (!gst_buffer_pool_set_config (port->buffers, config)) {
+    GST_ERROR_OBJECT (port->comp->parent,
+        "failed to set buffer pool configuration");
+    return FALSE;
+  }
+
+  if (!gst_buffer_pool_set_active (port->buffers, TRUE)) {
+    GST_ERROR_OBJECT (port->comp->parent, "failed to activate buffer pool");
+    return FALSE;
+  }
+
+  return TRUE;
 }
 
 gboolean
-gst_droid_codec_start_component (GstDroidComponent * comp)
+gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
+    GstCaps * src)
 {
   OMX_STATETYPE state;
   OMX_ERRORTYPE err;
@@ -656,11 +682,11 @@ gst_droid_codec_start_component (GstDroidComponent * comp)
   }
 
   /* Let's allocate our buffers. */
-  if (!gst_droid_codec_allocate_port_buffers (comp, comp->in_port)) {
+  if (!gst_droid_codec_allocate_port_buffers (comp, comp->in_port, sink)) {
     return FALSE;
   }
 
-  if (!gst_droid_codec_allocate_port_buffers (comp, comp->out_port)) {
+  if (!gst_droid_codec_allocate_port_buffers (comp, comp->out_port, src)) {
     return FALSE;
   }
 
