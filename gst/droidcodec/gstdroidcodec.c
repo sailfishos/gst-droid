@@ -94,6 +94,8 @@ gst_droid_codec_destroy_handle (GstDroidCodecHandle * handle)
 {
   OMX_ERRORTYPE err;
 
+  GST_DEBUG ("destroying handle %p", handle);
+
   if (handle->type) {
     g_free (handle->type);
   }
@@ -140,37 +142,53 @@ gst_droid_codec_create_and_insert_handle_locked (GstDroidCodec * codec,
   gchar *role = NULL;
   GstDroidCodecHandle *handle = NULL;
   gboolean is_decoder;
+  GError *error = NULL;
+
+  GST_DEBUG ("create and insert handle locked");
 
   file = g_key_file_new ();
   path = g_strdup_printf ("%s/%s.conf", CONFIG_DIR, type);
 
   /* read info from configuration */
-  res = g_key_file_load_from_file (file, path, 0, NULL);
+  res = g_key_file_load_from_file (file, path, 0, &error);
   if (!res) {
+    GST_ERROR ("error %s reading %s", error->message, path);
     goto error;
   }
 
-  core_path = g_key_file_get_string (file, "droidcodec", "core", NULL);
+  core_path = g_key_file_get_string (file, "droidcodec", "core", &error);
   if (!core_path) {
+    GST_ERROR ("error %s reading %s", error->message, path);
     goto error;
   }
 
-  name = g_key_file_get_string (file, "droidcodec", "component", NULL);
+  name = g_key_file_get_string (file, "droidcodec", "component", &error);
   if (!name) {
+    GST_ERROR ("error %s reading %s", error->message, path);
     goto error;
   }
 
   is_decoder = strstr (name, "decoder") != NULL;
 
-  role = g_key_file_get_string (file, "droidcodec", "role", NULL);
+  role = g_key_file_get_string (file, "droidcodec", "role", &error);
   if (!role) {
+    GST_ERROR ("error %s reading %s", error->message, path);
     goto error;
   }
 
-  in_port = g_key_file_get_integer (file, "droidcodec", "in-port", NULL);
-  out_port = g_key_file_get_integer (file, "droidcodec", "out-port", NULL);
+  in_port = g_key_file_get_integer (file, "droidcodec", "in-port", &error);
+  if (error) {
+    GST_ERROR ("error %s reading %s", error->message, path);
+    goto error;
+  }
+
+  out_port = g_key_file_get_integer (file, "droidcodec", "out-port", &error);
+  if (error) {
+    GST_ERROR ("error %s reading %s", error->message, path);
+  }
 
   if (in_port == out_port) {
+    GST_ERROR ("in port and out port can not be equal");
     goto error;
   }
 
@@ -184,6 +202,7 @@ gst_droid_codec_create_and_insert_handle_locked (GstDroidCodec * codec,
   handle->is_decoder = is_decoder;
   handle->handle = android_dlopen (core_path, RTLD_NOW);
   if (!handle->handle) {
+    GST_ERROR ("error loading core %s", core_path);
     goto error;
   }
 
@@ -194,31 +213,43 @@ gst_droid_codec_create_and_insert_handle_locked (GstDroidCodec * codec,
   handle->free_handle = android_dlsym (handle->handle, "OMX_FreeHandle");
 
   if (!handle->init) {
+    GST_ERROR ("OMX_Init not found");
     goto error;
   }
 
   if (!handle->deinit) {
+    GST_ERROR ("OMX_Deinit not found");
     goto error;
   }
 
   if (!handle->get_handle) {
+    GST_ERROR ("OMX_GetHandle not found");
     goto error;
   }
 
   if (!handle->free_handle) {
+    GST_ERROR ("OMX_FreeHandle not found");
     goto error;
   }
 
   err = handle->init ();
   if (err != OMX_ErrorNone) {
+    GST_ERROR ("got error %s (0x%08x) while initialization",
+        gst_omx_error_to_string (err), err);
     goto error;
   }
 
   g_hash_table_insert (codec->cores, (gpointer) g_strdup (type), handle);
 
+  GST_DEBUG ("created handle %p", handle);
+
   return handle;
 
 error:
+  if (error) {
+    g_error_free (error);
+  }
+
   if (file) {
     g_key_file_unref (file);
   }
@@ -250,10 +281,14 @@ gst_droid_codec_destroy_component (GstDroidComponent * component)
 {
   OMX_ERRORTYPE err;
 
+  GST_DEBUG_OBJECT (component->parent, "destroy component %p", component);
+
   if (component->omx) {
     err = component->handle->free_handle (component->omx);
     if (err != OMX_ErrorNone) {
-      // TODO:
+      GST_ERROR_OBJECT (component->parent,
+          "got error %s (0x%08x) freeing component handle",
+          gst_omx_error_to_string (err), err);
     }
   }
 
@@ -271,14 +306,18 @@ gst_droid_codec_enable_android_native_buffers (GstDroidComponent * comp,
   OMX_INDEXTYPE extension;
   struct EnableAndroidNativeBuffersParams param;
   struct GetAndroidNativeBufferUsageParams usage_param;
+  OMX_STRING ext1 = "OMX.google.android.index.enableAndroidNativeBuffers2";
+  OMX_STRING ext2 = "OMX.google.android.index.getAndroidNativeBufferUsage";
+
+  GST_DEBUG_OBJECT (comp->parent, "enable android native buffers");
 
   /* enable */
-  err =
-      OMX_GetExtensionIndex (comp->omx,
-      (OMX_STRING) "OMX.google.android.index.enableAndroidNativeBuffers2",
-      &extension);
+  err = OMX_GetExtensionIndex (comp->omx, ext1, &extension);
 
   if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) while getting extension %s index",
+        gst_omx_error_to_string (err), err, ext1);
     return FALSE;
   }
 
@@ -287,16 +326,19 @@ gst_droid_codec_enable_android_native_buffers (GstDroidComponent * comp,
   param.enable = OMX_TRUE;
   err = gst_droid_codec_set_param (comp, extension, &param);
   if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) while enabling android buffers",
+        gst_omx_error_to_string (err), err);
     return FALSE;
   }
 
   /* get usage for gralloc allocation */
-  err =
-      OMX_GetExtensionIndex (comp->omx,
-      (OMX_STRING) "OMX.google.android.index.getAndroidNativeBufferUsage",
-      &extension);
+  err = OMX_GetExtensionIndex (comp->omx, ext2, &extension);
 
   if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) while getting extension %s index",
+        gst_omx_error_to_string (err), err, ext1);
     return FALSE;
   }
 
@@ -304,6 +346,9 @@ gst_droid_codec_enable_android_native_buffers (GstDroidComponent * comp,
   usage_param.nPortIndex = port->def.nPortIndex;
   err = gst_droid_codec_get_param (comp, extension, &param);
   if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) while getting native buffer usage",
+        gst_omx_error_to_string (err), err);
     return FALSE;
   }
 
@@ -319,13 +364,17 @@ gst_droid_codec_enable_metadata_in_buffers (GstDroidComponent * comp,
   OMX_ERRORTYPE err;
   OMX_INDEXTYPE extension;
   struct StoreMetaDataInBuffersParams param;
+  OMX_STRING ext = "OMX.google.android.index.storeMetaDataInBuffers";
 
-  err =
-      OMX_GetExtensionIndex (comp->omx,
-      (OMX_STRING) "OMX.google.android.index.storeMetaDataInBuffers",
-      &extension);
+  GST_DEBUG_OBJECT (comp->parent, "enable metadata in buffers");
+
+  err = OMX_GetExtensionIndex (comp->omx, ext, &extension);
 
   if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) while getting extension %s index",
+        gst_omx_error_to_string (err), err, ext);
+
     return FALSE;
   }
 
@@ -335,6 +384,9 @@ gst_droid_codec_enable_metadata_in_buffers (GstDroidComponent * comp,
 
   err = gst_droid_codec_set_param (comp, extension, &param);
   if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) while enabling metadata",
+        gst_omx_error_to_string (err), err);
     return FALSE;
   }
 
@@ -342,7 +394,8 @@ gst_droid_codec_enable_metadata_in_buffers (GstDroidComponent * comp,
 }
 
 GstDroidComponent *
-gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type)
+gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type,
+    GstElement * parent)
 {
   GstDroidComponent *component = NULL;
   GstDroidCodecHandle *handle;
@@ -356,6 +409,7 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type)
   } else {
     handle = gst_droid_codec_create_and_insert_handle_locked (codec, type);
     if (!handle) {
+      GST_ERROR_OBJECT (parent, "error getting codec %s", type);
       goto error;
     }
   }
@@ -365,10 +419,14 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type)
   component->in_port = g_slice_new0 (GstDroidComponentPort);
   component->out_port = g_slice_new0 (GstDroidComponentPort);
   component->handle = handle;
+  component->parent = parent;
 
   err =
       handle->get_handle (&component->omx, handle->name, component, &callbacks);
   if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (component->parent,
+        "got error %s (0x%08x) getting component handle",
+        gst_omx_error_to_string (err), err);
     goto error;
   }
 
@@ -376,10 +434,12 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type)
   component->in_port->usage = -1;
   GST_OMX_INIT_STRUCT (&component->in_port->def);
   component->in_port->def.nPortIndex = component->handle->in_port;
+  component->in_port->comp = component;
 
   component->out_port->usage = -1;
   GST_OMX_INIT_STRUCT (&component->out_port->def);
   component->out_port->def.nPortIndex = component->handle->out_port;
+  component->out_port->comp = component;
 
   if (component->handle->is_decoder) {
     /* enable usage of android native buffers on output port */
@@ -399,6 +459,9 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type)
       gst_droid_codec_get_param (component, OMX_IndexParamPortDefinition,
       &component->in_port->def);
   if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (component->parent,
+        "got error %s (0x%08x) getting input port definition",
+        gst_omx_error_to_string (err), err);
     goto error;
   }
 
@@ -406,6 +469,9 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type)
       gst_droid_codec_get_param (component, OMX_IndexParamPortDefinition,
       &component->out_port->def);
   if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (component->parent,
+        "got error %s (0x%08x) getting output port definition",
+        gst_omx_error_to_string (err), err);
     goto error;
   }
 
@@ -425,6 +491,8 @@ void
 gst_droid_codec_put_component (GstDroidCodec * codec,
     GstDroidComponent * component)
 {
+  GST_DEBUG_OBJECT (component->parent, "put component");
+
   g_mutex_lock (&codec->lock);
 
   if (component->handle->count > 1) {
@@ -441,6 +509,8 @@ gst_droid_codec_put_component (GstDroidCodec * codec,
 static void
 gst_droid_codec_free ()
 {
+  GST_DEBUG ("codec free");
+
   G_LOCK (codec);
 
   g_mutex_clear (&codec->lock);
@@ -454,6 +524,8 @@ gst_droid_codec_free ()
 GstDroidCodec *
 gst_droid_codec_get (void)
 {
+  GST_DEBUG ("codec get");
+
   G_LOCK (codec);
 
   if (!codec) {
@@ -474,6 +546,8 @@ OMX_ERRORTYPE
 gst_droid_codec_get_param (GstDroidComponent * comp, OMX_INDEXTYPE index,
     gpointer param)
 {
+  GST_DEBUG_OBJECT (comp->parent, "getting parameter at index 0x%08x", index);
+
   return OMX_GetParameter (comp->omx, index, param);
 }
 
@@ -481,6 +555,8 @@ OMX_ERRORTYPE
 gst_droid_codec_set_param (GstDroidComponent * comp, OMX_INDEXTYPE index,
     gpointer param)
 {
+  GST_DEBUG_OBJECT (comp->parent, "setting parameter at index 0x%08x", index);
+
   return OMX_SetParameter (comp->omx, index, param);
 }
 
@@ -490,6 +566,9 @@ gst_droid_codec_configure_component (GstDroidComponent * comp,
 {
   OMX_ERRORTYPE err;
   OMX_PARAM_PORTDEFINITIONTYPE def = comp->in_port->def;
+
+  GST_DEBUG_OBJECT (comp->parent, "configure component");
+
   def.format.video.nFrameWidth = info->width;
   def.format.video.nFrameHeight = info->height;
 
@@ -501,6 +580,9 @@ gst_droid_codec_configure_component (GstDroidComponent * comp,
 
   err = gst_droid_codec_set_param (comp, OMX_IndexParamPortDefinition, &def);
   if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) setting input port definition",
+        gst_omx_error_to_string (err), err);
     return FALSE;
   }
 
@@ -508,6 +590,9 @@ gst_droid_codec_configure_component (GstDroidComponent * comp,
       gst_droid_codec_get_param (comp, OMX_IndexParamPortDefinition,
       &comp->in_port->def);
   if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) getting input port definition",
+        gst_omx_error_to_string (err), err);
     return FALSE;
   }
 
@@ -515,6 +600,9 @@ gst_droid_codec_configure_component (GstDroidComponent * comp,
       gst_droid_codec_get_param (comp, OMX_IndexParamPortDefinition,
       &comp->out_port->def);
   if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) getting output port definition",
+        gst_omx_error_to_string (err), err);
     return FALSE;
   }
 
@@ -539,6 +627,8 @@ gst_droid_codec_start_component (GstDroidComponent * comp)
 {
   OMX_STATETYPE state;
   OMX_ERRORTYPE err;
+
+  GST_DEBUG_OBJECT (comp->parent, "start");
 
   /* TODO: locking */
 

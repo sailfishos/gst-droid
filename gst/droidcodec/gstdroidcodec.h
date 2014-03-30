@@ -51,6 +51,7 @@ struct _GstDroidComponent
   OMX_HANDLETYPE omx;
   GstDroidComponentPort *in_port;
   GstDroidComponentPort *out_port;
+  GstElement *parent;
 };
 
 struct _GstDroidCodec
@@ -67,11 +68,14 @@ struct _GstDroidComponentPort
   //  GMutex lock;
   //  GCond cond;
   OMX_PARAM_PORTDEFINITIONTYPE def;
+  GstBufferPool *buffers;
+  GstDroidComponent *comp;
 };
 
 GstDroidCodec *gst_droid_codec_get (void);
 
-GstDroidComponent *gst_droid_codec_get_component (GstDroidCodec * codec, const gchar *type);
+GstDroidComponent *gst_droid_codec_get_component (GstDroidCodec * codec,
+						  const gchar *type, GstElement * parent);
 void gst_droid_codec_put_component (GstDroidCodec * codec, GstDroidComponent * component);
 
 
@@ -82,6 +86,10 @@ OMX_ERRORTYPE gst_droid_codec_set_param (GstDroidComponent * comp,
 gboolean gst_droid_codec_configure_component (GstDroidComponent *comp,
 					      const GstVideoInfo * info);
 gboolean gst_droid_codec_start_component (GstDroidComponent *comp);
+
+const gchar *gst_omx_error_to_string (OMX_ERRORTYPE err);
+const gchar *gst_omx_state_to_string (OMX_STATETYPE state);
+const gchar *gst_omx_command_to_string (OMX_COMMANDTYPE cmd);
 
 G_END_DECLS
 

@@ -125,7 +125,8 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     return FALSE;
   }
 
-  dec->comp = gst_droid_codec_get_component (dec->codec, type);
+  dec->comp =
+      gst_droid_codec_get_component (dec->codec, type, GST_ELEMENT (dec));
   if (!dec->comp) {
     return FALSE;
   }
