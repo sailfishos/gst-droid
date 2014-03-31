@@ -801,6 +801,7 @@ gst_droid_codec_consume_frame (GstDroidComponent * comp, OMX_U32 flags,
   OMX_BUFFERHEADERTYPE *omx_buf;
   GstMapInfo info;
   OMX_ERRORTYPE err;
+  GstClockTime timestamp;
 
   GST_DEBUG_OBJECT (comp->parent, "consume");
 
@@ -842,11 +843,23 @@ gst_droid_codec_consume_frame (GstDroidComponent * comp, OMX_U32 flags,
   }
 
   /* fill omx buffer */
+  timestamp = frame->pts;
   frame->output_buffer = buf;
 
   omx_buf->pAppPrivate = frame;
   omx_buf->nFlags = flags;
   omx_buf->nFilledLen = info.size;
+
+  /* This is stolen from gst-omx */
+  if (GST_CLOCK_TIME_IS_VALID (timestamp)) {
+    omx_buf->nTimeStamp =
+        gst_util_uint64_scale (timestamp, OMX_TICKS_PER_SECOND, GST_SECOND);
+  } else {
+    omx_buf->nTimeStamp = 0;
+  }
+
+  omx_buf->nTickCount = 0;
+
   memcpy (omx_buf->pBuffer + omx_buf->nOffset, info.data, info.size);
 
   gst_buffer_unmap (frame->input_buffer, &info);
