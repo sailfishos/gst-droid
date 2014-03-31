@@ -89,6 +89,7 @@ gst_droiddec_loop (GstDroidDec * dec)
 
     frame->output_buffer = buffer;
 
+    // TODO: PTS, DTS, duration, ...
     gst_video_decoder_finish_frame (GST_VIDEO_DECODER (dec), frame);
     gst_video_codec_frame_unref (frame);
   }
@@ -153,11 +154,6 @@ gst_droiddec_stop (GstVideoDecoder * decoder)
 
   GST_DEBUG_OBJECT (dec, "stop");
 
-  dec->started = FALSE;
-
-  if (!gst_pad_stop_task (GST_VIDEO_DECODER_SRC_PAD (decoder))) {
-    // TODO:
-  }
   // TODO:
 
   return TRUE;
@@ -240,6 +236,12 @@ gst_droiddec_finish (GstVideoDecoder * decoder)
 
   GST_DEBUG_OBJECT (dec, "finish");
 
+  dec->started = FALSE;
+
+  // TODO:
+  if (!gst_pad_stop_task (GST_VIDEO_DECODER_SRC_PAD (decoder))) {
+    // TODO:
+  }
   // TODO:
 
   return GST_FLOW_OK;

@@ -858,6 +858,7 @@ gst_droid_codec_consume_frame (GstDroidComponent * comp, OMX_U32 flags,
     omx_buf->nTimeStamp = 0;
   }
 
+  /* TODO: */
   omx_buf->nTickCount = 0;
 
   memcpy (omx_buf->pBuffer + omx_buf->nOffset, info.data, info.size);
