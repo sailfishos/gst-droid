@@ -47,6 +47,44 @@ GST_STATIC_PAD_TEMPLATE (GST_VIDEO_DECODER_SINK_NAME,
     GST_STATIC_CAPS_ANY);
 
 static void
+gst_droiddec_loop (GstDroidDec * dec)
+{
+  OMX_BUFFERHEADERTYPE *buff;
+  GstBuffer *buffer;
+  GstVideoCodecFrame *frame;
+
+  while (TRUE) {
+    if (!gst_droid_codec_return_output_buffers (dec->comp)) {
+      // TODO: error
+    }
+    // 33ms
+    buff = g_async_queue_timeout_pop (dec->comp->full, 33000);
+    if (!buff) {
+      /* TODO: should we stop ? */
+      // TODO:
+      continue;
+    }
+
+    buffer = gst_omx_buffer_get_buffer (dec->comp, buff);
+    if (!buffer) {
+      /* TODO: error */
+    }
+
+    /* Now we can proceed. */
+    frame = gst_video_decoder_get_oldest_frame (GST_VIDEO_DECODER (dec));
+    if (!frame) {
+      /* TODO: error */
+    }
+
+    frame->output_buffer = buffer;
+
+    gst_video_decoder_finish_frame (GST_VIDEO_DECODER (dec), frame);
+    gst_video_codec_frame_unref (frame);
+  }
+
+}
+
+static void
 gst_droiddec_finalize (GObject * object)
 {
   GstDroidDec *dec = GST_DROIDDEC (object);
@@ -77,7 +115,6 @@ gst_droiddec_close (GstVideoDecoder * decoder)
   GstDroidDec *dec = GST_DROIDDEC (decoder);
 
   GST_DEBUG_OBJECT (dec, "close");
-
 
   // TODO:
 
@@ -154,6 +191,13 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     if (!gst_droid_codec_set_codec_data (dec->comp, state->codec_data)) {
       return FALSE;
     }
+  }
+
+  if (!gst_pad_start_task (GST_VIDEO_DECODER_SRC_PAD (decoder),
+          (GstTaskFunction) gst_droiddec_loop, gst_object_ref (dec),
+          gst_object_unref)) {
+    GST_ERROR_OBJECT (dec, "failed to start src task");
+    return FALSE;
   }
 
   return TRUE;

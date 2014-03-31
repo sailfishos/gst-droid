@@ -95,7 +95,14 @@ static OMX_ERRORTYPE
 EmptyBufferDone (OMX_HANDLETYPE hComponent, OMX_PTR pAppPrivate,
     OMX_BUFFERHEADERTYPE * pBuffer)
 {
-  GstVideoCodecFrame *frame = (GstVideoCodecFrame *) pBuffer->pAppPrivate;
+  GstDroidComponent *comp;
+  GstVideoCodecFrame *frame;
+
+  comp = (GstDroidComponent *) pAppPrivate;
+
+  GST_DEBUG_OBJECT (comp->parent, "fillBufferDone");
+
+  frame = (GstVideoCodecFrame *) pBuffer->pAppPrivate;
 
   if (frame->system_frame_number == 0) {
     if (frame->input_buffer) {
@@ -123,8 +130,13 @@ static OMX_ERRORTYPE
 FillBufferDone (OMX_HANDLETYPE hComponent, OMX_PTR pAppData,
     OMX_BUFFERHEADERTYPE * pBuffer)
 {
-  g_print ("FillBufferDone\n");
-  // TODO:
+  GstDroidComponent *comp;
+
+  comp = (GstDroidComponent *) pAppData;
+
+  GST_DEBUG_OBJECT (comp->parent, "fillBufferDone %p", pBuffer);
+
+  g_async_queue_push (comp->full, pBuffer);
 
   return OMX_ErrorNone;
 }
@@ -336,6 +348,7 @@ gst_droid_codec_destroy_component (GstDroidComponent * component)
   }
 
   /* free */
+  g_async_queue_unref (component->full);
   g_slice_free (GstDroidComponentPort, component->in_port);
   g_slice_free (GstDroidComponentPort, component->out_port);
   g_slice_free (GstDroidComponent, component);
@@ -463,6 +476,7 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type,
   component->out_port = g_slice_new0 (GstDroidComponentPort);
   component->handle = handle;
   component->parent = parent;
+  component->full = g_async_queue_new ();
 
   err =
       handle->get_handle (&component->omx, handle->name, component, &callbacks);
@@ -685,6 +699,8 @@ gst_droid_codec_allocate_port_buffers (GstDroidComponent * comp,
     return FALSE;
   }
 
+  /* TODO: We need to add the gralloc memory too to the buffers */
+
   return TRUE;
 }
 
@@ -694,11 +710,10 @@ gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
 {
   OMX_STATETYPE state;
   OMX_ERRORTYPE err;
-  GstBuffer *buffer;
-  GstBufferPoolAcquireParams params;
 
   GST_DEBUG_OBJECT (comp->parent, "start");
 
+  // TODO: check how android does it because we need to mimic it as close as possible.
   /* TODO: this code is really bad */
   /* TODO: locking */
 
@@ -760,24 +775,9 @@ gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
   }
 
   /* give back all output buffers */
-  params.flags = GST_BUFFER_POOL_ACQUIRE_FLAG_DONTWAIT;
-  while (gst_buffer_pool_acquire_buffer (comp->out_port->buffers, &buffer,
-          &params) == GST_FLOW_OK) {
-    if (comp->out_port->usage != -1) {
-      err =
-          OMX_FillThisBuffer (comp->omx,
-          gst_droid_codec_gralloc_allocator_get_omx_buffer
-          (gst_buffer_peek_memory (buffer, 0)));
-    } else {
-      err =
-          OMX_FillThisBuffer (comp->omx,
-          gst_droid_codec_omx_allocator_get_omx_buffer (gst_buffer_peek_memory
-              (buffer, 0)));
-    }
-
-    if (err != OMX_ErrorNone) {
-      return FALSE;
-    }
+  if (!gst_droid_codec_return_output_buffers (comp)) {
+    // TODO: error
+    return FALSE;
   }
 
   /* TODO: */
@@ -799,6 +799,7 @@ gst_droid_codec_consume_frame (GstDroidComponent * comp, OMX_U32 flags,
 
   GST_DEBUG_OBJECT (comp->parent, "consume");
 
+  // TODO: split the data instead of failing like that
   if (gst_buffer_get_size (frame->input_buffer) >
       comp->in_port->def.nBufferSize) {
     GST_ERROR_OBJECT (comp->parent, "buffer is too large to fit");
@@ -873,6 +874,51 @@ gst_droid_codec_set_codec_data (GstDroidComponent * comp,
     gst_buffer_unref (frame->input_buffer);
     g_slice_free (GstVideoCodecFrame, frame);
     return TRUE;
+  }
+
+  return TRUE;
+}
+
+GstBuffer *
+gst_omx_buffer_get_buffer (GstDroidComponent * comp,
+    OMX_BUFFERHEADERTYPE * buff)
+{
+  GST_DEBUG_OBJECT (comp->parent, "get buffer");
+
+  return (GstBuffer *) buff->pAppPrivate;
+}
+
+gboolean
+gst_droid_codec_return_output_buffers (GstDroidComponent * comp)
+{
+  GstBuffer *buffer;
+  GstBufferPoolAcquireParams params;
+  OMX_ERRORTYPE err;
+
+  GST_DEBUG_OBJECT (comp->parent, "return output buffers");
+
+  params.flags = GST_BUFFER_POOL_ACQUIRE_FLAG_DONTWAIT;
+  while (gst_buffer_pool_acquire_buffer (comp->out_port->buffers, &buffer,
+          &params) == GST_FLOW_OK) {
+    OMX_BUFFERHEADERTYPE *omx;
+
+    if (comp->out_port->usage != -1) {
+      omx =
+          gst_droid_codec_gralloc_allocator_get_omx_buffer
+          (gst_buffer_peek_memory (buffer, 0));
+    } else {
+      omx =
+          gst_droid_codec_omx_allocator_get_omx_buffer (gst_buffer_peek_memory
+          (buffer, 0));
+    }
+
+    omx->pAppPrivate = buffer;
+
+    err = OMX_FillThisBuffer (comp->omx, omx);
+
+    if (err != OMX_ErrorNone) {
+      return FALSE;
+    }
   }
 
   return TRUE;

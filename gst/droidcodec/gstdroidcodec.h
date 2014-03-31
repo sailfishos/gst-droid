@@ -52,6 +52,8 @@ struct _GstDroidComponent
   GstDroidComponentPort *in_port;
   GstDroidComponentPort *out_port;
   GstElement *parent;
+
+  GAsyncQueue *full;
 };
 
 struct _GstDroidCodec
@@ -90,6 +92,9 @@ gboolean gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * si
 gboolean gst_droid_codec_set_codec_data (GstDroidComponent * comp, GstBuffer * codec_data);
 gboolean gst_droid_codec_consume_frame (GstDroidComponent * comp, OMX_U32 flags,
 					GstVideoCodecFrame * frame);
+GstBuffer *gst_omx_buffer_get_buffer (GstDroidComponent * comp, OMX_BUFFERHEADERTYPE * buff);
+
+gboolean gst_droid_codec_return_output_buffers (GstDroidComponent * comp);
 
 const gchar *gst_omx_error_to_string (OMX_ERRORTYPE err);
 const gchar *gst_omx_state_to_string (OMX_STATETYPE state);
