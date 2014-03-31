@@ -214,3 +214,13 @@ gst_droid_codec_gralloc_allocator_get_omx_buffer (GstMemory * mem)
 
   return ((GstDroidCodecGrallocMemory *) mem)->omx_buf;
 }
+
+GstMemory *
+gst_droid_codec_gralloc_allocator_get_gralloc_memory (GstMemory * mem)
+{
+  if (!gst_memory_is_type (mem, GST_ALLOCATOR_DROID_CODEC_GRALLOC)) {
+    return NULL;
+  }
+
+  return ((GstDroidCodecGrallocMemory *) mem)->gralloc;
+}

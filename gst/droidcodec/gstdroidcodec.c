@@ -30,6 +30,7 @@
 #include "HardwareAPI.h"
 #include "gstdroidcodecallocatoromx.h"
 #include "gstdroidcodecallocatorgralloc.h"
+#include "gst/memory/gstgralloc.h"
 
 GST_DEFINE_MINI_OBJECT_TYPE (GstDroidCodec, gst_droid_codec);
 
@@ -915,9 +916,22 @@ gst_droid_codec_return_output_buffers (GstDroidComponent * comp)
     OMX_BUFFERHEADERTYPE *omx;
 
     if (comp->out_port->usage != -1) {
+      GstMemory *mem = gst_buffer_peek_memory (buffer, 0);
+      if (!gst_is_gralloc_memory (mem)) {
+        GstMemory *gralloc =
+            gst_droid_codec_gralloc_allocator_get_gralloc_memory (mem);
+        if (!gralloc) {
+          // TODO: error
+        }
+
+        gst_memory_ref (gralloc);
+
+        gst_buffer_insert_memory (buffer, 0, gralloc);
+      }
+
       omx =
           gst_droid_codec_gralloc_allocator_get_omx_buffer
-          (gst_buffer_peek_memory (buffer, 0));
+          (gst_buffer_peek_memory (buffer, 1));
     } else {
       omx =
           gst_droid_codec_omx_allocator_get_omx_buffer (gst_buffer_peek_memory
