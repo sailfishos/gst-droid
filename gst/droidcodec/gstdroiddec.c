@@ -69,8 +69,18 @@ gst_droiddec_loop (GstDroidDec * dec)
     if (!gst_droid_codec_return_output_buffers (dec->comp)) {
       // TODO: error
     }
-    // 33ms
-    buff = g_async_queue_timeout_pop (dec->comp->full, 33000);
+
+    GST_DEBUG_OBJECT (dec, "trying to get a buffer");
+    g_mutex_lock (&dec->comp->full_lock);
+    buff = g_queue_pop_head (dec->comp->full);
+    if (!buff) {
+      g_cond_wait (&dec->comp->full_cond, &dec->comp->full_lock);
+      buff = g_queue_pop_head (dec->comp->full);
+    }
+
+    g_mutex_unlock (&dec->comp->full_lock);
+    GST_DEBUG_OBJECT (dec, "got buffer %p", buff);
+
     if (!buff) {
       /* TODO: should we stop ? */
       // TODO:

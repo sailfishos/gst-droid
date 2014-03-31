@@ -152,7 +152,10 @@ FillBufferDone (OMX_HANDLETYPE hComponent, OMX_PTR pAppData,
 
   GST_DEBUG_OBJECT (comp->parent, "fillBufferDone %p", pBuffer);
 
-  g_async_queue_push (comp->full, pBuffer);
+  g_mutex_lock (&comp->full_lock);
+  g_queue_push_tail (comp->full, pBuffer);
+  g_cond_signal (&comp->full_cond);
+  g_mutex_unlock (&comp->full_lock);
 
   return OMX_ErrorNone;
 }
@@ -364,7 +367,9 @@ gst_droid_codec_destroy_component (GstDroidComponent * component)
   }
 
   /* free */
-  g_async_queue_unref (component->full);
+  g_queue_free (component->full);
+  g_mutex_clear (&component->full_lock);
+  g_cond_clear (&component->full_cond);
   g_slice_free (GstDroidComponentPort, component->in_port);
   g_slice_free (GstDroidComponentPort, component->out_port);
   g_slice_free (GstDroidComponent, component);
@@ -492,7 +497,9 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type,
   component->out_port = g_slice_new0 (GstDroidComponentPort);
   component->handle = handle;
   component->parent = parent;
-  component->full = g_async_queue_new ();
+  component->full = g_queue_new ();
+  g_mutex_init (&component->full_lock);
+  g_cond_init (&component->full_cond);
 
   err =
       handle->get_handle (&component->omx, handle->name, component, &callbacks);

@@ -53,7 +53,9 @@ struct _GstDroidComponent
   GstDroidComponentPort *out_port;
   GstElement *parent;
 
-  GAsyncQueue *full;
+  GMutex full_lock;
+  GCond full_cond;
+  GQueue *full;
 };
 
 struct _GstDroidCodec
