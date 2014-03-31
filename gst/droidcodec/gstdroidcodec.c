@@ -805,6 +805,7 @@ gst_droid_codec_consume_frame (GstDroidComponent * comp, OMX_U32 flags,
 
   GST_DEBUG_OBJECT (comp->parent, "consume");
 
+  flags |= OMX_BUFFERFLAG_ENDOFFRAME;
   // TODO: split the data instead of failing like that
   if (gst_buffer_get_size (frame->input_buffer) >
       comp->in_port->def.nBufferSize) {
@@ -890,8 +891,7 @@ gst_droid_codec_set_codec_data (GstDroidComponent * comp,
   frame->pts = GST_CLOCK_TIME_NONE;
   frame->system_frame_number = 0;
   frame->input_buffer = gst_buffer_ref (codec_data);
-  if (!gst_droid_codec_consume_frame (comp,
-          OMX_BUFFERFLAG_CODECCONFIG | OMX_BUFFERFLAG_ENDOFFRAME, frame)) {
+  if (!gst_droid_codec_consume_frame (comp, OMX_BUFFERFLAG_CODECCONFIG, frame)) {
     gst_buffer_unref (frame->input_buffer);
     g_slice_free (GstVideoCodecFrame, frame);
     return TRUE;

@@ -252,7 +252,7 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     GstVideoCodecFrame * frame)
 {
   GstDroidDec *dec = GST_DROIDDEC (decoder);
-  OMX_U32 flags = OMX_BUFFERFLAG_ENDOFFRAME;
+  OMX_U32 flags = 0;
 
   GST_DEBUG_OBJECT (dec, "handle frame");
 
