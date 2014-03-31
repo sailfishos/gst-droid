@@ -71,7 +71,7 @@ EventHandler (OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_EVENTTYPE eEvent,
       g_print ("OMX_EventCmdComplete\n");
       break;
     case OMX_EventError:
-      g_print ("OMX_EventError\n");
+      g_print ("OMX_EventError %s\n", gst_omx_error_to_string (nData1));
       break;
     case OMX_EventPortSettingsChanged:
       g_print ("OMX_EventPortSettingsChanged\n");
@@ -120,7 +120,7 @@ EmptyBufferDone (OMX_HANDLETYPE hComponent, OMX_PTR pAppPrivate,
     }
   }
 
-  g_print ("EmptyBufferDone\n");
+  //  g_print ("EmptyBufferDone\n");
   // TODO:
 
   return OMX_ErrorNone;

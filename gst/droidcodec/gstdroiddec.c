@@ -54,6 +54,17 @@ gst_droiddec_loop (GstDroidDec * dec)
   GstVideoCodecFrame *frame;
 
   while (TRUE) {
+    if (!dec->started) {
+      GST_DEBUG_OBJECT (dec, "stopping task");
+
+      if (!gst_pad_pause_task (GST_VIDEO_DECODER_SRC_PAD (GST_VIDEO_DECODER
+                  (dec)))) {
+        // TODO:
+      }
+
+      return;
+    }
+
     if (!gst_droid_codec_return_output_buffers (dec->comp)) {
       // TODO: error
     }
@@ -130,6 +141,8 @@ gst_droiddec_start (GstVideoDecoder * decoder)
 
   // TODO:
 
+  dec->started = TRUE;
+
   return TRUE;
 }
 
@@ -140,6 +153,11 @@ gst_droiddec_stop (GstVideoDecoder * decoder)
 
   GST_DEBUG_OBJECT (dec, "stop");
 
+  dec->started = FALSE;
+
+  if (!gst_pad_stop_task (GST_VIDEO_DECODER_SRC_PAD (decoder))) {
+    // TODO:
+  }
   // TODO:
 
   return TRUE;
@@ -332,6 +350,7 @@ gst_droiddec_init (GstDroidDec * dec)
   dec->comp = NULL;
   dec->in_state = NULL;
   dec->out_state = NULL;
+  dec->started = FALSE;
 
   // TODO:
 }
