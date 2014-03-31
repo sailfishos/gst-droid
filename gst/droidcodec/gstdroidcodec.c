@@ -120,6 +120,11 @@ EmptyBufferDone (OMX_HANDLETYPE hComponent, OMX_PTR pAppPrivate,
     }
   }
 
+  /* reset buffer */
+  pBuffer->nFilledLen = 0;
+  pBuffer->nOffset = 0;
+  pBuffer->nFlags = 0;
+
   //  g_print ("EmptyBufferDone\n");
   // TODO:
 
@@ -868,9 +873,11 @@ gst_droid_codec_set_codec_data (GstDroidComponent * comp,
   GST_DEBUG_OBJECT (comp->parent, "set codec_data");
 
   frame = g_slice_new0 (GstVideoCodecFrame);
+  frame->pts = GST_CLOCK_TIME_NONE;
   frame->system_frame_number = 0;
   frame->input_buffer = gst_buffer_ref (codec_data);
-  if (!gst_droid_codec_consume_frame (comp, OMX_BUFFERFLAG_CODECCONFIG, frame)) {
+  if (!gst_droid_codec_consume_frame (comp,
+          OMX_BUFFERFLAG_CODECCONFIG | OMX_BUFFERFLAG_ENDOFFRAME, frame)) {
     gst_buffer_unref (frame->input_buffer);
     g_slice_free (GstVideoCodecFrame, frame);
     return TRUE;
@@ -912,6 +919,10 @@ gst_droid_codec_return_output_buffers (GstDroidComponent * comp)
           (buffer, 0));
     }
 
+    /* reset buffer */
+    omx->nFilledLen = 0;
+    omx->nOffset = 0;
+    omx->nFlags = 0;
     omx->pAppPrivate = buffer;
 
     err = OMX_FillThisBuffer (comp->omx, omx);
