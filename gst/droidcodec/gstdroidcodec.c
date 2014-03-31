@@ -111,7 +111,7 @@ EmptyBufferDone (OMX_HANDLETYPE hComponent, OMX_PTR pAppPrivate,
 
   comp = (GstDroidComponent *) pAppPrivate;
 
-  GST_DEBUG_OBJECT (comp->parent, "fillBufferDone");
+  GST_DEBUG_OBJECT (comp->parent, "EmptyBufferDone");
 
   frame = (GstVideoCodecFrame *) pBuffer->pAppPrivate;
 
@@ -954,12 +954,17 @@ gst_droid_codec_return_output_buffers (GstDroidComponent * comp)
     omx->nFlags = 0;
     omx->pAppPrivate = buffer;
 
+    GST_DEBUG_OBJECT (comp->parent, "handing buffer %p to the omx codec",
+        buffer);
+
     err = OMX_FillThisBuffer (comp->omx, omx);
 
     if (err != OMX_ErrorNone) {
       return FALSE;
     }
   }
+
+  GST_DEBUG_OBJECT (comp->parent, "returned output buffers");
 
   return TRUE;
 }

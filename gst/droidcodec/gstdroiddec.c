@@ -92,6 +92,8 @@ gst_droiddec_loop (GstDroidDec * dec)
 
     frame->output_buffer = buffer;
 
+    GST_DEBUG_OBJECT (dec, "finishing frame %p", frame);
+
     // TODO: PTS, DTS, duration, ...
     gst_video_decoder_finish_frame (GST_VIDEO_DECODER (dec), frame);
     gst_video_codec_frame_unref (frame);
