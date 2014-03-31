@@ -11,6 +11,7 @@ libgstdroidcodec_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstdroidcodec_la_LIBTOOLFLAGS = --tag=disable-static
 
 libgstdroidcodec_la_SOURCES = \
+	plugin.c \
 	gstdroiddec.c \
 	gstdroidcodec.c \
 	gstdroidcodectype.c \
@@ -19,6 +20,7 @@ libgstdroidcodec_la_SOURCES = \
 	gstdroidcodecallocatorgralloc.c
 
 noinst_HEADERS = \
+	plugin.h \
 	gstdroiddec.h \
 	gstdroidcodec.h \
 	gstdroidcodectype.h \

@@ -26,11 +26,12 @@
 #include "gstdroiddec.h"
 #include "gst/memory/gstgralloc.h"
 #include "gstdroidcodectype.h"
+#include "plugin.h"
 
 #define gst_droiddec_parent_class parent_class
 G_DEFINE_TYPE (GstDroidDec, gst_droiddec, GST_TYPE_VIDEO_DECODER);
 
-GST_DEBUG_CATEGORY_STATIC (gst_droid_dec_debug);
+GST_DEBUG_CATEGORY (gst_droid_dec_debug);
 #define GST_CAT_DEFAULT gst_droid_dec_debug
 
 static GstStaticPadTemplate gst_droiddec_src_template_factory =
@@ -434,19 +435,3 @@ gst_droiddec_class_init (GstDroidDecClass * klass)
       GST_DEBUG_FUNCPTR (gst_droiddec_propose_allocation);
   gstvideodecoder_class->flush = GST_DEBUG_FUNCPTR (gst_droiddec_flush);
 }
-
-static gboolean
-plugin_init (GstPlugin * plugin)
-{
-  GST_DEBUG_CATEGORY_INIT (gst_droid_dec_debug, "droiddec",
-      0, "Android HAL decoder");
-
-  return gst_element_register (plugin, "droiddec", GST_RANK_PRIMARY + 1,
-      GST_TYPE_DROIDDEC);
-}
-
-GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
-    GST_VERSION_MINOR,
-    droiddec,
-    "Android HAL decoder",
-    plugin_init, VERSION, "LGPL", PACKAGE_NAME, "http://foolab.org/")

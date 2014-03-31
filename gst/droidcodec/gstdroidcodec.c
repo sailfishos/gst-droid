@@ -31,8 +31,12 @@
 #include "gstdroidcodecallocatoromx.h"
 #include "gstdroidcodecallocatorgralloc.h"
 #include "gst/memory/gstgralloc.h"
+#include "plugin.h"
 
 GST_DEFINE_MINI_OBJECT_TYPE (GstDroidCodec, gst_droid_codec);
+
+GST_DEBUG_CATEGORY (gst_droid_codec_debug);
+#define GST_CAT_DEFAULT gst_droid_codec_debug
 
 static GstDroidCodec *codec = NULL;
 G_LOCK_DEFINE_STATIC (codec);
@@ -66,6 +70,12 @@ static OMX_ERRORTYPE
 EventHandler (OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_EVENTTYPE eEvent,
     OMX_U32 nData1, OMX_U32 nData2, OMX_PTR pEventData)
 {
+  GstDroidComponent *comp = (GstDroidComponent *) pAppData;
+
+  GST_DEBUG_OBJECT (comp->parent,
+      "got OMX event of type 0x%x (arg1 = 0x%lx, arg2 = 0x%lx)", eEvent, nData1,
+      nData2);
+
   // TODO:
   switch (eEvent) {
     case OMX_EventCmdComplete:
