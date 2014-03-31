@@ -194,8 +194,8 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   }
 
   fmt =
-      gst_gralloc_hal_to_gst (dec->comp->out_port->def.format.video.
-      eColorFormat);
+      gst_gralloc_hal_to_gst (dec->comp->out_port->def.format.
+      video.eColorFormat);
   if (fmt == GST_VIDEO_FORMAT_UNKNOWN) {
     GST_WARNING_OBJECT (dec, "unknown hal format 0x%x. Using ENCODED instead",
         dec->comp->out_port->def.format.video.eColorFormat);
@@ -215,15 +215,15 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 
   GST_DEBUG_OBJECT (dec, "output caps %" GST_PTR_FORMAT, dec->out_state->caps);
 
-  /* negotiate */
-  if (!gst_video_decoder_negotiate (decoder)) {
-    // TODO:
-    return FALSE;
-  }
-
   /* now start */
   if (!gst_droid_codec_start_component (dec->comp, dec->in_state->caps,
           dec->out_state->caps)) {
+    return FALSE;
+  }
+
+  /* negotiate */
+  if (!gst_video_decoder_negotiate (decoder)) {
+    // TODO:
     return FALSE;
   }
 
@@ -328,11 +328,29 @@ gst_droiddec_src_event (GstVideoDecoder * decoder, GstEvent * event)
 static gboolean
 gst_droiddec_decide_allocation (GstVideoDecoder * decoder, GstQuery * query)
 {
+  gsize size;
+  GstStructure *conf;
   GstDroidDec *dec = GST_DROIDDEC (decoder);
 
   GST_DEBUG_OBJECT (dec, "decide allocation %" GST_PTR_FORMAT, query);
 
-  // TODO:
+  conf = gst_buffer_pool_get_config (dec->comp->out_port->buffers);
+
+  if (!gst_buffer_pool_config_get_params (conf, NULL, &size, NULL, NULL)) {
+    // TODO: error
+    gst_structure_free (conf);
+    return FALSE;
+  }
+
+  gst_structure_free (conf);
+
+  if (gst_query_get_n_allocation_pools (query) > 0) {
+    gst_query_set_nth_allocation_pool (query, 0, dec->comp->out_port->buffers,
+        size, size, size);
+  } else {
+    gst_query_add_allocation_pool (query, dec->comp->out_port->buffers, size,
+        size, size);
+  }
 
   return TRUE;
 }
