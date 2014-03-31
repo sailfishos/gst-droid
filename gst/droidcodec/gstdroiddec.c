@@ -85,6 +85,8 @@ gst_droiddec_loop (GstDroidDec * dec)
     /* Now we can proceed. */
     frame = gst_video_decoder_get_oldest_frame (GST_VIDEO_DECODER (dec));
     if (!frame) {
+      gst_buffer_unref (buffer);
+
       /* TODO: error */
       continue;
     }
