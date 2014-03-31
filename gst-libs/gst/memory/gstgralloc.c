@@ -237,13 +237,7 @@ gst_gralloc_allocator_wrap (GstAllocator * allocator, gint width, gint height,
 
   alloc = GST_GRALLOC_ALLOCATOR (allocator);
 
-  switch (format) {
-    case GST_VIDEO_FORMAT_YV12:
-      hal_format = HAL_PIXEL_FORMAT_YV12;
-      break;
-    default:
-      break;
-  }
+  hal_format = gst_gralloc_gst_to_hal (format);
 
   if (hal_format == 0) {
     return NULL;
@@ -325,4 +319,27 @@ gst_memory_get_native_buffer (GstMemory * mem)
   }
 
   return &((GstGrallocMemory *) mem)->buff;
+}
+
+GstVideoFormat
+gst_gralloc_hal_to_gst (int hal)
+{
+  switch (hal) {
+    case HAL_PIXEL_FORMAT_YV12:
+      return GST_VIDEO_FORMAT_YV12;
+    default:
+      return GST_VIDEO_FORMAT_UNKNOWN;
+  }
+}
+
+int
+gst_gralloc_gst_to_hal (GstVideoFormat gst)
+{
+  switch (gst) {
+    case GST_VIDEO_FORMAT_YV12:
+      return HAL_PIXEL_FORMAT_YV12;
+      break;
+    default:
+      return 0;
+  }
 }
