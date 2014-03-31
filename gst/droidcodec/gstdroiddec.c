@@ -55,6 +55,10 @@ gst_droiddec_loop (GstDroidDec * dec)
   GstVideoCodecFrame *frame;
 
   while (dec->started) {
+    if (gst_droid_codec_has_error (dec->comp)) {
+      return;
+    }
+
     if (!gst_droid_codec_return_output_buffers (dec->comp)) {
       // TODO: error
     }

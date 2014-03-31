@@ -79,10 +79,20 @@ EventHandler (OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_EVENTTYPE eEvent,
   // TODO:
   switch (eEvent) {
     case OMX_EventCmdComplete:
-      g_print ("OMX_EventCmdComplete\n");
       break;
     case OMX_EventError:
-      g_print ("OMX_EventError %s\n", gst_omx_error_to_string (nData1));
+      if (nData1 != OMX_ErrorNone) {
+        GST_ERROR_OBJECT (comp->parent, "error %s from omx",
+            gst_omx_error_to_string (nData1));
+        g_mutex_lock (&comp->lock);
+        comp->error = TRUE;
+        g_mutex_unlock (&comp->lock);
+
+        /* TODO: not sure if we need to lock or not */
+        gst_buffer_pool_set_active (comp->in_port->buffers, FALSE);
+        gst_buffer_pool_set_active (comp->out_port->buffers, FALSE);
+      }
+
       break;
     case OMX_EventPortSettingsChanged:
       g_print ("OMX_EventPortSettingsChanged\n");
@@ -367,6 +377,7 @@ gst_droid_codec_destroy_component (GstDroidComponent * component)
   }
 
   /* free */
+  g_mutex_clear (&component->lock);
   g_queue_free (component->full);
   g_mutex_clear (&component->full_lock);
   g_cond_clear (&component->full_cond);
@@ -500,6 +511,8 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type,
   component->full = g_queue_new ();
   g_mutex_init (&component->full_lock);
   g_cond_init (&component->full_cond);
+  component->error = FALSE;
+  g_mutex_init (&component->lock);
 
   err =
       handle->get_handle (&component->omx, handle->name, component, &callbacks);
@@ -742,6 +755,7 @@ gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
 
   err = OMX_GetState (comp->omx, &state);
   if (err != OMX_ErrorNone) {
+    // TODO: error
     return FALSE;
   }
 
@@ -758,8 +772,10 @@ gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
   }
 
   err = OMX_SendCommand (comp->omx, OMX_CommandStateSet, OMX_StateIdle, NULL);
-
   if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) while setting state to idle",
+        gst_omx_error_to_string (err), err);
     return FALSE;
   }
 
@@ -772,40 +788,72 @@ gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
     return FALSE;
   }
 
-  err = OMX_GetState (comp->omx, &state);
+  while ((err = OMX_GetState (comp->omx, &state)) != OMX_ErrorNone
+      && !gst_droid_codec_has_error (comp)) {
+    GST_DEBUG_OBJECT (comp->parent, "component in state %s",
+        gst_omx_state_to_string (state));
+
+    if (state == OMX_StateIdle) {
+      break;
+    }
+  }
+
   if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) while moving to idle state",
+        gst_omx_error_to_string (err), err);
     return FALSE;
   }
 
-  if (state != OMX_StateIdle) {
+  if (gst_droid_codec_has_error (comp)) {
     return FALSE;
   }
+
+  GST_DEBUG_OBJECT (comp->parent, "component is in idle state");
+  /* TODO: enable ports ? */
 
   err =
       OMX_SendCommand (comp->omx, OMX_CommandStateSet, OMX_StateExecuting,
       NULL);
   if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) while setting state to executing",
+        gst_omx_error_to_string (err), err);
     return FALSE;
   }
 
-  err = OMX_GetState (comp->omx, &state);
+  while ((err = OMX_GetState (comp->omx, &state)) != OMX_ErrorNone
+      && !gst_droid_codec_has_error (comp)) {
+    GST_DEBUG_OBJECT (comp->parent, "component in state %s",
+        gst_omx_state_to_string (state));
+
+    if (state == OMX_StateExecuting) {
+      break;
+    }
+  }
+
   if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) while setting state to executing",
+        gst_omx_error_to_string (err), err);
     return FALSE;
   }
 
-  if (state != OMX_StateIdle) {
+  if (gst_droid_codec_has_error (comp)) {
     return FALSE;
   }
+
+  GST_DEBUG_OBJECT (comp->parent, "component in executing state");
 
   /* give back all output buffers */
   if (!gst_droid_codec_return_output_buffers (comp)) {
-    // TODO: error
+    GST_ERROR_OBJECT (comp->parent,
+        "failed to hand output buffers to the codec");
     return FALSE;
   }
 
   /* TODO: */
 
-  /* TODO: Now we hand the output buffers ? */
   return TRUE;
 }
 
@@ -974,4 +1022,16 @@ gst_droid_codec_return_output_buffers (GstDroidComponent * comp)
   GST_DEBUG_OBJECT (comp->parent, "returned output buffers");
 
   return TRUE;
+}
+
+gboolean
+gst_droid_codec_has_error (GstDroidComponent * comp)
+{
+  gboolean err;
+
+  g_mutex_lock (&comp->lock);
+  err = comp->error;
+  g_mutex_unlock (&comp->lock);
+
+  return err;
 }

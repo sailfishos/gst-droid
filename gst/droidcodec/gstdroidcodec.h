@@ -53,6 +53,9 @@ struct _GstDroidComponent
   GstDroidComponentPort *out_port;
   GstElement *parent;
 
+  GMutex lock;
+  gboolean error;
+
   GMutex full_lock;
   GCond full_cond;
   GQueue *full;
@@ -97,6 +100,8 @@ gboolean gst_droid_codec_consume_frame (GstDroidComponent * comp, OMX_U32 flags,
 GstBuffer *gst_omx_buffer_get_buffer (GstDroidComponent * comp, OMX_BUFFERHEADERTYPE * buff);
 
 gboolean gst_droid_codec_return_output_buffers (GstDroidComponent * comp);
+
+gboolean gst_droid_codec_has_error (GstDroidComponent * comp);
 
 const gchar *gst_omx_error_to_string (OMX_ERRORTYPE err);
 const gchar *gst_omx_state_to_string (OMX_STATETYPE state);
