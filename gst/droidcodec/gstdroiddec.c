@@ -167,6 +167,7 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   const gchar *type;
   GstDroidDec *dec = GST_DROIDDEC (decoder);
   GstVideoFormat fmt;
+  GstCapsFeatures *feature;
 
   GST_DEBUG_OBJECT (dec, "set format %" GST_PTR_FORMAT, state->caps);
 
@@ -198,15 +199,27 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   if (fmt == GST_VIDEO_FORMAT_UNKNOWN) {
     GST_WARNING_OBJECT (dec, "unknown hal format 0x%x. Using ENCODED instead",
         dec->comp->out_port->def.format.video.eColorFormat);
+    fmt = GST_VIDEO_FORMAT_ENCODED;
   }
 
   dec->out_state = gst_video_decoder_set_output_state (GST_VIDEO_DECODER (dec),
       fmt, state->info.width, state->info.height, dec->in_state);
 
+  if (!dec->out_state->caps) {
+    /* we will add our caps */
+    dec->out_state->caps = gst_video_info_to_caps (&dec->out_state->info);
+  }
+
+  feature = gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_SURFACE, NULL);
+  gst_caps_set_features (dec->out_state->caps, 0, feature);
+
   GST_DEBUG_OBJECT (dec, "output caps %" GST_PTR_FORMAT, dec->out_state->caps);
 
   /* negotiate */
-  // TODO:
+  if (!gst_video_decoder_negotiate (decoder)) {
+    // TODO:
+    return FALSE;
+  }
 
   /* now start */
   if (!gst_droid_codec_start_component (dec->comp, dec->in_state->caps,
@@ -313,18 +326,6 @@ gst_droiddec_src_event (GstVideoDecoder * decoder, GstEvent * event)
 #endif
 
 static gboolean
-gst_droiddec_negotiate (GstVideoDecoder * decoder)
-{
-  GstDroidDec *dec = GST_DROIDDEC (decoder);
-
-  GST_DEBUG_OBJECT (dec, "negotiate");
-
-  // TODO:
-
-  return TRUE;
-}
-
-static gboolean
 gst_droiddec_decide_allocation (GstVideoDecoder * decoder, GstQuery * query)
 {
   GstDroidDec *dec = GST_DROIDDEC (decoder);
@@ -409,7 +410,6 @@ gst_droiddec_class_init (GstDroidDecClass * klass)
      GST_DEBUG_FUNCPTR (gst_droiddec_sink_event);
      gstvideodecoder_class->src_event = GST_DEBUG_FUNCPTR (gst_droiddec_src_event);
    */
-  gstvideodecoder_class->negotiate = GST_DEBUG_FUNCPTR (gst_droiddec_negotiate);
   gstvideodecoder_class->decide_allocation =
       GST_DEBUG_FUNCPTR (gst_droiddec_decide_allocation);
   gstvideodecoder_class->propose_allocation =
