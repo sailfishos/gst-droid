@@ -79,12 +79,14 @@ gst_droiddec_loop (GstDroidDec * dec)
     buffer = gst_omx_buffer_get_buffer (dec->comp, buff);
     if (!buffer) {
       /* TODO: error */
+      continue;
     }
 
     /* Now we can proceed. */
     frame = gst_video_decoder_get_oldest_frame (GST_VIDEO_DECODER (dec));
     if (!frame) {
       /* TODO: error */
+      continue;
     }
 
     frame->output_buffer = buffer;
