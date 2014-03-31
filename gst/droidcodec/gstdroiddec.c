@@ -54,18 +54,7 @@ gst_droiddec_loop (GstDroidDec * dec)
   GstBuffer *buffer;
   GstVideoCodecFrame *frame;
 
-  while (TRUE) {
-    if (!dec->started) {
-      GST_DEBUG_OBJECT (dec, "stopping task");
-
-      if (!gst_pad_pause_task (GST_VIDEO_DECODER_SRC_PAD (GST_VIDEO_DECODER
-                  (dec)))) {
-        // TODO:
-      }
-
-      return;
-    }
-
+  while (dec->started) {
     if (!gst_droid_codec_return_output_buffers (dec->comp)) {
       // TODO: error
     }
@@ -109,6 +98,16 @@ gst_droiddec_loop (GstDroidDec * dec)
     gst_video_codec_frame_unref (frame);
   }
 
+  if (!dec->started) {
+    GST_DEBUG_OBJECT (dec, "stopping task");
+
+    if (!gst_pad_pause_task (GST_VIDEO_DECODER_SRC_PAD (GST_VIDEO_DECODER
+                (dec)))) {
+      // TODO:
+    }
+
+    return;
+  }
 }
 
 static void
@@ -207,8 +206,8 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   }
 
   fmt =
-      gst_gralloc_hal_to_gst (dec->comp->out_port->def.format.
-      video.eColorFormat);
+      gst_gralloc_hal_to_gst (dec->comp->out_port->def.format.video.
+      eColorFormat);
   if (fmt == GST_VIDEO_FORMAT_UNKNOWN) {
     GST_WARNING_OBJECT (dec, "unknown hal format 0x%x. Using ENCODED instead",
         dec->comp->out_port->def.format.video.eColorFormat);
