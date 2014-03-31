@@ -232,15 +232,18 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     GstVideoCodecFrame * frame)
 {
   GstDroidDec *dec = GST_DROIDDEC (decoder);
+  OMX_U32 flags = OMX_BUFFERFLAG_ENDOFFRAME;
 
   GST_DEBUG_OBJECT (dec, "handle frame");
 
   frame->system_frame_number = 1;
   // TODO:
 
-  // TODO: sync frame flag
-  if (!gst_droid_codec_consume_frame (dec->comp, OMX_BUFFERFLAG_ENDOFFRAME,
-          frame)) {
+  if (GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame)) {
+    flags |= OMX_BUFFERFLAG_SYNCFRAME;
+  }
+
+  if (!gst_droid_codec_consume_frame (dec->comp, flags, frame)) {
     // TODO: error
     return GST_FLOW_ERROR;
   }
