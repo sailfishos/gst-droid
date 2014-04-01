@@ -188,6 +188,7 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   GstDroidDec *dec = GST_DROIDDEC (decoder);
   GstVideoFormat fmt;
   GstCapsFeatures *feature;
+  int hal_fmt;
 
   GST_DEBUG_OBJECT (dec, "set format %" GST_PTR_FORMAT, state->caps);
 
@@ -213,9 +214,9 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     return FALSE;
   }
 
-  fmt =
-      gst_gralloc_hal_to_gst (dec->comp->out_port->def.format.
-      video.eColorFormat);
+  hal_fmt = dec->comp->out_port->def.format.video.eColorFormat;
+  fmt = gst_gralloc_hal_to_gst (hal_fmt);
+
   if (fmt == GST_VIDEO_FORMAT_UNKNOWN) {
     GST_WARNING_OBJECT (dec, "unknown hal format 0x%x. Using ENCODED instead",
         dec->comp->out_port->def.format.video.eColorFormat);
