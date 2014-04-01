@@ -325,10 +325,20 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   }
   // TODO:
 
+  /* This can deadlock if omx does not provide an input buffer and we end up
+   * waiting for a buffer which does not happen because omx needs us to provide
+   * output buffers to be filled (which can not happen because _loop() tries
+   * to call get_oldest_frame() which acquires the stream lock the base class
+   * is holding before calling us */
+  GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
   if (!gst_droid_codec_consume_frame (dec->comp, frame)) {
+    GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+
     // TODO: error
     return GST_FLOW_ERROR;
   }
+
+  GST_VIDEO_DECODER_STREAM_LOCK (decoder);
 
   return GST_FLOW_OK;
 }
