@@ -84,7 +84,8 @@ gst_droiddec_loop (GstDroidDec * dec)
 
     buffer = gst_omx_buffer_get_buffer (dec->comp, buff);
     if (!buffer) {
-      /* TODO: error */
+      GST_ERROR_OBJECT (dec, "can not get buffer associated with omx buffer %p",
+          buff);
       continue;
     }
 
@@ -92,8 +93,7 @@ gst_droiddec_loop (GstDroidDec * dec)
     frame = gst_video_decoder_get_oldest_frame (GST_VIDEO_DECODER (dec));
     if (!frame) {
       gst_buffer_unref (buffer);
-
-      /* TODO: error */
+      GST_ERROR_OBJECT (dec, "can not find a video frame");
       continue;
     }
 

@@ -133,6 +133,7 @@ EmptyBufferDone (OMX_HANDLETYPE hComponent, OMX_PTR pAppPrivate,
   pBuffer->nFlags = 0;
 
   if (buffer) {
+    GST_DEBUG ("buffer %p emptied and being returned", buffer);
     gst_buffer_unref (buffer);
   }
 
@@ -856,7 +857,7 @@ gst_droid_codec_consume_frame (GstDroidComponent * comp,
   gsize size, offset = 0;
   GstClockTime timestamp, duration;
 
-  GST_DEBUG_OBJECT (comp->parent, "consume");
+  GST_DEBUG_OBJECT (comp->parent, "consume frame");
 
   params.flags = GST_BUFFER_POOL_ACQUIRE_FLAG_NONE;
 
@@ -928,6 +929,8 @@ gst_droid_codec_consume_frame (GstDroidComponent * comp,
       return FALSE;
     }
   }
+
+  GST_DEBUG_OBJECT (comp->parent, "frame consumed");
 
   return TRUE;
 }
