@@ -75,6 +75,8 @@ gst_droiddec_loop (GstDroidDec * dec)
     GST_DEBUG_OBJECT (dec, "got buffer %p", buff);
 
     if (!buff) {
+      GST_DEBUG_OBJECT (dec, "got no buffer");
+
       /* TODO: should we stop ? */
       // TODO:
       continue;
@@ -283,6 +285,14 @@ gst_droiddec_finish (GstVideoDecoder * decoder)
   GST_DEBUG_OBJECT (dec, "finish");
 
   dec->started = FALSE;
+
+  /* TODO: not sure if we need to lock or not */
+  gst_buffer_pool_set_active (dec->comp->in_port->buffers, FALSE);
+  gst_buffer_pool_set_active (dec->comp->out_port->buffers, FALSE);
+
+  g_mutex_lock (&dec->comp->full_lock);
+  g_cond_signal (&dec->comp->full_cond);
+  g_mutex_unlock (&dec->comp->full_lock);
 
   // TODO:
   if (!gst_pad_stop_task (GST_VIDEO_DECODER_SRC_PAD (decoder))) {
