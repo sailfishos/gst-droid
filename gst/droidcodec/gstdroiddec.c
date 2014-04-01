@@ -291,15 +291,22 @@ gst_droiddec_finish (GstVideoDecoder * decoder)
   gst_buffer_pool_set_active (dec->comp->in_port->buffers, FALSE);
   gst_buffer_pool_set_active (dec->comp->out_port->buffers, FALSE);
 
+  /* Just informing the task that we are finishing */
   g_mutex_lock (&dec->comp->full_lock);
   g_cond_signal (&dec->comp->full_cond);
   g_mutex_unlock (&dec->comp->full_lock);
 
-  // TODO:
+  /* We need to release the stream lock to prevent deadlocks when the _loop ()
+   * function tries to call _finish_frame ()
+   */
+  GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
+  GST_PAD_STREAM_LOCK (GST_VIDEO_DECODER_SRC_PAD (decoder));
+  GST_PAD_STREAM_UNLOCK (GST_VIDEO_DECODER_SRC_PAD (decoder));
+  GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+
   if (!gst_pad_stop_task (GST_VIDEO_DECODER_SRC_PAD (decoder))) {
-    // TODO:
+    // TODO: error
   }
-  // TODO:
 
   return GST_FLOW_OK;
 }
