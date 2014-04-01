@@ -728,6 +728,32 @@ gst_droid_codec_allocate_port_buffers (GstDroidComponent * comp,
   return TRUE;
 }
 
+static gboolean
+gst_droid_codec_set_port_enabled (GstDroidComponent * comp, int index,
+    gboolean enable)
+{
+  OMX_ERRORTYPE err;
+
+  // TODO:
+
+  GST_DEBUG_OBJECT (comp->parent, "set port enabled: %d %d", index, enable);
+
+  if (enable) {
+    err = OMX_SendCommand (comp->omx, OMX_CommandPortEnable, index, NULL);
+  } else {
+    err = OMX_SendCommand (comp->omx, OMX_CommandPortDisable, index, NULL);
+  }
+
+  if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) while enabling or disabling port",
+        gst_omx_error_to_string (err), err);
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
 gboolean
 gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
     GstCaps * src)
@@ -756,6 +782,16 @@ gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
   }
 
   if (state != OMX_StateLoaded) {
+    return FALSE;
+  }
+
+  if (!gst_droid_codec_set_port_enabled (comp, comp->in_port->def.nPortIndex,
+          TRUE)) {
+    return FALSE;
+  }
+
+  if (!gst_droid_codec_set_port_enabled (comp, comp->out_port->def.nPortIndex,
+          TRUE)) {
     return FALSE;
   }
 
