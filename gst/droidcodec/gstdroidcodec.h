@@ -95,8 +95,7 @@ gboolean gst_droid_codec_configure_component (GstDroidComponent *comp,
 					      const GstVideoInfo * info);
 gboolean gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink, GstCaps * src);
 gboolean gst_droid_codec_set_codec_data (GstDroidComponent * comp, GstBuffer * codec_data);
-gboolean gst_droid_codec_consume_frame (GstDroidComponent * comp, OMX_U32 flags,
-					GstVideoCodecFrame * frame);
+gboolean gst_droid_codec_consume_frame (GstDroidComponent * comp, GstVideoCodecFrame * frame);
 GstBuffer *gst_omx_buffer_get_buffer (GstDroidComponent * comp, OMX_BUFFERHEADERTYPE * buff);
 
 gboolean gst_droid_codec_return_output_buffers (GstDroidComponent * comp);

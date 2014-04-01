@@ -212,8 +212,8 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   }
 
   fmt =
-      gst_gralloc_hal_to_gst (dec->comp->out_port->def.format.video.
-      eColorFormat);
+      gst_gralloc_hal_to_gst (dec->comp->out_port->def.format.
+      video.eColorFormat);
   if (fmt == GST_VIDEO_FORMAT_UNKNOWN) {
     GST_WARNING_OBJECT (dec, "unknown hal format 0x%x. Using ENCODED instead",
         dec->comp->out_port->def.format.video.eColorFormat);
@@ -298,8 +298,6 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     GstVideoCodecFrame * frame)
 {
   GstDroidDec *dec = GST_DROIDDEC (decoder);
-  OMX_U32 flags = 0;
-
   GST_DEBUG_OBJECT (dec, "handle frame");
 
   if (gst_droid_codec_has_error (dec->comp)) {
@@ -307,15 +305,9 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     gst_video_decoder_release_frame (decoder, frame);
     return GST_FLOW_ERROR;
   }
-
-  frame->system_frame_number = 1;
   // TODO:
 
-  if (GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame)) {
-    flags |= OMX_BUFFERFLAG_SYNCFRAME;
-  }
-
-  if (!gst_droid_codec_consume_frame (dec->comp, flags, frame)) {
+  if (!gst_droid_codec_consume_frame (dec->comp, frame)) {
     // TODO: error
     return GST_FLOW_ERROR;
   }

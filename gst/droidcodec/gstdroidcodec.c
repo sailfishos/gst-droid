@@ -117,28 +117,14 @@ EmptyBufferDone (OMX_HANDLETYPE hComponent, OMX_PTR pAppPrivate,
     OMX_BUFFERHEADERTYPE * pBuffer)
 {
   GstDroidComponent *comp;
-  GstVideoCodecFrame *frame;
+  GstBuffer *buffer = NULL;
 
   comp = (GstDroidComponent *) pAppPrivate;
 
   GST_DEBUG_OBJECT (comp->parent, "EmptyBufferDone");
 
-  frame = (GstVideoCodecFrame *) pBuffer->pAppPrivate;
-
-  if (frame->system_frame_number == 0) {
-    if (frame->input_buffer) {
-      gst_buffer_unref (frame->input_buffer);
-    }
-
-    if (frame->output_buffer) {
-      gst_buffer_unref (frame->output_buffer);
-    }
-
-    g_slice_free (GstVideoCodecFrame, frame);
-  } else {
-    if (frame->output_buffer) {
-      gst_buffer_unref (frame->output_buffer);
-    }
+  if (pBuffer->pAppPrivate) {
+    buffer = (GstBuffer *) pBuffer->pAppPrivate;
   }
 
   /* reset buffer */
@@ -146,8 +132,9 @@ EmptyBufferDone (OMX_HANDLETYPE hComponent, OMX_PTR pAppPrivate,
   pBuffer->nOffset = 0;
   pBuffer->nFlags = 0;
 
-  //  g_print ("EmptyBufferDone\n");
-  // TODO:
+  if (buffer) {
+    gst_buffer_unref (buffer);
+  }
 
   return OMX_ErrorNone;
 }
@@ -858,30 +845,106 @@ gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
 }
 
 gboolean
-gst_droid_codec_consume_frame (GstDroidComponent * comp, OMX_U32 flags,
+gst_droid_codec_consume_frame (GstDroidComponent * comp,
     GstVideoCodecFrame * frame)
 {
   GstFlowReturn ret;
   GstBufferPoolAcquireParams params;
   GstBuffer *buf = NULL;
   OMX_BUFFERHEADERTYPE *omx_buf;
-  GstMapInfo info;
   OMX_ERRORTYPE err;
-  GstClockTime timestamp;
+  gsize size, offset = 0;
+  GstClockTime timestamp, duration;
 
   GST_DEBUG_OBJECT (comp->parent, "consume");
 
-  if (flags & OMX_BUFFERFLAG_CODECCONFIG) {
-    if (gst_buffer_get_size (frame->input_buffer) >
-        comp->in_port->def.nBufferSize) {
-      GST_ERROR_OBJECT (comp->parent, "codec config is too large");
+  params.flags = GST_BUFFER_POOL_ACQUIRE_FLAG_NONE;
+
+  size = gst_buffer_get_size (frame->input_buffer);
+  timestamp = frame->pts;
+  duration = frame->duration;
+
+  /* This is mainly based on gst-omx */
+  while (offset < size) {
+    /* acquire a buffer from the pool */
+    ret =
+        gst_buffer_pool_acquire_buffer (comp->in_port->buffers, &buf, &params);
+    if (ret != GST_FLOW_OK) {
+      GST_ERROR_OBJECT (comp->parent, "error %s acquiring input buffer",
+          gst_flow_get_name (ret));
+      return FALSE;
+    }
+
+    /* get omx buffer */
+    omx_buf =
+        gst_droid_codec_omx_allocator_get_omx_buffer (gst_buffer_peek_memory
+        (buf, 0));
+    if (!omx_buf) {
+      gst_buffer_unref (buf);
+
+      GST_ERROR_OBJECT (comp->parent, "failed to get omx buffer");
+      return FALSE;
+    }
+
+    omx_buf->nFilledLen =
+        MIN (size - offset, omx_buf->nAllocLen - omx_buf->nOffset);
+
+    gst_buffer_extract (frame->input_buffer, offset,
+        omx_buf->pBuffer + omx_buf->nOffset, omx_buf->nFilledLen);
+
+    if (timestamp != GST_CLOCK_TIME_NONE) {
+      omx_buf->nTimeStamp =
+          gst_util_uint64_scale (timestamp, OMX_TICKS_PER_SECOND, GST_SECOND);
+    } else {
+      omx_buf->nTimeStamp = 0;
+    }
+
+    if (duration != GST_CLOCK_TIME_NONE && offset == 0) {
+      omx_buf->nTickCount =
+          gst_util_uint64_scale (omx_buf->nFilledLen, duration, size);
+    } else {
+      omx_buf->nTickCount = 0;
+    }
+
+    if (offset == 0 && GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame)) {
+      omx_buf->nFlags |= OMX_BUFFERFLAG_SYNCFRAME;
+    }
+
+    offset += omx_buf->nFilledLen;
+
+    if (offset == size) {
+      omx_buf->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
+    }
+
+    omx_buf->pAppPrivate = buf;
+
+    /* empty! */
+    err = OMX_EmptyThisBuffer (comp->omx, omx_buf);
+
+    if (err != OMX_ErrorNone) {
+      GST_ERROR ("got error %s (0x%08x) while calling EmptyThisBuffer",
+          gst_omx_error_to_string (err), err);
+
       return FALSE;
     }
   }
 
-  /* acquire a buffer from the pool */
-  params.flags = GST_BUFFER_POOL_ACQUIRE_FLAG_NONE;
+  return TRUE;
+}
 
+gboolean
+gst_droid_codec_set_codec_data (GstDroidComponent * comp,
+    GstBuffer * codec_data)
+{
+  GstBuffer *buf;
+  OMX_BUFFERHEADERTYPE *omx_buf;
+  GstFlowReturn ret;
+  GstBufferPoolAcquireParams params;
+  OMX_ERRORTYPE err;
+
+  GST_DEBUG_OBJECT (comp->parent, "set codec_data");
+
+  params.flags = GST_BUFFER_POOL_ACQUIRE_FLAG_NONE;
   ret = gst_buffer_pool_acquire_buffer (comp->in_port->buffers, &buf, &params);
   if (ret != GST_FLOW_OK) {
     GST_ERROR_OBJECT (comp->parent, "error %s acquiring input buffer",
@@ -889,7 +952,7 @@ gst_droid_codec_consume_frame (GstDroidComponent * comp, OMX_U32 flags,
     return FALSE;
   }
 
-  /* get our buffer */
+  /* get omx buffer */
   omx_buf =
       gst_droid_codec_omx_allocator_get_omx_buffer (gst_buffer_peek_memory (buf,
           0));
@@ -900,31 +963,23 @@ gst_droid_codec_consume_frame (GstDroidComponent * comp, OMX_U32 flags,
     return FALSE;
   }
 
-  flags |= OMX_BUFFERFLAG_ENDOFFRAME;
-  /* fill omx buffer */
-  timestamp = frame->pts;
-  frame->output_buffer = buf;
-
-  omx_buf->pAppPrivate = frame;
-  omx_buf->nFlags = flags;
-  omx_buf->nFilledLen = info.size;
-
-  /* This is stolen from gst-omx */
-  if (GST_CLOCK_TIME_IS_VALID (timestamp)) {
-    omx_buf->nTimeStamp =
-        gst_util_uint64_scale (timestamp, OMX_TICKS_PER_SECOND, GST_SECOND);
-  } else {
-    omx_buf->nTimeStamp = 0;
+  if (omx_buf->nAllocLen - omx_buf->nOffset < gst_buffer_get_size (codec_data)) {
+    gst_buffer_unref (buf);
+    GST_ERROR_OBJECT (comp->parent, "codec config is too large");
+    return FALSE;
   }
 
-  /* TODO: */
+  omx_buf->nFilledLen = gst_buffer_get_size (codec_data);
+  gst_buffer_extract (codec_data, 0,
+      omx_buf->pBuffer + omx_buf->nOffset, omx_buf->nFilledLen);
+
+  gst_buffer_unref (buf);
+
+  omx_buf->nFlags = OMX_BUFFERFLAG_CODECCONFIG | OMX_BUFFERFLAG_ENDOFFRAME;
+  omx_buf->nTimeStamp = 0;
   omx_buf->nTickCount = 0;
+  omx_buf->pAppPrivate = NULL;
 
-  gst_buffer_extract (frame->input_buffer, 0,
-      omx_buf->pBuffer + omx_buf->nOffset,
-      gst_buffer_get_size (frame->input_buffer));
-
-  /* empty! */
   err = OMX_EmptyThisBuffer (comp->omx, omx_buf);
 
   if (err != OMX_ErrorNone) {
@@ -932,27 +987,6 @@ gst_droid_codec_consume_frame (GstDroidComponent * comp, OMX_U32 flags,
         gst_omx_error_to_string (err), err);
 
     return FALSE;
-  }
-
-  return TRUE;
-}
-
-gboolean
-gst_droid_codec_set_codec_data (GstDroidComponent * comp,
-    GstBuffer * codec_data)
-{
-  GstVideoCodecFrame *frame;
-
-  GST_DEBUG_OBJECT (comp->parent, "set codec_data");
-
-  frame = g_slice_new0 (GstVideoCodecFrame);
-  frame->pts = GST_CLOCK_TIME_NONE;
-  frame->system_frame_number = 0;
-  frame->input_buffer = gst_buffer_ref (codec_data);
-  if (!gst_droid_codec_consume_frame (comp, OMX_BUFFERFLAG_CODECCONFIG, frame)) {
-    gst_buffer_unref (frame->input_buffer);
-    g_slice_free (GstVideoCodecFrame, frame);
-    return TRUE;
   }
 
   return TRUE;
