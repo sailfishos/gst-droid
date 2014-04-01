@@ -60,7 +60,8 @@ gst_droiddec_loop (GstDroidDec * dec)
     }
 
     if (!gst_droid_codec_return_output_buffers (dec->comp)) {
-      // TODO: error
+      GST_WARNING_OBJECT (dec,
+          "failed to return output buffers to the decoder");
     }
 
     GST_DEBUG_OBJECT (dec, "trying to get a buffer");
@@ -111,7 +112,7 @@ gst_droiddec_loop (GstDroidDec * dec)
 
     if (!gst_pad_pause_task (GST_VIDEO_DECODER_SRC_PAD (GST_VIDEO_DECODER
                 (dec)))) {
-      // TODO:
+      GST_WARNING_OBJECT (dec, "failed to pause src pad task");
     }
 
     return;
@@ -305,7 +306,7 @@ gst_droiddec_finish (GstVideoDecoder * decoder)
   GST_VIDEO_DECODER_STREAM_LOCK (decoder);
 
   if (!gst_pad_stop_task (GST_VIDEO_DECODER_SRC_PAD (decoder))) {
-    // TODO: error
+    GST_WARNING_OBJECT (dec, "failed to stop src pad task");
   }
 
   return GST_FLOW_OK;
@@ -323,7 +324,6 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     gst_video_decoder_release_frame (decoder, frame);
     return GST_FLOW_ERROR;
   }
-  // TODO:
 
   /* This can deadlock if omx does not provide an input buffer and we end up
    * waiting for a buffer which does not happen because omx needs us to provide
@@ -339,6 +339,8 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   }
 
   GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+
+  // TODO:
 
   return GST_FLOW_OK;
 }
