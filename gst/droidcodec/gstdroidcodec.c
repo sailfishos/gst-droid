@@ -871,12 +871,12 @@ gst_droid_codec_consume_frame (GstDroidComponent * comp, OMX_U32 flags,
 
   GST_DEBUG_OBJECT (comp->parent, "consume");
 
-  flags |= OMX_BUFFERFLAG_ENDOFFRAME;
-  // TODO: split the data instead of failing like that
-  if (gst_buffer_get_size (frame->input_buffer) >
-      comp->in_port->def.nBufferSize) {
-    GST_ERROR_OBJECT (comp->parent, "buffer is too large to fit");
-    return FALSE;
+  if (flags & OMX_BUFFERFLAG_CODECCONFIG) {
+    if (gst_buffer_get_size (frame->input_buffer) >
+        comp->in_port->def.nBufferSize) {
+      GST_ERROR_OBJECT (comp->parent, "codec config is too large");
+      return FALSE;
+    }
   }
 
   /* acquire a buffer from the pool */
@@ -900,6 +900,7 @@ gst_droid_codec_consume_frame (GstDroidComponent * comp, OMX_U32 flags,
     return FALSE;
   }
 
+  flags |= OMX_BUFFERFLAG_ENDOFFRAME;
   /* fill omx buffer */
   timestamp = frame->pts;
   frame->output_buffer = buf;
