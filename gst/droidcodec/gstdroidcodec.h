@@ -87,7 +87,7 @@ GstDroidCodec *gst_droid_codec_get (void);
 GstDroidComponent *gst_droid_codec_get_component (GstDroidCodec * codec,
 						  const gchar *type, GstElement * parent);
 void gst_droid_codec_put_component (GstDroidCodec * codec, GstDroidComponent * component);
-
+void gst_droid_codec_destroy_component (GstDroidComponent * component);
 
 OMX_ERRORTYPE gst_droid_codec_get_param (GstDroidComponent * comp,
 					 OMX_INDEXTYPE index, gpointer param);
@@ -96,6 +96,7 @@ OMX_ERRORTYPE gst_droid_codec_set_param (GstDroidComponent * comp,
 gboolean gst_droid_codec_configure_component (GstDroidComponent *comp,
 					      const GstVideoInfo * info);
 gboolean gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink, GstCaps * src);
+void gst_droid_codec_stop_component (GstDroidComponent * comp);
 gboolean gst_droid_codec_set_codec_data (GstDroidComponent * comp, GstBuffer * codec_data);
 gboolean gst_droid_codec_consume_frame (GstDroidComponent * comp, GstVideoCodecFrame * frame);
 GstBuffer *gst_omx_buffer_get_buffer (GstDroidComponent * comp, OMX_BUFFERHEADERTYPE * buff);

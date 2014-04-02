@@ -126,7 +126,6 @@ gst_droiddec_finalize (GObject * object)
 
   GST_DEBUG_OBJECT (dec, "finalize");
 
-  gst_mini_object_unref (GST_MINI_OBJECT (dec->codec));
   // TODO:
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
@@ -175,7 +174,28 @@ gst_droiddec_stop (GstVideoDecoder * decoder)
 
   GST_DEBUG_OBJECT (dec, "stop");
 
-  // TODO:
+  if (!dec->codec) {
+    return TRUE;
+  }
+
+  if (dec->in_state) {
+    gst_video_codec_state_unref (dec->in_state);
+    dec->in_state = NULL;
+  }
+
+  if (dec->out_state) {
+    gst_video_codec_state_unref (dec->out_state);
+    dec->out_state = NULL;
+  }
+
+  if (dec->comp) {
+    gst_droid_codec_stop_component (dec->comp);
+    gst_droid_codec_destroy_component (dec->comp);
+    dec->comp = NULL;
+  }
+
+  gst_mini_object_unref (GST_MINI_OBJECT (dec->codec));
+  dec->codec = NULL;
 
   return TRUE;
 }

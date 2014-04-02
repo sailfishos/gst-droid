@@ -354,7 +354,7 @@ error:
   return NULL;
 }
 
-static void
+void
 gst_droid_codec_destroy_component (GstDroidComponent * component)
 {
   OMX_ERRORTYPE err;
@@ -371,6 +371,7 @@ gst_droid_codec_destroy_component (GstDroidComponent * component)
   }
 
   /* free */
+  gst_mini_object_unref (GST_MINI_OBJECT (component->handle));
   g_mutex_clear (&component->lock);
   g_queue_free (component->full);
   g_mutex_clear (&component->full_lock);
@@ -500,7 +501,8 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type,
   component = g_slice_new0 (GstDroidComponent);
   component->in_port = g_slice_new0 (GstDroidComponentPort);
   component->out_port = g_slice_new0 (GstDroidComponentPort);
-  component->handle = handle;
+  component->handle =
+      (GstDroidCodecHandle *) gst_mini_object_ref (GST_MINI_OBJECT (handle));
   component->parent = parent;
   component->full = g_queue_new ();
   g_mutex_init (&component->full_lock);
@@ -878,6 +880,45 @@ gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
   /* TODO: */
 
   return TRUE;
+}
+
+void
+gst_droid_codec_stop_component (GstDroidComponent * comp)
+{
+  OMX_BUFFERHEADERTYPE *buff;
+
+  GST_DEBUG_OBJECT (comp->parent, "stop");
+
+  gst_droid_codec_set_state (comp, OMX_StateIdle);
+
+  if (!gst_droid_codec_wait_for_state (comp, OMX_StateIdle)) {
+    GST_ERROR_OBJECT (comp->parent, "component failed to reach idle state");
+  }
+
+  gst_droid_codec_set_state (comp, OMX_StateLoaded);
+
+  gst_buffer_pool_set_active (comp->in_port->buffers, FALSE);
+  gst_buffer_pool_set_active (comp->out_port->buffers, FALSE);
+
+  g_mutex_lock (&comp->full_lock);
+  while ((buff = g_queue_pop_head (comp->full)) != NULL) {
+    /* return to the pool */
+    GstBuffer *buffer = gst_omx_buffer_get_buffer (comp, buff);
+    gst_buffer_unref (buffer);
+  }
+
+  g_mutex_unlock (&comp->full_lock);
+
+  if (!gst_droid_codec_wait_for_state (comp, OMX_StateLoaded)) {
+    GST_ERROR_OBJECT (comp->parent, "component failed to reach loaded state");
+  }
+
+  /* TODO: flush our ports? */
+  gst_droid_codec_set_port_enabled (comp, comp->in_port->def.nPortIndex, FALSE);
+  gst_droid_codec_set_port_enabled (comp, comp->out_port->def.nPortIndex,
+      FALSE);
+
+  GST_INFO_OBJECT (comp->parent, "component is in loaded state");
 }
 
 static GstBuffer *
