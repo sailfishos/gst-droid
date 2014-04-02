@@ -906,7 +906,11 @@ gst_droid_codec_consume_frame (GstDroidComponent * comp,
     /* acquire a buffer from the pool */
     ret =
         gst_buffer_pool_acquire_buffer (comp->in_port->buffers, &buf, &params);
-    if (ret != GST_FLOW_OK) {
+    if (ret == GST_FLOW_FLUSHING) {
+      /* pool got deactivated */
+      GST_INFO_OBJECT (comp->parent, "input buffer pool is flushing");
+      return FALSE;
+    } else if (ret != GST_FLOW_OK) {
       GST_ERROR_OBJECT (comp->parent, "error %s acquiring input buffer",
           gst_flow_get_name (ret));
       return FALSE;
@@ -985,7 +989,11 @@ gst_droid_codec_set_codec_data (GstDroidComponent * comp,
 
   params.flags = GST_BUFFER_POOL_ACQUIRE_FLAG_NONE;
   ret = gst_buffer_pool_acquire_buffer (comp->in_port->buffers, &buf, &params);
-  if (ret != GST_FLOW_OK) {
+  if (ret == GST_FLOW_FLUSHING) {
+    /* pool got deactivated */
+    GST_INFO_OBJECT (comp->parent, "input buffer pool is flushing");
+    return FALSE;
+  } else if (ret != GST_FLOW_OK) {
     GST_ERROR_OBJECT (comp->parent, "error %s acquiring input buffer",
         gst_flow_get_name (ret));
     return FALSE;
