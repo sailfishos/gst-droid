@@ -321,6 +321,12 @@ gst_droid_codec_create_and_insert_handle_locked (GstDroidCodec * codec,
 
   GST_DEBUG ("created handle %p", handle);
 
+  g_free (path);
+  g_free (core_path);
+  g_free (name);
+  g_free (role);
+  g_key_file_unref (file);
+
   return handle;
 
 error:
@@ -916,6 +922,12 @@ gst_droid_codec_stop_component (GstDroidComponent * comp)
 
   gst_object_unref (comp->out_port->buffers);
   comp->out_port->buffers = NULL;
+
+  gst_object_unref (comp->in_port->allocator);
+  comp->in_port->allocator = NULL;
+
+  gst_object_unref (comp->out_port->allocator);
+  comp->out_port->allocator = NULL;
 
   GST_INFO_OBJECT (comp->parent, "component is in loaded state");
 }
