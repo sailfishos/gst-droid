@@ -139,7 +139,7 @@ gst_droiddec_open (GstVideoDecoder * decoder)
 
   GST_DEBUG_OBJECT (dec, "open");
 
-  // TODO:
+  /* nothing to do here */
 
   return TRUE;
 }
@@ -151,7 +151,7 @@ gst_droiddec_close (GstVideoDecoder * decoder)
 
   GST_DEBUG_OBJECT (dec, "close");
 
-  // TODO:
+  /* nothing to do here */
 
   return TRUE;
 }
@@ -162,8 +162,6 @@ gst_droiddec_start (GstVideoDecoder * decoder)
   GstDroidDec *dec = GST_DROIDDEC (decoder);
 
   GST_DEBUG_OBJECT (dec, "start");
-
-  // TODO:
 
   dec->started = TRUE;
 
@@ -385,7 +383,7 @@ gst_droiddec_decide_allocation (GstVideoDecoder * decoder, GstQuery * query)
   conf = gst_buffer_pool_get_config (dec->comp->out_port->buffers);
 
   if (!gst_buffer_pool_config_get_params (conf, NULL, &size, NULL, NULL)) {
-    // TODO: error
+    GST_ERROR_OBJECT (dec, "failed to get buffer pool configuration");
     gst_structure_free (conf);
     return FALSE;
   }
@@ -435,8 +433,6 @@ gst_droiddec_init (GstDroidDec * dec)
   dec->in_state = NULL;
   dec->out_state = NULL;
   dec->started = FALSE;
-
-  // TODO:
 }
 
 static void
