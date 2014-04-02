@@ -45,6 +45,9 @@ G_LOCK_DEFINE_STATIC (codec);
 // TODO: hardcoded
 #define CONFIG_DIR   "/etc/gst-droid/droidcodec.d"
 
+/* 10 ms */
+#define BUFFER_POOL_ACQUISITION_TIMEOUT 10000
+
 struct _GstDroidCodecHandle
 {
   void *handle;
@@ -896,7 +899,7 @@ gst_droid_codec_acquire_buffer_from_pool (GstDroidComponent * comp,
       break;
     } else if (ret == GST_FLOW_EOS) {
       GST_DEBUG_OBJECT (comp->parent, "waiting for buffers");
-      usleep (10000);           /* 10 ms */
+      usleep (BUFFER_POOL_ACQUISITION_TIMEOUT);
     }
   }
 
