@@ -911,6 +911,12 @@ gst_droid_codec_stop_component (GstDroidComponent * comp)
   gst_droid_codec_set_port_enabled (comp, comp->out_port->def.nPortIndex,
       FALSE);
 
+  gst_object_unref (comp->in_port->buffers);
+  comp->in_port->buffers = NULL;
+
+  gst_object_unref (comp->out_port->buffers);
+  comp->out_port->buffers = NULL;
+
   GST_INFO_OBJECT (comp->parent, "component is in loaded state");
 }
 
