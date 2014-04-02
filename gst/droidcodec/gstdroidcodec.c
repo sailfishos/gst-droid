@@ -754,6 +754,48 @@ gst_droid_codec_set_port_enabled (GstDroidComponent * comp, int index,
   return TRUE;
 }
 
+static gboolean
+gst_droid_codec_set_state (GstDroidComponent * comp, OMX_STATETYPE new_state)
+{
+  OMX_STATETYPE old_state;
+  OMX_ERRORTYPE err;
+
+  GST_DEBUG_OBJECT (comp->parent, "setting state to %s",
+      gst_omx_state_to_string (new_state));
+
+  err = OMX_GetState (comp->omx, &old_state);
+  if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent, "error %s getting component state",
+        gst_omx_error_to_string (err));
+    return FALSE;
+  }
+
+  if (old_state == new_state) {
+    GST_DEBUG_OBJECT (comp->parent, "new state is already the existing state");
+    return TRUE;
+  }
+
+  if (new_state <= OMX_StateInvalid || new_state > OMX_StateExecuting) {
+    GST_ERROR_OBJECT (comp->parent, "cannot handle transition from %s to %s",
+        gst_omx_state_to_string (old_state),
+        gst_omx_state_to_string (new_state));
+    return FALSE;
+  }
+
+  err = OMX_SendCommand (comp->omx, OMX_CommandStateSet, new_state, NULL);
+  if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) while setting state to %s",
+        gst_omx_error_to_string (err), err,
+        gst_omx_state_to_string (new_state));
+    return FALSE;
+  }
+
+  /* we can not do much here really */
+
+  return TRUE;
+}
+
 gboolean
 gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
     GstCaps * src)
@@ -767,21 +809,7 @@ gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
   /* TODO: this code is really bad */
   /* TODO: locking */
 
-  err = OMX_GetState (comp->omx, &state);
-  if (err != OMX_ErrorNone) {
-    // TODO: error
-    return FALSE;
-  }
-
-  if (state == OMX_StateExecuting) {
-    return TRUE;
-  }
-
-  if (state <= OMX_StateInvalid || state > OMX_StateExecuting) {
-    return FALSE;
-  }
-
-  if (state != OMX_StateLoaded) {
+  if (!gst_droid_codec_set_state (comp, OMX_StateIdle)) {
     return FALSE;
   }
 
@@ -792,14 +820,6 @@ gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
 
   if (!gst_droid_codec_set_port_enabled (comp, comp->out_port->def.nPortIndex,
           TRUE)) {
-    return FALSE;
-  }
-
-  err = OMX_SendCommand (comp->omx, OMX_CommandStateSet, OMX_StateIdle, NULL);
-  if (err != OMX_ErrorNone) {
-    GST_ERROR_OBJECT (comp->parent,
-        "got error %s (0x%08x) while setting state to idle",
-        gst_omx_error_to_string (err), err);
     return FALSE;
   }
 
@@ -834,15 +854,8 @@ gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
   }
 
   GST_DEBUG_OBJECT (comp->parent, "component is in idle state");
-  /* TODO: enable ports ? */
 
-  err =
-      OMX_SendCommand (comp->omx, OMX_CommandStateSet, OMX_StateExecuting,
-      NULL);
-  if (err != OMX_ErrorNone) {
-    GST_ERROR_OBJECT (comp->parent,
-        "got error %s (0x%08x) while setting state to executing",
-        gst_omx_error_to_string (err), err);
+  if (!gst_droid_codec_set_state (comp, OMX_StateExecuting)) {
     return FALSE;
   }
 
