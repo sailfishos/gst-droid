@@ -340,36 +340,8 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
 
   GST_VIDEO_DECODER_STREAM_LOCK (decoder);
 
-  // TODO:
-
   return GST_FLOW_OK;
 }
-
-#if 0
-static gboolean
-gst_droiddec_sink_event (GstVideoDecoder * decoder, GstEvent * event)
-{
-  GstDroidDec *dec = GST_DROIDDEC (decoder);
-
-  GST_DEBUG_OBJECT (dec, "sink event %" GST_PTR_FORMAT, event);
-
-  // TODO:
-
-  return TRUE;
-}
-
-static gboolean
-gst_droiddec_src_event (GstVideoDecoder * decoder, GstEvent * event)
-{
-  GstDroidDec *dec = GST_DROIDDEC (decoder);
-
-  GST_DEBUG_OBJECT (dec, "src event %" GST_PTR_FORMAT, event);
-
-  // TODO:
-
-  return TRUE;
-}
-#endif
 
 static gboolean
 gst_droiddec_decide_allocation (GstVideoDecoder * decoder, GstQuery * query)
@@ -467,11 +439,6 @@ gst_droiddec_class_init (GstDroidDecClass * klass)
   gstvideodecoder_class->finish = GST_DEBUG_FUNCPTR (gst_droiddec_finish);
   gstvideodecoder_class->handle_frame =
       GST_DEBUG_FUNCPTR (gst_droiddec_handle_frame);
-  /*
-     gstvideodecoder_class->sink_event =
-     GST_DEBUG_FUNCPTR (gst_droiddec_sink_event);
-     gstvideodecoder_class->src_event = GST_DEBUG_FUNCPTR (gst_droiddec_src_event);
-   */
   gstvideodecoder_class->decide_allocation =
       GST_DEBUG_FUNCPTR (gst_droiddec_decide_allocation);
   gstvideodecoder_class->propose_allocation =
