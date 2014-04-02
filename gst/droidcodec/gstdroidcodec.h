@@ -59,6 +59,8 @@ struct _GstDroidComponent
   GMutex full_lock;
   GCond full_cond;
   GQueue *full;
+
+  OMX_STATETYPE state;
 };
 
 struct _GstDroidCodec

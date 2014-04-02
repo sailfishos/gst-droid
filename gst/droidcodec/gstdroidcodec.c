@@ -46,7 +46,7 @@ G_LOCK_DEFINE_STATIC (codec);
 #define CONFIG_DIR   "/etc/gst-droid/droidcodec.d"
 
 /* 10 ms */
-#define BUFFER_POOL_ACQUISITION_TIMEOUT 10000
+#define WAIT_TIMEOUT 10000
 
 struct _GstDroidCodecHandle
 {
@@ -83,6 +83,12 @@ EventHandler (OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_EVENTTYPE eEvent,
   // TODO:
   switch (eEvent) {
     case OMX_EventCmdComplete:
+      if (nData1 == OMX_CommandStateSet) {
+        GST_INFO_OBJECT (comp->parent, "component reached state %s",
+            gst_omx_state_to_string (nData2));
+        g_atomic_int_set (&comp->state, nData2);
+      }
+
       break;
     case OMX_EventError:
       if (nData1 != OMX_ErrorNone) {
@@ -501,6 +507,7 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type,
   g_cond_init (&component->full_cond);
   component->error = FALSE;
   g_mutex_init (&component->lock);
+  g_atomic_int_set (&component->state, OMX_StateLoaded);
 
   err =
       handle->get_handle (&component->omx, handle->name, component, &callbacks);
@@ -755,6 +762,22 @@ gst_droid_codec_set_port_enabled (GstDroidComponent * comp, int index,
 }
 
 static gboolean
+gst_droid_codec_wait_for_state (GstDroidComponent * comp,
+    OMX_STATETYPE new_state)
+{
+  while (g_atomic_int_get (&comp->state) != new_state
+      && !gst_droid_codec_has_error (comp)) {
+    usleep (WAIT_TIMEOUT);
+  }
+
+  if (gst_droid_codec_has_error (comp)) {
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+static gboolean
 gst_droid_codec_set_state (GstDroidComponent * comp, OMX_STATETYPE new_state)
 {
   OMX_STATETYPE old_state;
@@ -800,19 +823,13 @@ gboolean
 gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
     GstCaps * src)
 {
-  OMX_STATETYPE state;
-  OMX_ERRORTYPE err;
-
   GST_DEBUG_OBJECT (comp->parent, "start");
-
-  // TODO: check how android does it because we need to mimic it as close as possible.
-  /* TODO: this code is really bad */
-  /* TODO: locking */
 
   if (!gst_droid_codec_set_state (comp, OMX_StateIdle)) {
     return FALSE;
   }
 
+  /* TODO: not sure when to enable the ports */
   if (!gst_droid_codec_set_port_enabled (comp, comp->in_port->def.nPortIndex,
           TRUE)) {
     return FALSE;
@@ -832,24 +849,8 @@ gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
     return FALSE;
   }
 
-  while ((err = OMX_GetState (comp->omx, &state)) != OMX_ErrorNone
-      && !gst_droid_codec_has_error (comp)) {
-    GST_DEBUG_OBJECT (comp->parent, "component in state %s",
-        gst_omx_state_to_string (state));
-
-    if (state == OMX_StateIdle) {
-      break;
-    }
-  }
-
-  if (err != OMX_ErrorNone) {
-    GST_ERROR_OBJECT (comp->parent,
-        "got error %s (0x%08x) while moving to idle state",
-        gst_omx_error_to_string (err), err);
-    return FALSE;
-  }
-
-  if (gst_droid_codec_has_error (comp)) {
+  if (!gst_droid_codec_wait_for_state (comp, OMX_StateIdle)) {
+    GST_ERROR_OBJECT (comp->parent, "component failed to reach idle state");
     return FALSE;
   }
 
@@ -859,24 +860,9 @@ gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
     return FALSE;
   }
 
-  while ((err = OMX_GetState (comp->omx, &state)) != OMX_ErrorNone
-      && !gst_droid_codec_has_error (comp)) {
-    GST_DEBUG_OBJECT (comp->parent, "component in state %s",
-        gst_omx_state_to_string (state));
-
-    if (state == OMX_StateExecuting) {
-      break;
-    }
-  }
-
-  if (err != OMX_ErrorNone) {
+  if (!gst_droid_codec_wait_for_state (comp, OMX_StateExecuting)) {
     GST_ERROR_OBJECT (comp->parent,
-        "got error %s (0x%08x) while setting state to executing",
-        gst_omx_error_to_string (err), err);
-    return FALSE;
-  }
-
-  if (gst_droid_codec_has_error (comp)) {
+        "component failed to reach executing state");
     return FALSE;
   }
 
@@ -912,7 +898,7 @@ gst_droid_codec_acquire_buffer_from_pool (GstDroidComponent * comp,
       break;
     } else if (ret == GST_FLOW_EOS) {
       GST_DEBUG_OBJECT (comp->parent, "waiting for buffers");
-      usleep (BUFFER_POOL_ACQUISITION_TIMEOUT);
+      usleep (WAIT_TIMEOUT);
     }
   }
 
