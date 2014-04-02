@@ -320,7 +320,7 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   GST_DEBUG_OBJECT (dec, "handle frame");
 
   if (gst_droid_codec_has_error (dec->comp)) {
-    GST_ERROR_OBJECT (dec, "component reporting error. Not handling frame");
+    GST_ERROR_OBJECT (dec, "not handling frame while omx is in error state");
     gst_video_decoder_release_frame (decoder, frame);
     return GST_FLOW_ERROR;
   }
