@@ -77,9 +77,9 @@ gst_droiddec_loop (GstDroidDec * dec)
 
     if (!buff) {
       GST_DEBUG_OBJECT (dec, "got no buffer");
-
-      /* TODO: should we stop ? */
-      // TODO:
+      /* This can only happen if we are not running
+       * yet we will not exit because we should detect
+       * that upon looping */
       continue;
     }
 
@@ -245,7 +245,6 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 
   /* negotiate */
   if (!gst_video_decoder_negotiate (decoder)) {
-    // TODO:
     return FALSE;
   }
 
@@ -337,7 +336,6 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   if (!gst_droid_codec_consume_frame (dec->comp, frame)) {
     GST_VIDEO_DECODER_STREAM_LOCK (decoder);
 
-    // TODO: error
     return GST_FLOW_ERROR;
   }
 
