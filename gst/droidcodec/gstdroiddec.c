@@ -335,7 +335,8 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
   if (!gst_droid_codec_consume_frame (dec->comp, frame)) {
     GST_VIDEO_DECODER_STREAM_LOCK (decoder);
-
+    /* don't leak the frame */
+    gst_video_decoder_release_frame (decoder, frame);
     return GST_FLOW_ERROR;
   }
 
