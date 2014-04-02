@@ -288,9 +288,12 @@ gst_droiddec_finish (GstVideoDecoder * decoder)
 
   dec->started = FALSE;
 
-  /* TODO: not sure if we need to lock or not */
-  gst_buffer_pool_set_active (dec->comp->in_port->buffers, FALSE);
-  gst_buffer_pool_set_active (dec->comp->out_port->buffers, FALSE);
+  /* That should be enough for now as we can not deactivate our buffer pools
+   * otherwise we end up freeing the buffers before deactivating our omx ports
+   */
+  // TODO: move those to the shutdown sequence (when we have it).
+  //  gst_buffer_pool_set_active (dec->comp->in_port->buffers, FALSE);
+  //  gst_buffer_pool_set_active (dec->comp->out_port->buffers, FALSE);
 
   /* Just informing the task that we are finishing */
   g_mutex_lock (&dec->comp->full_lock);

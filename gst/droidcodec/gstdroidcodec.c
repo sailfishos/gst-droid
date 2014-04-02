@@ -27,6 +27,7 @@
 #include "binding.h"
 #include <dlfcn.h>
 #include <string.h>
+#include <unistd.h>
 #include "HardwareAPI.h"
 #include "gstdroidcodecallocatoromx.h"
 #include "gstdroidcodecallocatorgralloc.h"
@@ -87,10 +88,6 @@ EventHandler (OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_EVENTTYPE eEvent,
         g_mutex_lock (&comp->lock);
         comp->error = TRUE;
         g_mutex_unlock (&comp->lock);
-
-        /* TODO: not sure if we need to lock or not */
-        gst_buffer_pool_set_active (comp->in_port->buffers, FALSE);
-        gst_buffer_pool_set_active (comp->out_port->buffers, FALSE);
       }
 
       break;
@@ -881,12 +878,35 @@ gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
   return TRUE;
 }
 
+static GstBuffer *
+gst_droid_codec_acquire_buffer_from_pool (GstDroidComponent * comp,
+    GstBufferPool * pool)
+{
+  GstBuffer *buffer = NULL;
+  GstBufferPoolAcquireParams params;
+  GstFlowReturn ret;
+
+  GST_DEBUG_OBJECT (comp->parent, "acquire buffer from pool %p", pool);
+
+  while (!gst_droid_codec_has_error (comp)) {
+    params.flags = GST_BUFFER_POOL_ACQUIRE_FLAG_DONTWAIT;
+
+    ret = gst_buffer_pool_acquire_buffer (pool, &buffer, &params);
+    if (buffer || ret != GST_FLOW_EOS) {
+      break;
+    } else if (ret == GST_FLOW_EOS) {
+      GST_DEBUG_OBJECT (comp->parent, "waiting for buffers");
+      usleep (10000);           /* 10 ms */
+    }
+  }
+
+  return buffer;
+}
+
 gboolean
 gst_droid_codec_consume_frame (GstDroidComponent * comp,
     GstVideoCodecFrame * frame)
 {
-  GstFlowReturn ret;
-  GstBufferPoolAcquireParams params;
   GstBuffer *buf = NULL;
   OMX_BUFFERHEADERTYPE *omx_buf;
   OMX_ERRORTYPE err;
@@ -895,8 +915,6 @@ gst_droid_codec_consume_frame (GstDroidComponent * comp,
 
   GST_DEBUG_OBJECT (comp->parent, "consume frame");
 
-  params.flags = GST_BUFFER_POOL_ACQUIRE_FLAG_NONE;
-
   size = gst_buffer_get_size (frame->input_buffer);
   timestamp = frame->pts;
   duration = frame->duration;
@@ -904,15 +922,13 @@ gst_droid_codec_consume_frame (GstDroidComponent * comp,
   /* This is mainly based on gst-omx */
   while (offset < size) {
     /* acquire a buffer from the pool */
-    ret =
-        gst_buffer_pool_acquire_buffer (comp->in_port->buffers, &buf, &params);
-    if (ret == GST_FLOW_FLUSHING) {
-      /* pool got deactivated */
-      GST_INFO_OBJECT (comp->parent, "input buffer pool is flushing");
+    buf =
+        gst_droid_codec_acquire_buffer_from_pool (comp, comp->in_port->buffers);
+    if (!buf && gst_droid_codec_has_error (comp)) {
+      GST_INFO_OBJECT (comp->parent, "component in error state");
       return FALSE;
-    } else if (ret != GST_FLOW_OK) {
-      GST_ERROR_OBJECT (comp->parent, "error %s acquiring input buffer",
-          gst_flow_get_name (ret));
+    } else if (!buf) {
+      GST_ERROR_OBJECT (comp->parent, "could not acquire buffer");
       return FALSE;
     }
 
@@ -981,21 +997,16 @@ gst_droid_codec_set_codec_data (GstDroidComponent * comp,
 {
   GstBuffer *buf;
   OMX_BUFFERHEADERTYPE *omx_buf;
-  GstFlowReturn ret;
-  GstBufferPoolAcquireParams params;
   OMX_ERRORTYPE err;
 
   GST_DEBUG_OBJECT (comp->parent, "set codec_data");
 
-  params.flags = GST_BUFFER_POOL_ACQUIRE_FLAG_NONE;
-  ret = gst_buffer_pool_acquire_buffer (comp->in_port->buffers, &buf, &params);
-  if (ret == GST_FLOW_FLUSHING) {
-    /* pool got deactivated */
-    GST_INFO_OBJECT (comp->parent, "input buffer pool is flushing");
+  buf = gst_droid_codec_acquire_buffer_from_pool (comp, comp->in_port->buffers);
+  if (!buf && gst_droid_codec_has_error (comp)) {
+    GST_INFO_OBJECT (comp->parent, "component in error state");
     return FALSE;
-  } else if (ret != GST_FLOW_OK) {
-    GST_ERROR_OBJECT (comp->parent, "error %s acquiring input buffer",
-        gst_flow_get_name (ret));
+  } else if (!buf) {
+    GST_ERROR_OBJECT (comp->parent, "could not acquire buffer");
     return FALSE;
   }
 
