@@ -370,8 +370,19 @@ gst_droid_codec_destroy_component (GstDroidComponent * component)
     }
   }
 
+  /* Let's take care of the handle */
+  g_mutex_lock (&component->codec->lock);
+
+  if (component->handle->count > 1) {
+    component->handle->count--;
+  } else {
+    g_hash_table_remove (codec->cores, component->handle->type);
+  }
+
+  g_mutex_unlock (&component->codec->lock);
+
   /* free */
-  gst_mini_object_unref (GST_MINI_OBJECT (component->handle));
+  gst_mini_object_unref (GST_MINI_OBJECT (component->codec));
   g_mutex_clear (&component->lock);
   g_queue_free (component->full);
   g_mutex_clear (&component->full_lock);
@@ -501,8 +512,9 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type,
   component = g_slice_new0 (GstDroidComponent);
   component->in_port = g_slice_new0 (GstDroidComponentPort);
   component->out_port = g_slice_new0 (GstDroidComponentPort);
-  component->handle =
-      (GstDroidCodecHandle *) gst_mini_object_ref (GST_MINI_OBJECT (handle));
+  component->codec =
+      (GstDroidCodec *) gst_mini_object_ref (GST_MINI_OBJECT (codec));
+  component->handle = handle;
   component->parent = parent;
   component->full = g_queue_new ();
   g_mutex_init (&component->full_lock);
@@ -575,25 +587,6 @@ unlock_and_out:
   g_mutex_unlock (&codec->lock);
 
   return component;
-}
-
-void
-gst_droid_codec_put_component (GstDroidCodec * codec,
-    GstDroidComponent * component)
-{
-  GST_DEBUG_OBJECT (component->parent, "put component");
-
-  g_mutex_lock (&codec->lock);
-
-  if (component->handle->count > 1) {
-    component->handle->count--;
-  } else {
-    g_hash_table_remove (codec->cores, component->handle->type);
-  }
-
-  g_mutex_unlock (&codec->lock);
-
-  gst_droid_codec_destroy_component (component);
 }
 
 static void

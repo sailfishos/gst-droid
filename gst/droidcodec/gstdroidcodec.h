@@ -45,9 +45,19 @@ typedef struct _GstDroidComponent GstDroidComponent;
 typedef struct _GstDroidCodecHandle GstDroidCodecHandle;
 typedef struct _GstDroidComponentPort GstDroidComponentPort;
 
+struct _GstDroidCodec
+{
+  GstMiniObject parent;
+
+  GMutex lock;
+  GHashTable *cores;
+};
+
 struct _GstDroidComponent
 {
   GstDroidCodecHandle *handle;
+  GstDroidCodec *codec;
+
   OMX_HANDLETYPE omx;
   GstDroidComponentPort *in_port;
   GstDroidComponentPort *out_port;
@@ -61,14 +71,6 @@ struct _GstDroidComponent
   GQueue *full;
 
   OMX_STATETYPE state;
-};
-
-struct _GstDroidCodec
-{
-  GstMiniObject parent;
-
-  GMutex lock;
-  GHashTable *cores;
 };
 
 struct _GstDroidComponentPort
@@ -86,7 +88,6 @@ GstDroidCodec *gst_droid_codec_get (void);
 
 GstDroidComponent *gst_droid_codec_get_component (GstDroidCodec * codec,
 						  const gchar *type, GstElement * parent);
-void gst_droid_codec_put_component (GstDroidCodec * codec, GstDroidComponent * component);
 void gst_droid_codec_destroy_component (GstDroidComponent * component);
 
 OMX_ERRORTYPE gst_droid_codec_get_param (GstDroidComponent * comp,
