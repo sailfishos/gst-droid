@@ -32,6 +32,16 @@ mpeg4v (GstStructure * s)
   return gst_structure_get_int (s, "mpegversion", &val) && val == 4;
 }
 
+static gboolean
+h264 (GstStructure * s)
+{
+  const char *alignment = gst_structure_get_string (s, "alignment");
+  const char *format = gst_structure_get_string (s, "stream-format");
+
+  return alignment && format && !strcmp (alignment, "au")
+      && !strcmp (format, "byte-stream");
+}
+
 struct _GstDroidCodecType
 {
   const gchar *media_type;
@@ -41,6 +51,8 @@ struct _GstDroidCodecType
 
 GstDroidCodecType types[] = {
   {"video/mpeg", "mpeg4videodec", mpeg4v},
+  {"video/x-h264", "h264decode", h264},
+  {"video/x-h263", "h263decode", NULL},
 };
 
 const gchar *
