@@ -887,11 +887,25 @@ gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
   return TRUE;
 }
 
+static void
+gst_droid_codec_pop_full_locked (GstDroidComponent * comp)
+{
+  OMX_BUFFERHEADERTYPE *buff;
+  GstBuffer *buffer;
+
+  while (comp->full->length > 0) {
+    buff = g_queue_pop_head (comp->full);
+
+    if (buff) {
+      buffer = gst_omx_buffer_get_buffer (comp, buff);
+      gst_buffer_unref (buffer);
+    }
+  }
+}
+
 void
 gst_droid_codec_stop_component (GstDroidComponent * comp)
 {
-  OMX_BUFFERHEADERTYPE *buff;
-
   GST_DEBUG_OBJECT (comp->parent, "stop");
 
   gst_droid_codec_set_state (comp, OMX_StateIdle);
@@ -906,12 +920,7 @@ gst_droid_codec_stop_component (GstDroidComponent * comp)
   gst_buffer_pool_set_active (comp->out_port->buffers, FALSE);
 
   g_mutex_lock (&comp->full_lock);
-  while ((buff = g_queue_pop_head (comp->full)) != NULL) {
-    /* return to the pool */
-    GstBuffer *buffer = gst_omx_buffer_get_buffer (comp, buff);
-    gst_buffer_unref (buffer);
-  }
-
+  gst_droid_codec_pop_full_locked (comp);
   g_mutex_unlock (&comp->full_lock);
 
   if (!gst_droid_codec_wait_for_state (comp, OMX_StateLoaded)) {
@@ -1225,7 +1234,6 @@ gboolean
 gst_droid_codec_reconfigure_output_port (GstDroidComponent * comp)
 {
   OMX_ERRORTYPE err;
-  OMX_BUFFERHEADERTYPE *buff;
 
   GST_DEBUG_OBJECT (comp->parent, "reconfigure output port");
 
@@ -1236,12 +1244,7 @@ gst_droid_codec_reconfigure_output_port (GstDroidComponent * comp)
   }
 
   g_mutex_lock (&comp->full_lock);
-  while ((buff = g_queue_pop_head (comp->full)) != NULL) {
-    /* return to the pool */
-    GstBuffer *buffer = gst_omx_buffer_get_buffer (comp, buff);
-    gst_buffer_unref (buffer);
-  }
-
+  gst_droid_codec_pop_full_locked (comp);
   g_mutex_unlock (&comp->full_lock);
 
   /* free buffers */
