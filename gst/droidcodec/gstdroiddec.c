@@ -276,6 +276,8 @@ gst_droiddec_stop (GstVideoDecoder * decoder)
 
   GST_DEBUG_OBJECT (dec, "stop");
 
+  gst_droiddec_stop_loop (decoder);
+
   if (!dec->codec) {
     return TRUE;
   }
