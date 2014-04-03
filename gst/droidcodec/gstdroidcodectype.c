@@ -56,6 +56,7 @@ GstDroidCodecType types[] = {
   {"video/x-h264", "h264decode", h264,
       "video/x-h264, alignment=au, stream-format=byte-stream"},
   {"video/x-h263", "h263decode", NULL, "video/x-h263"},
+  {"video/x-divx", "divxdecode", NULL, "video/x-divx"},
 };
 
 const gchar *
