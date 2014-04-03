@@ -295,7 +295,10 @@ gst_gralloc_mem_is_span (GstMemory * mem1, GstMemory * mem2, gsize * offset)
 static GstMemory *
 gst_gralloc_mem_copy (GstMemory * mem, gssize offset, gssize size)
 {
-  return NULL;
+  /* TODO: bad but playbin needs it
+   * https://bugzilla.gnome.org/show_bug.cgi?id=727409
+   */
+  return gst_memory_ref (mem);
 }
 
 static void
