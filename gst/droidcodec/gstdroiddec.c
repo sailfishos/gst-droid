@@ -81,6 +81,13 @@ gst_droiddec_stop_loop (GstVideoDecoder * decoder)
 
   /* Just informing the task that we are finishing */
   g_mutex_lock (&dec->comp->full_lock);
+  /* if the queue is empty then we _prepend_ a NULL buffer
+   * which should not be a problem because the loop is running
+   * and it will pop it. If it's not then we will clean it up later. */
+  if (dec->comp->full->length == 0) {
+    g_queue_push_head (dec->comp->full, NULL);
+  }
+
   g_cond_signal (&dec->comp->full_cond);
   g_mutex_unlock (&dec->comp->full_lock);
 
@@ -95,6 +102,8 @@ gst_droiddec_stop_loop (GstVideoDecoder * decoder)
   if (!gst_pad_stop_task (GST_VIDEO_DECODER_SRC_PAD (decoder))) {
     GST_WARNING_OBJECT (dec, "failed to stop src pad task");
   }
+
+  GST_DEBUG_OBJECT (dec, "stopped loop");
 }
 
 static GstVideoCodecState *
@@ -153,6 +162,14 @@ gst_droiddec_loop (GstDroidDec * dec)
     g_mutex_lock (&dec->comp->full_lock);
     buff = g_queue_pop_head (dec->comp->full);
     if (!buff) {
+
+      if (!dec->started) {
+        /* this is a signal that we should quit */
+        GST_DEBUG_OBJECT (dec, "got no buffer");
+        g_mutex_unlock (&dec->comp->full_lock);
+        continue;
+      }
+
       g_cond_wait (&dec->comp->full_cond, &dec->comp->full_lock);
       buff = g_queue_pop_head (dec->comp->full);
     }
