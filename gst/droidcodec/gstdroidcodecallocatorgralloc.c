@@ -121,7 +121,6 @@ gst_droid_codec_gralloc_allocator_free (GstAllocator * allocator,
 
   omx_mem = (GstDroidCodecGrallocMemory *) mem;
 
-
   err = OMX_FreeBuffer (alloc->port->comp->omx,
       alloc->port->def.nPortIndex, omx_mem->omx_buf);
 

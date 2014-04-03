@@ -47,6 +47,97 @@ GST_STATIC_PAD_TEMPLATE (GST_VIDEO_DECODER_SINK_NAME,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS_ANY);
 
+static gboolean
+gst_droiddec_do_haandle_frame (GstVideoDecoder * decoder,
+    GstVideoCodecFrame * frame)
+{
+  GstDroidDec *dec = GST_DROIDDEC (decoder);
+
+  GST_DEBUG_OBJECT (dec, "do handle frame");
+
+  /* This can deadlock if omx does not provide an input buffer and we end up
+   * waiting for a buffer which does not happen because omx needs us to provide
+   * output buffers to be filled (which can not happen because _loop() tries
+   * to call get_oldest_frame() which acquires the stream lock the base class
+   * is holding before calling us */
+
+  GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
+  if (!gst_droid_codec_consume_frame (dec->comp, frame)) {
+    GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+    return FALSE;
+  }
+
+  GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+
+  return TRUE;
+}
+
+static void
+gst_droiddec_stop_loop (GstVideoDecoder * decoder)
+{
+  GstDroidDec *dec = GST_DROIDDEC (decoder);
+
+  GST_DEBUG_OBJECT (dec, "stop loop");
+
+  dec->started = FALSE;
+
+  /* That should be enough for now as we can not deactivate our buffer pools
+   * otherwise we end up freeing the buffers before deactivating our omx ports
+   */
+
+  /* Just informing the task that we are finishing */
+  g_mutex_lock (&dec->comp->full_lock);
+  g_cond_signal (&dec->comp->full_cond);
+  g_mutex_unlock (&dec->comp->full_lock);
+
+  /* We need to release the stream lock to prevent deadlocks when the _loop ()
+   * function tries to call _finish_frame ()
+   */
+  GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
+  GST_PAD_STREAM_LOCK (GST_VIDEO_DECODER_SRC_PAD (decoder));
+  GST_PAD_STREAM_UNLOCK (GST_VIDEO_DECODER_SRC_PAD (decoder));
+  GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+
+  if (!gst_pad_stop_task (GST_VIDEO_DECODER_SRC_PAD (decoder))) {
+    GST_WARNING_OBJECT (dec, "failed to stop src pad task");
+  }
+}
+
+static GstVideoCodecState *
+gst_droiddec_configure_state (GstVideoDecoder * decoder, gsize width,
+    gsize height, int hal_fmt)
+{
+  GstVideoFormat fmt;
+  GstVideoCodecState *out;
+  GstCapsFeatures *feature;
+  GstDroidDec *dec = GST_DROIDDEC (decoder);
+
+  GST_DEBUG_OBJECT (dec, "configure state: width: %d, height: %d, fmt: 0x%x",
+      width, height, hal_fmt);
+
+  fmt = gst_gralloc_hal_to_gst (hal_fmt);
+  if (fmt == GST_VIDEO_FORMAT_UNKNOWN) {
+    GST_WARNING_OBJECT (dec, "unknown hal format 0x%x. Using ENCODED instead",
+        hal_fmt);
+    fmt = GST_VIDEO_FORMAT_ENCODED;
+  }
+
+  out = gst_video_decoder_set_output_state (GST_VIDEO_DECODER (dec),
+      fmt, width, height, dec->in_state);
+
+  if (!out->caps) {
+    /* we will add our caps */
+    out->caps = gst_video_info_to_caps (&out->info);
+  }
+
+  feature = gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_SURFACE, NULL);
+  gst_caps_set_features (out->caps, 0, feature);
+
+  GST_DEBUG_OBJECT (dec, "output caps %" GST_PTR_FORMAT, out->caps);
+
+  return out;
+}
+
 static void
 gst_droiddec_loop (GstDroidDec * dec)
 {
@@ -205,8 +296,6 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 {
   const gchar *type;
   GstDroidDec *dec = GST_DROIDDEC (decoder);
-  GstVideoFormat fmt;
-  GstCapsFeatures *feature;
   int hal_fmt;
 
   GST_DEBUG_OBJECT (dec, "set format %" GST_PTR_FORMAT, state->caps);
@@ -234,26 +323,10 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   }
 
   hal_fmt = dec->comp->out_port->def.format.video.eColorFormat;
-  fmt = gst_gralloc_hal_to_gst (hal_fmt);
 
-  if (fmt == GST_VIDEO_FORMAT_UNKNOWN) {
-    GST_WARNING_OBJECT (dec, "unknown hal format 0x%x. Using ENCODED instead",
-        dec->comp->out_port->def.format.video.eColorFormat);
-    fmt = GST_VIDEO_FORMAT_ENCODED;
-  }
-
-  dec->out_state = gst_video_decoder_set_output_state (GST_VIDEO_DECODER (dec),
-      fmt, state->info.width, state->info.height, dec->in_state);
-
-  if (!dec->out_state->caps) {
-    /* we will add our caps */
-    dec->out_state->caps = gst_video_info_to_caps (&dec->out_state->info);
-  }
-
-  feature = gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_SURFACE, NULL);
-  gst_caps_set_features (dec->out_state->caps, 0, feature);
-
-  GST_DEBUG_OBJECT (dec, "output caps %" GST_PTR_FORMAT, dec->out_state->caps);
+  dec->out_state =
+      gst_droiddec_configure_state (decoder, state->info.width,
+      state->info.height, hal_fmt);
 
   /* now start */
   if (!gst_droid_codec_start_component (dec->comp, dec->in_state->caps,
@@ -261,7 +334,6 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     return FALSE;
   }
 
-  /* negotiate */
   if (!gst_video_decoder_negotiate (decoder)) {
     return FALSE;
   }
@@ -303,31 +375,7 @@ gst_droiddec_finish (GstVideoDecoder * decoder)
 
   GST_DEBUG_OBJECT (dec, "finish");
 
-  dec->started = FALSE;
-
-  /* That should be enough for now as we can not deactivate our buffer pools
-   * otherwise we end up freeing the buffers before deactivating our omx ports
-   */
-  // TODO: move those to the shutdown sequence (when we have it).
-  //  gst_buffer_pool_set_active (dec->comp->in_port->buffers, FALSE);
-  //  gst_buffer_pool_set_active (dec->comp->out_port->buffers, FALSE);
-
-  /* Just informing the task that we are finishing */
-  g_mutex_lock (&dec->comp->full_lock);
-  g_cond_signal (&dec->comp->full_cond);
-  g_mutex_unlock (&dec->comp->full_lock);
-
-  /* We need to release the stream lock to prevent deadlocks when the _loop ()
-   * function tries to call _finish_frame ()
-   */
-  GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
-  GST_PAD_STREAM_LOCK (GST_VIDEO_DECODER_SRC_PAD (decoder));
-  GST_PAD_STREAM_UNLOCK (GST_VIDEO_DECODER_SRC_PAD (decoder));
-  GST_VIDEO_DECODER_STREAM_LOCK (decoder);
-
-  if (!gst_pad_stop_task (GST_VIDEO_DECODER_SRC_PAD (decoder))) {
-    GST_WARNING_OBJECT (dec, "failed to stop src pad task");
-  }
+  gst_droiddec_stop_loop (decoder);
 
   return GST_FLOW_OK;
 }
@@ -336,31 +384,87 @@ static GstFlowReturn
 gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     GstVideoCodecFrame * frame)
 {
+  gsize width, height;
+  int hal_fmt;
+  GstStructure *config;
   GstDroidDec *dec = GST_DROIDDEC (decoder);
+
   GST_DEBUG_OBJECT (dec, "handle frame");
 
   if (gst_droid_codec_has_error (dec->comp)) {
     GST_ERROR_OBJECT (dec, "not handling frame while omx is in error state");
-    gst_video_decoder_release_frame (decoder, frame);
-    return GST_FLOW_ERROR;
+    goto error;
   }
 
-  /* This can deadlock if omx does not provide an input buffer and we end up
-   * waiting for a buffer which does not happen because omx needs us to provide
-   * output buffers to be filled (which can not happen because _loop() tries
-   * to call get_oldest_frame() which acquires the stream lock the base class
-   * is holding before calling us */
-  GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
-  if (!gst_droid_codec_consume_frame (dec->comp, frame)) {
-    GST_VIDEO_DECODER_STREAM_LOCK (decoder);
-    /* don't leak the frame */
-    gst_video_decoder_release_frame (decoder, frame);
-    return GST_FLOW_ERROR;
+  if (gst_droiddec_do_haandle_frame (decoder, frame)) {
+    return GST_FLOW_OK;
   }
 
-  GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+  if (gst_droid_codec_needs_reconfigure (dec->comp)) {
+    gst_droiddec_stop_loop (decoder);
 
-  return GST_FLOW_OK;
+    /* reconfigure */
+    if (!gst_droid_codec_reconfigure_output_port (dec->comp)) {
+      /* failed */
+      goto error;
+    }
+  }
+
+  gst_droid_codec_unset_needs_reconfigure (dec->comp);
+
+  /* update codec state and src caps */
+  if (dec->out_state) {
+    gst_video_codec_state_unref (dec->out_state);
+  }
+
+  width = dec->comp->out_port->def.format.video.nFrameWidth;
+  height = dec->comp->out_port->def.format.video.nFrameHeight;
+  hal_fmt = dec->comp->out_port->def.format.video.eColorFormat;
+  dec->out_state = gst_droiddec_configure_state (decoder,
+      width, height, hal_fmt);
+
+  /* now the buffer pool */
+  config = gst_buffer_pool_get_config (dec->comp->out_port->buffers);
+  gst_buffer_pool_config_set_params (config, dec->out_state->caps,
+      dec->comp->out_port->def.nBufferSize,
+      dec->comp->out_port->def.nBufferCountActual,
+      dec->comp->out_port->def.nBufferCountActual);
+  gst_buffer_pool_config_set_allocator (config, dec->comp->out_port->allocator,
+      NULL);
+
+  if (!gst_buffer_pool_set_config (dec->comp->out_port->buffers, config)) {
+    GST_ERROR_OBJECT (dec, "failed to set buffer pool configuration");
+    goto error;
+  }
+
+  if (!gst_video_decoder_negotiate (decoder)) {
+    goto error;
+  }
+
+  if (!gst_buffer_pool_set_active (dec->comp->out_port->buffers, TRUE)) {
+    GST_ERROR_OBJECT (dec, "failed to activate buffer pool");
+    goto error;
+  }
+
+  /* start the loop */
+  dec->started = TRUE;
+
+  if (!gst_pad_start_task (GST_VIDEO_DECODER_SRC_PAD (decoder),
+          (GstTaskFunction) gst_droiddec_loop, gst_object_ref (dec),
+          gst_object_unref)) {
+    GST_ERROR_OBJECT (dec, "failed to start src task");
+    goto error;
+  }
+
+  if (gst_droiddec_do_haandle_frame (decoder, frame)) {
+    return GST_FLOW_OK;
+  }
+
+error:
+  /* don't leak the frame */
+  gst_video_decoder_release_frame (decoder, frame);
+
+  return GST_FLOW_ERROR;
 }
 
 static gboolean

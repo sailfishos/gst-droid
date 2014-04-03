@@ -101,7 +101,19 @@ EventHandler (OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_EVENTTYPE eEvent,
 
       break;
     case OMX_EventPortSettingsChanged:
-      g_print ("OMX_EventPortSettingsChanged\n");
+      if (nData1 != 1) {
+        GST_ERROR_OBJECT (comp->parent,
+            "OMX_EventPortSettingsChanged not supported on input port");
+        g_mutex_lock (&comp->lock);
+        comp->error = TRUE;
+        g_mutex_unlock (&comp->lock);
+      } else {
+        GST_INFO_OBJECT (comp->parent, "component needs to be reconfigured");
+        g_mutex_lock (&comp->lock);
+        comp->needs_reconfigure = TRUE;
+        g_mutex_unlock (&comp->lock);
+      }
+
       break;
     case OMX_EventPortFormatDetected:
       g_print ("OMX_EventPortFormatDetected\n");
@@ -526,6 +538,7 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type,
   g_mutex_init (&component->full_lock);
   g_cond_init (&component->full_cond);
   component->error = FALSE;
+  component->needs_reconfigure = FALSE;
   g_mutex_init (&component->lock);
   g_atomic_int_set (&component->state, OMX_StateLoaded);
 
@@ -731,8 +744,6 @@ gst_droid_codec_allocate_port_buffers (GstDroidComponent * comp,
     return FALSE;
   }
 
-  /* TODO: We need to add the gralloc memory too to the buffers */
-
   return TRUE;
 }
 
@@ -741,8 +752,6 @@ gst_droid_codec_set_port_enabled (GstDroidComponent * comp, int index,
     gboolean enable)
 {
   OMX_ERRORTYPE err;
-
-  // TODO:
 
   GST_DEBUG_OBJECT (comp->parent, "set port enabled: %d %d", index, enable);
 
@@ -942,7 +951,15 @@ gst_droid_codec_acquire_buffer_from_pool (GstDroidComponent * comp,
 
   GST_DEBUG_OBJECT (comp->parent, "acquire buffer from pool %p", pool);
 
-  while (!gst_droid_codec_has_error (comp)) {
+  while (TRUE) {
+    if (gst_droid_codec_has_error (comp)) {
+      return NULL;
+    }
+
+    if (gst_droid_codec_needs_reconfigure (comp)) {
+      return NULL;
+    }
+
     params.flags = GST_BUFFER_POOL_ACQUIRE_FLAG_DONTWAIT;
 
     ret = gst_buffer_pool_acquire_buffer (pool, &buffer, &params);
@@ -980,6 +997,9 @@ gst_droid_codec_consume_frame (GstDroidComponent * comp,
         gst_droid_codec_acquire_buffer_from_pool (comp, comp->in_port->buffers);
     if (!buf && gst_droid_codec_has_error (comp)) {
       GST_INFO_OBJECT (comp->parent, "component in error state");
+      return FALSE;
+    } else if (!buf && gst_droid_codec_needs_reconfigure (comp)) {
+      GST_INFO_OBJECT (comp->parent, "component needs reconfigure");
       return FALSE;
     } else if (!buf) {
       GST_ERROR_OBJECT (comp->parent, "could not acquire buffer");
@@ -1171,6 +1191,27 @@ gst_droid_codec_return_output_buffers (GstDroidComponent * comp)
   return TRUE;
 }
 
+void
+gst_droid_codec_unset_needs_reconfigure (GstDroidComponent * comp)
+{
+  g_mutex_lock (&comp->lock);
+  comp->needs_reconfigure = FALSE;
+  g_mutex_unlock (&comp->lock);
+
+}
+
+gboolean
+gst_droid_codec_needs_reconfigure (GstDroidComponent * comp)
+{
+  gboolean reconfigure;
+
+  g_mutex_lock (&comp->lock);
+  reconfigure = comp->needs_reconfigure;
+  g_mutex_unlock (&comp->lock);
+
+  return reconfigure;
+}
+
 gboolean
 gst_droid_codec_has_error (GstDroidComponent * comp)
 {
@@ -1181,4 +1222,51 @@ gst_droid_codec_has_error (GstDroidComponent * comp)
   g_mutex_unlock (&comp->lock);
 
   return err;
+}
+
+gboolean
+gst_droid_codec_reconfigure_output_port (GstDroidComponent * comp)
+{
+  OMX_ERRORTYPE err;
+  OMX_BUFFERHEADERTYPE *buff;
+
+  GST_DEBUG_OBJECT (comp->parent, "reconfigure output port");
+
+  /* disable port */
+  if (!gst_droid_codec_set_port_enabled (comp, comp->out_port->def.nPortIndex,
+          FALSE)) {
+    return FALSE;
+  }
+
+  g_mutex_lock (&comp->full_lock);
+  while ((buff = g_queue_pop_head (comp->full)) != NULL) {
+    /* return to the pool */
+    GstBuffer *buffer = gst_omx_buffer_get_buffer (comp, buff);
+    gst_buffer_unref (buffer);
+  }
+
+  g_mutex_unlock (&comp->full_lock);
+
+  /* free buffers */
+  gst_buffer_pool_set_active (comp->out_port->buffers, FALSE);
+
+  /* enable port */
+  if (!gst_droid_codec_set_port_enabled (comp, comp->out_port->def.nPortIndex,
+          TRUE)) {
+    return FALSE;
+  }
+
+  /* update port definition */
+  err =
+      gst_droid_codec_get_param (comp, OMX_IndexParamPortDefinition,
+      &comp->out_port->def);
+  if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) getting output port definition",
+        gst_omx_error_to_string (err), err);
+
+    return FALSE;
+  }
+
+  return TRUE;
 }
