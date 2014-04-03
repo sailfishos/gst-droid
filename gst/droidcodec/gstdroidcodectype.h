@@ -27,6 +27,7 @@
 G_BEGIN_DECLS
 
 const gchar *gst_droid_codec_type_from_caps (GstCaps * caps);
+GstCaps *gst_droid_codec_type_all_caps ();
 
 G_END_DECLS
 

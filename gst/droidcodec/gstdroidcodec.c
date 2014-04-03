@@ -42,9 +42,6 @@ GST_DEBUG_CATEGORY (gst_droid_codec_debug);
 static GstDroidCodec *codec = NULL;
 G_LOCK_DEFINE_STATIC (codec);
 
-// TODO: hardcoded
-#define CONFIG_DIR   "/etc/gst-droid/droidcodec.d"
-
 /* 10 ms */
 #define WAIT_TIMEOUT 10000
 
@@ -237,7 +234,7 @@ gst_droid_codec_create_and_insert_handle_locked (GstDroidCodec * codec,
   GST_DEBUG ("create and insert handle locked");
 
   file = g_key_file_new ();
-  path = g_strdup_printf ("%s/%s.conf", CONFIG_DIR, type);
+  path = g_strdup_printf ("%s/%s.conf", DROID_CODEC_CONFIG_DIR, type);
 
   /* read info from configuration */
   res = g_key_file_load_from_file (file, path, 0, &error);

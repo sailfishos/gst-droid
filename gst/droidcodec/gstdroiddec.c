@@ -41,12 +41,6 @@ GST_STATIC_PAD_TEMPLATE (GST_VIDEO_DECODER_SRC_NAME,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
         (GST_CAPS_FEATURE_MEMORY_DROID_SURFACE, "{ENCODED, YV12}")));
 
-static GstStaticPadTemplate gst_droiddec_sink_template_factory =
-GST_STATIC_PAD_TEMPLATE (GST_VIDEO_DECODER_SINK_NAME,
-    GST_PAD_SINK,
-    GST_PAD_ALWAYS,
-    GST_STATIC_CAPS_ANY);
-
 static gboolean
 gst_droiddec_do_haandle_frame (GstVideoDecoder * decoder,
     GstVideoCodecFrame * frame)
@@ -537,6 +531,8 @@ gst_droiddec_class_init (GstDroidDecClass * klass)
   GObjectClass *gobject_class;
   GstElementClass *gstelement_class;
   GstVideoDecoderClass *gstvideodecoder_class;
+  GstCaps *caps;
+  GstPadTemplate *tpl;
 
   gobject_class = (GObjectClass *) klass;
   gstelement_class = (GstElementClass *) klass;
@@ -546,8 +542,10 @@ gst_droiddec_class_init (GstDroidDecClass * klass)
       "Video sink", "Decoder/Video/Device",
       "Android HAL decoder", "Mohammed Sameer <msameer@foolab.org>");
 
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&gst_droiddec_sink_template_factory));
+  caps = gst_droid_codec_type_all_caps ();
+  tpl = gst_pad_template_new (GST_VIDEO_DECODER_SINK_NAME,
+      GST_PAD_SINK, GST_PAD_ALWAYS, caps);
+  gst_element_class_add_pad_template (gstelement_class, tpl);
 
   gst_element_class_add_pad_template (gstelement_class,
       gst_static_pad_template_get (&gst_droiddec_src_template_factory));
