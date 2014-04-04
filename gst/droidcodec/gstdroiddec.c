@@ -567,6 +567,47 @@ gst_droiddec_change_state (GstElement * element, GstStateChange transition)
   return ret;
 }
 
+static gboolean
+gst_droiddec_negotiate (GstVideoDecoder * decoder)
+{
+  GstDroidDec *dec;
+  GstCaps *caps = NULL;
+  gboolean ret = FALSE;
+
+  dec = GST_DROIDDEC (decoder);
+
+  GST_DEBUG_OBJECT (dec, "negotiate");
+
+  /* We don't negotiate. We either use our caps or fail */
+  caps =
+      gst_pad_peer_query_caps (GST_VIDEO_DECODER_SRC_PAD (decoder),
+      dec->out_state->caps);
+
+  GST_DEBUG_OBJECT (dec, "intersection %" GST_PTR_FORMAT, caps);
+
+  if (gst_caps_is_empty (caps)) {
+    goto error;
+  }
+
+  if (!gst_pad_set_caps (GST_VIDEO_DECODER_SRC_PAD (decoder), caps)) {
+    goto error;
+  }
+
+  ret = TRUE;
+  goto out;
+
+error:
+  GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
+      ("failed to negotiate output format"));
+
+out:
+  if (caps) {
+    gst_caps_unref (caps);
+  }
+
+  return ret;
+}
+
 static void
 gst_droiddec_class_init (GstDroidDecClass * klass)
 {
@@ -610,4 +651,5 @@ gst_droiddec_class_init (GstDroidDecClass * klass)
   gstvideodecoder_class->propose_allocation =
       GST_DEBUG_FUNCPTR (gst_droiddec_propose_allocation);
   gstvideodecoder_class->flush = GST_DEBUG_FUNCPTR (gst_droiddec_flush);
+  gstvideodecoder_class->negotiate = GST_DEBUG_FUNCPTR (gst_droiddec_negotiate);
 }
