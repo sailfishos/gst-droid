@@ -544,6 +544,29 @@ gst_droiddec_init (GstDroidDec * dec)
   dec->started = FALSE;
 }
 
+static GstStateChangeReturn
+gst_droiddec_change_state (GstElement * element, GstStateChange transition)
+{
+  GstStateChangeReturn ret;
+  GstDroidDec *dec;
+  GstVideoDecoder *decoder;
+
+  decoder = GST_VIDEO_DECODER (element);
+  dec = GST_DROIDDEC (element);
+
+  GST_DEBUG_OBJECT (dec, "change state");
+
+  if (transition == GST_STATE_CHANGE_PAUSED_TO_READY) {
+    GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+    gst_droiddec_stop_loop (decoder);
+    GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
+  }
+
+  ret = GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
+
+  return ret;
+}
+
 static void
 gst_droiddec_class_init (GstDroidDecClass * klass)
 {
@@ -570,6 +593,8 @@ gst_droiddec_class_init (GstDroidDecClass * klass)
       gst_static_pad_template_get (&gst_droiddec_src_template_factory));
 
   gobject_class->finalize = gst_droiddec_finalize;
+  gstelement_class->change_state =
+      GST_DEBUG_FUNCPTR (gst_droiddec_change_state);
   gstvideodecoder_class->open = GST_DEBUG_FUNCPTR (gst_droiddec_open);
   gstvideodecoder_class->close = GST_DEBUG_FUNCPTR (gst_droiddec_close);
   gstvideodecoder_class->start = GST_DEBUG_FUNCPTR (gst_droiddec_start);
