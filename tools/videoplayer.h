@@ -90,6 +90,7 @@ private:
   static void on_volume_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
 
   bool setState(const State& state);
+  bool setPaused(int flags);
 
   QtCamViewfinderRenderer *m_renderer;
   QUrl m_url;

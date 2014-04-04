@@ -68,7 +68,6 @@ void VideoPlayer::classBegin() {
   }
 
   g_signal_connect (G_OBJECT (m_bin), "notify::volume", G_CALLBACK (on_volume_changed), this);
-  //  g_object_set (m_bin, "flags", 99, NULL);
 
   GstElement *elem = gst_element_factory_make("pulsesink", "VideoPlayerPulseSink");
   if (!elem) {
@@ -217,6 +216,31 @@ VideoPlayer::State VideoPlayer::state() const {
   return m_state;
 }
 
+bool VideoPlayer::setPaused(int flags) {
+  g_object_set (m_bin, "flags", flags, NULL);
+
+  if (gst_element_set_state(m_bin, GST_STATE_PAUSED) == GST_STATE_CHANGE_FAILURE) {
+    qmlInfo(this) << "error setting pipeline to PAUSED";
+    return false;
+  }
+
+  GstBus *bus = gst_element_get_bus(m_bin);
+  GstMessage *message =
+    gst_bus_timed_pop_filtered(bus, GST_CLOCK_TIME_NONE,
+			       (GstMessageType)(GST_MESSAGE_ASYNC_DONE | GST_MESSAGE_ERROR));
+
+  if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_ERROR) {
+    gst_message_unref (message);
+    gst_object_unref(bus);
+    gst_element_set_state(m_bin, GST_STATE_NULL);
+    return false;
+  }
+
+  gst_message_unref (message);
+  gst_object_unref(bus);
+  return true;
+}
+
 bool VideoPlayer::setState(const VideoPlayer::State& state) {
   if (state == m_state) {
     return true;
@@ -229,12 +253,6 @@ bool VideoPlayer::setState(const VideoPlayer::State& state) {
 
   if (state == VideoPlayer::StatePaused) {
     m_timer->stop();
-
-    // Set uri if needed:
-    if (m_state == VideoPlayer::StateStopped) {
-      const char *uri = m_url.toString().toUtf8().constData();
-      g_object_set(m_bin, "uri", uri, NULL);
-    }
 
     if (gst_element_set_state(m_bin, GST_STATE_PAUSED) == GST_STATE_CHANGE_FAILURE) {
       qmlInfo(this) << "error setting pipeline to PAUSED";
@@ -265,20 +283,17 @@ bool VideoPlayer::setState(const VideoPlayer::State& state) {
       g_object_set(m_bin, "uri", uri, NULL);
     }
 
+    if (!setPaused (0x00000001 | 0x00000002 | 0x00000010 | 0x00000020 |  0x00000200)) {
+
+      if (!setPaused (0x00000001 | 0x00000002 | 0x00000010 | 0x00000020 |  0x00000200 | 0x00000040)) {
+	qmlInfo(this) << "error setting pipeline to PAUSED";
+	return false;
+      }
+
+    }
+
     if (gst_element_set_state(m_bin, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
       qmlInfo(this) << "error setting pipeline to PLAYING";
-      return false;
-    }
-
-    GstState st;
-    if (gst_element_get_state(m_bin, &st, NULL, GST_CLOCK_TIME_NONE)
-	== GST_STATE_CHANGE_FAILURE) {
-      qmlInfo(this) << "setting pipeline to PLAYING failed";
-      return false;
-    }
-
-    if (st != GST_STATE_PLAYING) {
-      qmlInfo(this) << "pipeline failed to transition to to PLAYING state";
       return false;
     }
 
