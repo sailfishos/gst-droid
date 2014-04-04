@@ -42,22 +42,26 @@ GST_STATIC_PAD_TEMPLATE (GST_VIDEO_DECODER_SRC_NAME,
         (GST_CAPS_FEATURE_MEMORY_DROID_SURFACE, "{ENCODED, YV12}")));
 
 static gboolean
-gst_droiddec_do_handle_frame (GstVideoDecoder * decoder,
+gst_droiddec_do_haandle_frame (GstVideoDecoder * decoder,
     GstVideoCodecFrame * frame)
 {
   GstDroidDec *dec = GST_DROIDDEC (decoder);
 
   GST_DEBUG_OBJECT (dec, "do handle frame");
 
-  g_mutex_lock (&dec->frames_lock);
-  g_queue_push_tail (dec->frames, frame);
-  g_mutex_unlock (&dec->frames_lock);
+  /* This can deadlock if omx does not provide an input buffer and we end up
+   * waiting for a buffer which does not happen because omx needs us to provide
+   * output buffers to be filled (which can not happen because _loop() tries
+   * to call get_oldest_frame() which acquires the stream lock the base class
+   * is holding before calling us */
 
+  GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
   if (!gst_droid_codec_consume_frame (dec->comp, frame)) {
+    GST_VIDEO_DECODER_STREAM_LOCK (decoder);
     return FALSE;
   }
 
-  GST_DEBUG_OBJECT (dec, "handled frame");
+  GST_VIDEO_DECODER_STREAM_LOCK (decoder);
 
   return TRUE;
 }
@@ -158,6 +162,7 @@ gst_droiddec_loop (GstDroidDec * dec)
     g_mutex_lock (&dec->comp->full_lock);
     buff = g_queue_pop_head (dec->comp->full);
     if (!buff) {
+
       if (!dec->started) {
         /* this is a signal that we should quit */
         GST_DEBUG_OBJECT (dec, "got no buffer");
@@ -188,9 +193,7 @@ gst_droiddec_loop (GstDroidDec * dec)
     }
 
     /* Now we can proceed. */
-    g_mutex_lock (&dec->frames_lock);
-    frame = g_queue_pop_head (dec->frames);
-    g_mutex_unlock (&dec->frames_lock);
+    frame = gst_video_decoder_get_oldest_frame (GST_VIDEO_DECODER (dec));
     if (!frame) {
       gst_buffer_unref (buffer);
       GST_ERROR_OBJECT (dec, "can not find a video frame");
@@ -203,6 +206,7 @@ gst_droiddec_loop (GstDroidDec * dec)
 
     // TODO: PTS, DTS, duration, ...
     gst_video_decoder_finish_frame (GST_VIDEO_DECODER (dec), frame);
+    gst_video_codec_frame_unref (frame);
   }
 
   if (!dec->started) {
@@ -224,9 +228,7 @@ gst_droiddec_finalize (GObject * object)
 
   GST_DEBUG_OBJECT (dec, "finalize");
 
-  g_mutex_clear (&dec->frames_lock);
-  g_queue_free_full (dec->frames, (GDestroyNotify) gst_video_codec_frame_unref);
-  dec->frames = NULL;
+  // TODO:
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
@@ -298,9 +300,6 @@ gst_droiddec_stop (GstVideoDecoder * decoder)
 
   gst_mini_object_unref (GST_MINI_OBJECT (dec->codec));
   dec->codec = NULL;
-
-  g_queue_foreach (dec->frames, (GFunc) gst_video_codec_frame_unref, NULL);
-  g_queue_clear (dec->frames);
 
   return TRUE;
 }
@@ -410,7 +409,7 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     goto error;
   }
 
-  if (gst_droiddec_do_handle_frame (decoder, frame)) {
+  if (gst_droiddec_do_haandle_frame (decoder, frame)) {
     return GST_FLOW_OK;
   }
 
@@ -470,11 +469,14 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     goto error;
   }
 
-  if (gst_droiddec_do_handle_frame (decoder, frame)) {
+  if (gst_droiddec_do_haandle_frame (decoder, frame)) {
     return GST_FLOW_OK;
   }
 
 error:
+  /* don't leak the frame */
+  gst_video_decoder_release_frame (decoder, frame);
+
   return GST_FLOW_ERROR;
 }
 
@@ -540,31 +542,6 @@ gst_droiddec_init (GstDroidDec * dec)
   dec->in_state = NULL;
   dec->out_state = NULL;
   dec->started = FALSE;
-  // TODO: cleanup
-  dec->frames = g_queue_new ();
-  g_mutex_init (&dec->frames_lock);
-}
-
-static GstStateChangeReturn
-gst_droiddec_change_state (GstElement * element, GstStateChange transition)
-{
-  GstStateChangeReturn ret;
-  GstDroidDec *dec;
-
-  dec = GST_DROIDDEC (element);
-
-  GST_DEBUG_OBJECT (dec, "change state");
-
-  if (transition == GST_STATE_CHANGE_PAUSED_TO_READY) {
-
-    GST_WARNING_OBJECT (dec, "foo");
-
-    //    gst_droiddec_stop_loop (GST_VIDEO_DECODER (dec));
-  }
-
-  ret = GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
-
-  return ret;
 }
 
 static void
@@ -593,8 +570,6 @@ gst_droiddec_class_init (GstDroidDecClass * klass)
       gst_static_pad_template_get (&gst_droiddec_src_template_factory));
 
   gobject_class->finalize = gst_droiddec_finalize;
-  gstelement_class->change_state =
-      GST_DEBUG_FUNCPTR (gst_droiddec_change_state);
   gstvideodecoder_class->open = GST_DEBUG_FUNCPTR (gst_droiddec_open);
   gstvideodecoder_class->close = GST_DEBUG_FUNCPTR (gst_droiddec_close);
   gstvideodecoder_class->start = GST_DEBUG_FUNCPTR (gst_droiddec_start);
