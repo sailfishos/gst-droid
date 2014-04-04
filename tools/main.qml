@@ -38,6 +38,9 @@ Rectangle {
                         if (player.state != VideoPlayer.StatePlaying) {
                                 player.play()
                         }
+                        else {
+                                player.pause()
+                        }
                 }
         }
 }
