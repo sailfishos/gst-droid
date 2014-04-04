@@ -56,15 +56,6 @@ VideoPlayer::~VideoPlayer() {
 
 void VideoPlayer::componentComplete() {
   QQuickPaintedItem::componentComplete();
-
-  m_renderer = QtCamViewfinderRenderer::create(this);
-  if (!m_renderer) {
-    qmlInfo(this) << "Failed to create viewfinder renderer";
-    return;
-  }
-
-  m_renderer->resize(QSizeF(width(), height()));
-  QObject::connect(m_renderer, SIGNAL(updateRequested()), this, SLOT(updateRequested()));
 }
 
 void VideoPlayer::classBegin() {
@@ -144,13 +135,24 @@ bool VideoPlayer::pause() {
 }
 
 bool VideoPlayer::play() {
-  if (!m_created) {
-    if (m_bin) {
-      g_object_set(m_bin, "video-sink", m_renderer->sinkElement(), NULL);
+  if (!m_renderer) {
+    m_renderer = QtCamViewfinderRenderer::create(this);
+    if (!m_renderer) {
+      qmlInfo(this) << "Failed to create viewfinder renderer";
+      return false;
     }
 
-    m_created = true;
+    QObject::connect(m_renderer, SIGNAL(updateRequested()), this, SLOT(updateRequested()));
   }
+
+  m_renderer->resize(QSizeF(width(), height()));
+
+  if (!m_bin) {
+    qmlInfo(this) << "no playbin";
+    return false;
+  }
+
+  g_object_set(m_bin, "video-sink", m_renderer->sinkElement(), NULL);
 
   return setState(VideoPlayer::StatePlaying);
 }
@@ -292,6 +294,9 @@ bool VideoPlayer::setState(const VideoPlayer::State& state) {
   else {
     m_timer->stop();
     m_pos = 0;
+
+    delete m_renderer;
+    m_renderer = 0;
 
     if (gst_element_set_state(m_bin, GST_STATE_NULL) == GST_STATE_CHANGE_FAILURE) {
       qmlInfo(this) << "error setting pipeline to NULL";
