@@ -24,7 +24,6 @@ import VideoPlayer 1.0
 
 Rectangle {
         color: "black"
-//        anchors.fill: parent
 
         VideoPlayer {
                 id: player
@@ -32,8 +31,17 @@ Rectangle {
                 source: _source
         }
 
-        MouseArea {
-                anchors.fill: parent
+        Button {
+                anchors.bottom: parent.bottom
+                anchors.left: parent.left
+                text: "<<"
+                onClicked: player.position = player.position - 5000
+        }
+
+        Button {
+                anchors.bottom: parent.bottom
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "P"
                 onClicked: {
                         if (player.state != VideoPlayer.StatePlaying) {
                                 player.play()
@@ -42,5 +50,12 @@ Rectangle {
                                 player.pause()
                         }
                 }
+        }
+
+        Button {
+                anchors.bottom: parent.bottom
+                anchors.right: parent.right
+                text: ">>"
+                onClicked: player.position = player.position + 5000
         }
 }
