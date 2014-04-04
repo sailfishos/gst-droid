@@ -369,18 +369,6 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   return TRUE;
 }
 
-static gboolean
-gst_droiddec_reset (GstVideoDecoder * decoder, gboolean hard)
-{
-  GstDroidDec *dec = GST_DROIDDEC (decoder);
-
-  GST_DEBUG_OBJECT (dec, "reset %d", hard);
-
-  // TODO:
-
-  return TRUE;
-}
-
 static GstFlowReturn
 gst_droiddec_finish (GstVideoDecoder * decoder)
 {
@@ -642,7 +630,6 @@ gst_droiddec_class_init (GstDroidDecClass * klass)
   gstvideodecoder_class->stop = GST_DEBUG_FUNCPTR (gst_droiddec_stop);
   gstvideodecoder_class->set_format =
       GST_DEBUG_FUNCPTR (gst_droiddec_set_format);
-  gstvideodecoder_class->reset = GST_DEBUG_FUNCPTR (gst_droiddec_reset);
   gstvideodecoder_class->finish = GST_DEBUG_FUNCPTR (gst_droiddec_finish);
   gstvideodecoder_class->handle_frame =
       GST_DEBUG_FUNCPTR (gst_droiddec_handle_frame);
