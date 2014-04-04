@@ -50,6 +50,8 @@ struct _GstDroidDec
   GstDroidComponent *comp;
   GstVideoCodecState *in_state;
   GstVideoCodecState *out_state;
+  GQueue *frames;
+  GMutex frames_lock;
 };
 
 struct _GstDroidDecClass
