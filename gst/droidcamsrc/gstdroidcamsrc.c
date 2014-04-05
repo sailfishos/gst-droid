@@ -145,11 +145,16 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
     case GST_STATE_CHANGE_READY_TO_PAUSED:
       if (!gst_droidcamsrc_dev_open (src->dev, "0")) {
         ret = GST_STATE_CHANGE_FAILURE;
+      } else if (!gst_droidcamsrc_dev_init (src->dev)) {
+        ret = GST_STATE_CHANGE_FAILURE;
       }
 
       break;
 
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
+      if (!gst_droidcamsrc_dev_start (src->dev)) {
+        ret = GST_STATE_CHANGE_FAILURE;
+      }
 
       break;
 
@@ -169,10 +174,11 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 
   switch (transition) {
     case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
-
+      gst_droidcamsrc_dev_stop (src->dev);
       break;
 
     case GST_STATE_CHANGE_PAUSED_TO_READY:
+      gst_droidcamsrc_dev_deinit (src->dev);
       gst_droidcamsrc_dev_close (src->dev);
       break;
 

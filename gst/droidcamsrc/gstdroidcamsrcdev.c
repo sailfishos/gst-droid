@@ -25,6 +25,7 @@
 
 #include "gstdroidcamsrcdev.h"
 #include "gstdroidcamsrcdevmemory.h"
+#include <stdlib.h>
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 #define GST_CAT_DEFAULT gst_droidcamsrc_debug
@@ -37,6 +38,29 @@ gst_droidcamsrc_dev_request_memory (int fd, size_t buf_size,
       num_bufs);
 
   return gst_droidcamsrc_dev_memory_get (fd, buf_size, num_bufs);
+}
+
+static void
+gst_droidcamsrc_dev_notify_callback (int32_t msg_type,
+    int32_t ext1, int32_t ext2, void *user)
+{
+  // TODO:
+}
+
+static void
+gst_droidcamsrc_dev_data_callback (int32_t msg_type,
+    const camera_memory_t * data, unsigned int index,
+    camera_frame_metadata_t * metadata, void *user)
+{
+  // TODO:
+}
+
+static void
+gst_droidcamsrc_dev_data_timestamp_callback (int64_t timestamp,
+    int32_t msg_type, const camera_memory_t * data,
+    unsigned int index, void *user)
+{
+  // TODO:
 }
 
 GstDroidCamSrcDev *
@@ -103,12 +127,37 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
 gboolean
 gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
 {
+  gchar *params;
+  int err;
+
   GST_DEBUG ("dev init");
 
-  dev->dev->ops->set_callbacks (dev->dev, NULL, NULL, NULL,
+  dev->pool = gst_droid_cam_src_buffer_pool_new ();
+
+  params = dev->dev->ops->get_parameters (dev->dev);
+  // TODO: parse params
+
+  dev->dev->ops->set_parameters (dev->dev, params);
+
+  if (dev->dev->ops->put_parameters) {
+    dev->dev->ops->put_parameters (dev->dev, params);
+  } else {
+    free (params);
+  }
+
+  params = NULL;
+
+  dev->dev->ops->set_callbacks (dev->dev, gst_droidcamsrc_dev_notify_callback,
+      gst_droidcamsrc_dev_data_callback,
+      gst_droidcamsrc_dev_data_timestamp_callback,
       gst_droidcamsrc_dev_request_memory, dev);
 
-  // TODO:
+  err = dev->dev->ops->set_preview_window (dev->dev, &dev->pool->window);
+  if (err != 0) {
+    GST_ERROR ("error 0x%x setting preview window", err);
+    return FALSE;
+  }
+
   return TRUE;
 }
 
@@ -116,4 +165,32 @@ void
 gst_droidcamsrc_dev_deinit (GstDroidCamSrcDev * dev)
 {
   GST_DEBUG ("dev deinit");
+
+  gst_object_unref (GST_OBJECT (dev->pool));
+  dev->pool = NULL;
+}
+
+gboolean
+gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev)
+{
+  int err;
+
+  GST_DEBUG ("dev start");
+
+  err = dev->dev->ops->start_preview (dev->dev);
+  if (err != 0) {
+    GST_ERROR ("error 0x%x starting preview", err);
+    return FALSE;
+  }
+  // TODO:
+
+  return TRUE;
+}
+
+void
+gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev)
+{
+  GST_DEBUG ("dev stop");
+
+  dev->dev->ops->stop_preview (dev->dev);
 }
