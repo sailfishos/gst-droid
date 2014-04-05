@@ -279,8 +279,9 @@ bool VideoPlayer::setState(const VideoPlayer::State& state) {
   else if (state == VideoPlayer::StatePlaying) {
     // Set uri if needed:
     if (m_state == VideoPlayer::StateStopped) {
-      const char *uri = m_url.toString().toUtf8().constData();
-      g_object_set(m_bin, "uri", uri, NULL);
+      QString string = m_url.toString();
+      QByteArray array = string.toUtf8();
+      g_object_set(m_bin, "uri", array.constData(), NULL);
     }
 
     if (!setPaused (0x00000001 | 0x00000002 | 0x00000010 | 0x00000020 |  0x00000200)) {
