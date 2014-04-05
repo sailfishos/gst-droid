@@ -23,6 +23,9 @@
 #define __GST_DROID_CAM_SRC_H__
 
 #include <gst/gst.h>
+#include <hardware/hardware.h>
+#include <hardware/camera.h>
+#include <system/camera.h>
 
 G_BEGIN_DECLS
 
@@ -37,12 +40,39 @@ G_BEGIN_DECLS
 #define GST_IS_DROIDCAMSRC_CLASS(klass) \
   (G_TYPE_CHECK_CLASS_TYPE((klass), GST_TYPE_DROIDCAMSRC))
 
+#define MAX_CAMERAS 2
+
 typedef struct _GstDroidCamSrc GstDroidCamSrc;
 typedef struct _GstDroidCamSrcClass GstDroidCamSrcClass;
+typedef struct _GstDroidCamSrcCamInfo GstDroidCamSrcCamInfo;
+
+typedef enum {
+  GST_DROID_CAM_SRC_DIRECTION_BACK = CAMERA_FACING_BACK,
+  GST_DROID_CAM_SRC_DIRECTION_FRONT = CAMERA_FACING_FRONT,
+} GstDroidCamSrcCamDirection;
+
+typedef enum {
+  GST_DROID_CAM_SRC_ORIENTATION_0,
+  GST_DROID_CAM_SRC_ORIENTATION_90,
+  GST_DROID_CAM_SRC_ORIENTATION_180,
+  GST_DROID_CAM_SRC_ORIENTATION_270,
+} GstDroidCamSrcCamOrientation;
+
+struct _GstDroidCamSrcCamInfo
+{
+  int num;
+  GstDroidCamSrcCamDirection direction;
+  GstDroidCamSrcCamOrientation orientation;
+};
 
 struct _GstDroidCamSrc
 {
   GstElement parent;
+
+  GstDroidCamSrcCamInfo info[MAX_CAMERAS];
+
+  camera_module_t *hw;
+  camera_device_t *dev;
 
   GstPad *vfsrc;
   GstPad *imgsrc;
