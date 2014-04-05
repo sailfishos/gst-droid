@@ -172,7 +172,7 @@ gst_droidcamsrc_buffer_pool_cancel_buffer (struct preview_stream_ops *w,
 
   // TODO:
 
-  return -1;
+  return 0;
 }
 
 static int
@@ -340,7 +340,7 @@ gst_droidcamsrc_buffer_pool_set_timestamp (struct preview_stream_ops *w,
 {
   // TODO:
 
-  return -1;
+  return 0;
 }
 
 static void
