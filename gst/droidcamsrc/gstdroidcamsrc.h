@@ -45,6 +45,7 @@ G_BEGIN_DECLS
 typedef struct _GstDroidCamSrc GstDroidCamSrc;
 typedef struct _GstDroidCamSrcClass GstDroidCamSrcClass;
 typedef struct _GstDroidCamSrcCamInfo GstDroidCamSrcCamInfo;
+typedef struct _GstDroidCamSrcPad GstDroidCamSrcPad;
 
 typedef enum {
   GST_DROID_CAM_SRC_DIRECTION_BACK = CAMERA_FACING_BACK,
@@ -63,6 +64,16 @@ struct _GstDroidCamSrcCamInfo
   int num;
   GstDroidCamSrcCamDirection direction;
   GstDroidCamSrcCamOrientation orientation;
+};
+
+struct _GstDroidCamSrcPad
+{
+  GstPad *pad;
+  GQueue *queue;
+  GCond cond;
+  GMutex lock;
+  gboolean running;
+  GstTaskFunction loop;
 };
 
 struct _GstDroidCamSrc

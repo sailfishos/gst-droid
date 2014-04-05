@@ -135,7 +135,8 @@ gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
   dev->pool = gst_droid_cam_src_buffer_pool_new ();
 
   params = dev->dev->ops->get_parameters (dev->dev);
-  // TODO: parse params
+
+  dev->params = gst_droidcamsrc_params_new (params);
 
   dev->dev->ops->set_parameters (dev->dev, params);
 
@@ -168,6 +169,9 @@ gst_droidcamsrc_dev_deinit (GstDroidCamSrcDev * dev)
 
   gst_object_unref (GST_OBJECT (dev->pool));
   dev->pool = NULL;
+
+  gst_droidcamsrc_params_destroy (dev->params);
+  dev->params = NULL;
 }
 
 gboolean
