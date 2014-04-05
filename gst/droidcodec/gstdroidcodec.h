@@ -112,6 +112,7 @@ gboolean gst_droid_codec_has_error (GstDroidComponent * comp);
 gboolean gst_droid_codec_needs_reconfigure (GstDroidComponent * comp);
 void gst_droid_codec_unset_needs_reconfigure (GstDroidComponent * comp);
 gboolean gst_droid_codec_is_running (GstDroidComponent * comp);
+void gst_droid_codec_set_running (GstDroidComponent * comp, gboolean running);
 
 void gst_droid_codec_empty_full (GstDroidComponent * comp);
 gboolean gst_droid_codec_flush (GstDroidComponent * comp, gboolean pause);

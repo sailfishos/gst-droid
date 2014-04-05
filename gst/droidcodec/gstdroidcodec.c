@@ -1262,6 +1262,14 @@ gst_droid_codec_is_running (GstDroidComponent * comp)
   return started;
 }
 
+void
+gst_droid_codec_set_running (GstDroidComponent * comp, gboolean running)
+{
+  g_mutex_lock (&comp->lock);
+  comp->started = running;
+  g_mutex_unlock (&comp->lock);
+}
+
 gboolean
 gst_droid_codec_reconfigure_output_port (GstDroidComponent * comp)
 {

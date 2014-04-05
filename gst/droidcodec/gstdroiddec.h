@@ -45,7 +45,6 @@ typedef struct _GstDroidDecClass GstDroidDecClass;
 struct _GstDroidDec
 {
   GstVideoDecoder parent;
-  gboolean started;
   GstDroidCodec *codec;
   GstDroidComponent *comp;
   GstVideoCodecState *in_state;

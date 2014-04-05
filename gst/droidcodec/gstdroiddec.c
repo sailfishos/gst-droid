@@ -73,7 +73,7 @@ gst_droiddec_stop_loop (GstVideoDecoder * decoder)
 
   GST_DEBUG_OBJECT (dec, "stop loop");
 
-  dec->started = FALSE;
+  gst_droid_codec_set_running (dec->comp, FALSE);
 
   /* That should be enough for now as we can not deactivate our buffer pools
    * otherwise we end up freeing the buffers before deactivating our omx ports
@@ -148,7 +148,7 @@ gst_droiddec_loop (GstDroidDec * dec)
   GstBuffer *buffer;
   GstVideoCodecFrame *frame;
 
-  while (dec->started) {
+  while (gst_droid_codec_is_running (dec->comp)) {
     if (gst_droid_codec_has_error (dec->comp)) {
       return;
     }
@@ -163,7 +163,7 @@ gst_droiddec_loop (GstDroidDec * dec)
     buff = g_queue_pop_head (dec->comp->full);
 
     if (!buff) {
-      if (!dec->started) {
+      if (!gst_droid_codec_is_running (dec->comp)) {
         /* this is a signal that we should quit */
         GST_DEBUG_OBJECT (dec, "got no buffer");
         g_mutex_unlock (&dec->comp->full_lock);
@@ -209,7 +209,7 @@ gst_droiddec_loop (GstDroidDec * dec)
     gst_video_codec_frame_unref (frame);
   }
 
-  if (!dec->started) {
+  if (!gst_droid_codec_is_running (dec->comp)) {
     GST_DEBUG_OBJECT (dec, "stopping task");
 
     if (!gst_pad_pause_task (GST_VIDEO_DECODER_SRC_PAD (GST_VIDEO_DECODER
@@ -263,8 +263,6 @@ gst_droiddec_start (GstVideoDecoder * decoder)
   GstDroidDec *dec = GST_DROIDDEC (decoder);
 
   GST_DEBUG_OBJECT (dec, "start");
-
-  dec->started = TRUE;
 
   return TRUE;
 }
@@ -405,8 +403,6 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
 
     gst_droid_codec_empty_full (dec->comp);
 
-    dec->started = TRUE;
-
     if (!gst_pad_start_task (GST_VIDEO_DECODER_SRC_PAD (decoder),
             (GstTaskFunction) gst_droiddec_loop, gst_object_ref (dec),
             gst_object_unref)) {
@@ -470,7 +466,7 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   }
 
   /* start the loop */
-  dec->started = TRUE;
+  gst_droid_codec_set_running (dec->comp, TRUE);
 
   if (!gst_pad_start_task (GST_VIDEO_DECODER_SRC_PAD (decoder),
           (GstTaskFunction) gst_droiddec_loop, gst_object_ref (dec),
@@ -558,7 +554,6 @@ gst_droiddec_init (GstDroidDec * dec)
   dec->comp = NULL;
   dec->in_state = NULL;
   dec->out_state = NULL;
-  dec->started = FALSE;
 }
 
 static GstStateChangeReturn
