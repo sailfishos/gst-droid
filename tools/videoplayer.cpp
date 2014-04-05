@@ -284,13 +284,14 @@ bool VideoPlayer::setState(const VideoPlayer::State& state) {
       g_object_set(m_bin, "uri", array.constData(), NULL);
     }
 
-    if (!setPaused (0x00000001 | 0x00000002 | 0x00000010 | 0x00000020 |  0x00000200)) {
+    int flags = 0x00000001 | 0x00000002 | 0x00000010 | 0x00000020 |  0x00000200;
+    if (!setPaused (flags)) {
+      flags |= 0x00000040;
 
-      if (!setPaused (0x00000001 | 0x00000002 | 0x00000010 | 0x00000020 |  0x00000200 | 0x00000040)) {
+      if (!setPaused (flags)) {
 	qmlInfo(this) << "error setting pipeline to PAUSED";
 	return false;
       }
-
     }
 
     if (gst_element_set_state(m_bin, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
