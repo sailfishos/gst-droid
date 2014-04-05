@@ -357,10 +357,11 @@ gboolean VideoPlayer::bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
 
   case GST_MESSAGE_ERROR:
     gst_message_parse_error (msg, &err, &debug);
+    qWarning() << "Error" << err->message;
 
     emit that->error(err->message, err->code, debug);
     that->stop();
-    qWarning() << "Error" << err->message;
+
     if (err) {
       g_error_free (err);
     }
