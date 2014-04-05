@@ -397,6 +397,12 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
 
   /* if we have been flushed then we need to start accepting data again */
   if (!gst_droid_codec_is_running (dec->comp)) {
+    if (GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame)) {
+      GST_WARNING_OBJECT (dec, "dropping non sync frame");
+      gst_video_decoder_drop_frame (decoder, frame);
+      return GST_FLOW_OK;
+    }
+
     if (!gst_droid_codec_flush (dec->comp, FALSE)) {
       goto error;
     }
