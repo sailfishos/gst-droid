@@ -66,6 +66,7 @@ struct _GstDroidComponent
   GMutex lock;
   gboolean error;
   gboolean needs_reconfigure;
+  gboolean started;
 
   GMutex full_lock;
   GCond full_cond;
@@ -110,6 +111,10 @@ gboolean gst_droid_codec_reconfigure_output_port (GstDroidComponent * comp);
 gboolean gst_droid_codec_has_error (GstDroidComponent * comp);
 gboolean gst_droid_codec_needs_reconfigure (GstDroidComponent * comp);
 void gst_droid_codec_unset_needs_reconfigure (GstDroidComponent * comp);
+gboolean gst_droid_codec_is_running (GstDroidComponent * comp);
+
+void gst_droid_codec_empty_full (GstDroidComponent * comp);
+gboolean gst_droid_codec_flush (GstDroidComponent * comp, gboolean pause);
 
 const gchar *gst_omx_error_to_string (OMX_ERRORTYPE err);
 const gchar *gst_omx_state_to_string (OMX_STATETYPE state);

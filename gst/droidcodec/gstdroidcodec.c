@@ -536,6 +536,7 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type,
   g_cond_init (&component->full_cond);
   component->error = FALSE;
   component->needs_reconfigure = FALSE;
+  component->started = FALSE;
   g_mutex_init (&component->lock);
   g_atomic_int_set (&component->state, OMX_StateLoaded);
 
@@ -805,7 +806,7 @@ gst_droid_codec_set_state (GstDroidComponent * comp, OMX_STATETYPE new_state)
     return TRUE;
   }
 
-  if (new_state <= OMX_StateInvalid || new_state > OMX_StateExecuting) {
+  if (new_state <= OMX_StateInvalid || new_state > OMX_StatePause) {
     GST_ERROR_OBJECT (comp->parent, "cannot handle transition from %s to %s",
         gst_omx_state_to_string (old_state),
         gst_omx_state_to_string (new_state));
@@ -882,7 +883,9 @@ gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink,
     return FALSE;
   }
 
-  /* TODO: */
+  g_mutex_lock (&comp->lock);
+  comp->started = TRUE;
+  g_mutex_unlock (&comp->lock);
 
   return TRUE;
 }
@@ -904,9 +907,21 @@ gst_droid_codec_pop_full_locked (GstDroidComponent * comp)
 }
 
 void
+gst_droid_codec_empty_full (GstDroidComponent * comp)
+{
+  g_mutex_lock (&comp->full_lock);
+  gst_droid_codec_pop_full_locked (comp);
+  g_mutex_unlock (&comp->full_lock);
+}
+
+void
 gst_droid_codec_stop_component (GstDroidComponent * comp)
 {
   GST_DEBUG_OBJECT (comp->parent, "stop");
+
+  g_mutex_lock (&comp->lock);
+  comp->started = FALSE;
+  g_mutex_unlock (&comp->lock);
 
   gst_droid_codec_set_state (comp, OMX_StateIdle);
 
@@ -966,6 +981,10 @@ gst_droid_codec_acquire_buffer_from_pool (GstDroidComponent * comp,
       return NULL;
     }
 
+    if (!gst_droid_codec_is_running (comp)) {
+      return NULL;
+    }
+
     params.flags = GST_BUFFER_POOL_ACQUIRE_FLAG_DONTWAIT;
 
     ret = gst_buffer_pool_acquire_buffer (pool, &buffer, &params);
@@ -1006,6 +1025,9 @@ gst_droid_codec_consume_frame (GstDroidComponent * comp,
       return FALSE;
     } else if (!buf && gst_droid_codec_needs_reconfigure (comp)) {
       GST_INFO_OBJECT (comp->parent, "component needs reconfigure");
+      return FALSE;
+    } else if (!buf && !gst_droid_codec_is_running (comp)) {
+      GST_INFO_OBJECT (comp->parent, "component is not running");
       return FALSE;
     } else if (!buf) {
       GST_ERROR_OBJECT (comp->parent, "could not acquire buffer");
@@ -1203,7 +1225,6 @@ gst_droid_codec_unset_needs_reconfigure (GstDroidComponent * comp)
   g_mutex_lock (&comp->lock);
   comp->needs_reconfigure = FALSE;
   g_mutex_unlock (&comp->lock);
-
 }
 
 gboolean
@@ -1228,6 +1249,17 @@ gst_droid_codec_has_error (GstDroidComponent * comp)
   g_mutex_unlock (&comp->lock);
 
   return err;
+}
+
+gboolean
+gst_droid_codec_is_running (GstDroidComponent * comp)
+{
+  gboolean started;
+  g_mutex_lock (&comp->lock);
+  started = comp->started;
+  g_mutex_unlock (&comp->lock);
+
+  return started;
 }
 
 gboolean
@@ -1266,6 +1298,62 @@ gst_droid_codec_reconfigure_output_port (GstDroidComponent * comp)
         gst_omx_error_to_string (err), err);
 
     return FALSE;
+  }
+
+  return TRUE;
+}
+
+gboolean
+gst_droid_codec_flush (GstDroidComponent * comp, gboolean pause)
+{
+  OMX_ERRORTYPE err;
+  GST_DEBUG_OBJECT (comp->parent, "flush %d", pause);
+
+  if (pause) {
+    g_mutex_lock (&comp->lock);
+    comp->started = FALSE;
+    g_mutex_unlock (&comp->lock);
+
+    /* set state to pause */
+    if (!gst_droid_codec_set_state (comp, OMX_StatePause)) {
+      return FALSE;
+    }
+
+    if (!gst_droid_codec_wait_for_state (comp, OMX_StatePause)) {
+      GST_ERROR_OBJECT (comp->parent, "component failed to reach pause state");
+      return FALSE;
+    }
+
+    /* flush ports */
+    err = OMX_SendCommand (comp->omx, OMX_CommandFlush, -1, NULL);
+    if (err != OMX_ErrorNone) {
+      GST_ERROR_OBJECT (comp->parent,
+          "got error %s (0x%08x) while flushing ports",
+          gst_omx_error_to_string (err), err);
+      return FALSE;
+    }
+  } else {
+    /* set state to executing */
+    if (!gst_droid_codec_set_state (comp, OMX_StateExecuting)) {
+      return FALSE;
+    }
+
+    if (!gst_droid_codec_wait_for_state (comp, OMX_StateExecuting)) {
+      GST_ERROR_OBJECT (comp->parent,
+          "component failed to reach executing state");
+      return FALSE;
+    }
+
+    /* fill port */
+    if (!gst_droid_codec_return_output_buffers (comp)) {
+      GST_ERROR_OBJECT (comp->parent,
+          "failed to hand output buffers to the codec");
+      return FALSE;
+    }
+
+    g_mutex_lock (&comp->lock);
+    comp->started = TRUE;
+    g_mutex_unlock (&comp->lock);
   }
 
   return TRUE;
