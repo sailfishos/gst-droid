@@ -1,1 +1,1 @@
-SUBDIRS = droideglsink droidcodec
+SUBDIRS = droideglsink droidcodec droidcamsrc
