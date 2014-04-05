@@ -559,17 +559,21 @@ static gboolean
 gst_droiddec_negotiate (GstVideoDecoder * decoder)
 {
   GstDroidDec *dec;
+  GstPad *pad;
   GstCaps *caps = NULL;
   gboolean ret = FALSE;
 
   dec = GST_DROIDDEC (decoder);
+  pad = GST_VIDEO_DECODER_SRC_PAD (decoder);
 
   GST_DEBUG_OBJECT (dec, "negotiate");
 
+  if (!GST_VIDEO_DECODER_CLASS (parent_class)->negotiate (decoder)) {
+    return FALSE;
+  }
+
   /* We don't negotiate. We either use our caps or fail */
-  caps =
-      gst_pad_peer_query_caps (GST_VIDEO_DECODER_SRC_PAD (decoder),
-      dec->out_state->caps);
+  caps = gst_pad_peer_query_caps (pad, dec->out_state->caps);
 
   GST_DEBUG_OBJECT (dec, "intersection %" GST_PTR_FORMAT, caps);
 
@@ -577,7 +581,7 @@ gst_droiddec_negotiate (GstVideoDecoder * decoder)
     goto error;
   }
 
-  if (!gst_pad_set_caps (GST_VIDEO_DECODER_SRC_PAD (decoder), caps)) {
+  if (!gst_pad_set_caps (pad, caps)) {
     goto error;
   }
 
