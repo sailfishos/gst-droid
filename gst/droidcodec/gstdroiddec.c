@@ -42,7 +42,7 @@ GST_STATIC_PAD_TEMPLATE (GST_VIDEO_DECODER_SRC_NAME,
         (GST_CAPS_FEATURE_MEMORY_DROID_SURFACE, "{ENCODED, YV12}")));
 
 static gboolean
-gst_droiddec_do_haandle_frame (GstVideoDecoder * decoder,
+gst_droiddec_do_handle_frame (GstVideoDecoder * decoder,
     GstVideoCodecFrame * frame)
 {
   GstDroidDec *dec = GST_DROIDDEC (decoder);
@@ -161,8 +161,8 @@ gst_droiddec_loop (GstDroidDec * dec)
     GST_DEBUG_OBJECT (dec, "trying to get a buffer");
     g_mutex_lock (&dec->comp->full_lock);
     buff = g_queue_pop_head (dec->comp->full);
-    if (!buff) {
 
+    if (!buff) {
       if (!dec->started) {
         /* this is a signal that we should quit */
         GST_DEBUG_OBJECT (dec, "got no buffer");
@@ -397,8 +397,30 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     goto error;
   }
 
-  if (gst_droiddec_do_haandle_frame (decoder, frame)) {
+  /* if we have been flushed then we need to start accepting data again */
+  if (!gst_droid_codec_is_running (dec->comp)) {
+    if (!gst_droid_codec_flush (dec->comp, FALSE)) {
+      goto error;
+    }
+
+    gst_droid_codec_empty_full (dec->comp);
+
+    dec->started = TRUE;
+
+    if (!gst_pad_start_task (GST_VIDEO_DECODER_SRC_PAD (decoder),
+            (GstTaskFunction) gst_droiddec_loop, gst_object_ref (dec),
+            gst_object_unref)) {
+      GST_ERROR_OBJECT (dec, "failed to start src task");
+      goto error;
+    }
+  }
+
+  if (gst_droiddec_do_handle_frame (decoder, frame)) {
     return GST_FLOW_OK;
+  }
+
+  if (!gst_droid_codec_is_running (dec->comp)) {
+    return GST_FLOW_FLUSHING;
   }
 
   if (gst_droid_codec_needs_reconfigure (dec->comp)) {
@@ -457,7 +479,7 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     goto error;
   }
 
-  if (gst_droiddec_do_haandle_frame (decoder, frame)) {
+  if (gst_droiddec_do_handle_frame (decoder, frame)) {
     return GST_FLOW_OK;
   }
 
@@ -517,7 +539,14 @@ gst_droiddec_flush (GstVideoDecoder * decoder)
 
   GST_DEBUG_OBJECT (dec, "flush");
 
-  // TODO:
+  gst_droiddec_stop_loop (decoder);
+
+  /* now flush our component */
+  if (!gst_droid_codec_flush (dec->comp, TRUE)) {
+    return FALSE;
+  }
+
+  GST_DEBUG_OBJECT (dec, "Flushed");
 
   return TRUE;
 }
