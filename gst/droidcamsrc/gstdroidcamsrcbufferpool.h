@@ -41,6 +41,8 @@ struct _GstDroidCamSrcBufferPool
   preview_stream_ops_t window;
   GstCaps *caps;
   GstAllocator *allocator;
+  GHashTable *map;
+  GMutex lock;
 };
 
 struct _GstDroidCamSrcBufferPoolClass
@@ -49,6 +51,7 @@ struct _GstDroidCamSrcBufferPoolClass
 };
 
 GstDroidCamSrcBufferPool * gst_droid_cam_src_buffer_pool_new ();
+void gst_droid_cam_src_buffer_pool_reset (GstDroidCamSrcBufferPool * pool);
 
 G_END_DECLS
 

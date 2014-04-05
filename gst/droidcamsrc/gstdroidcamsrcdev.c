@@ -197,4 +197,6 @@ gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev)
   if (!gst_buffer_pool_set_active (GST_BUFFER_POOL (dev->pool), FALSE)) {
     GST_ERROR ("failed to deactivate buffer pool");
   }
+
+  gst_droid_cam_src_buffer_pool_reset (dev->pool);
 }
