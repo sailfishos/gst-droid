@@ -122,8 +122,8 @@ gst_droideglsink_set_caps (GstBaseSink * bsink, GstCaps * caps)
   GST_DEBUG_OBJECT (sink, "set caps with %" GST_PTR_FORMAT, caps);
 
   if (!gst_video_info_from_caps (&info, caps)) {
-    GST_DEBUG_OBJECT (sink,
-        "Could not locate image format from caps %" GST_PTR_FORMAT, caps);
+    GST_ELEMENT_ERROR (sink, STREAM, FORMAT, (NULL),
+        ("ould not locate image format from caps %" GST_PTR_FORMAT, caps));
     return FALSE;
   }
 
