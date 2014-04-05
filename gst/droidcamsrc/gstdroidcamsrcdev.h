@@ -19,12 +19,27 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef __PLUGIN_H__
-#define __PLUGIN_H__
+#ifndef __GST_DROID_CAM_SRC_DEV_H__
+#define __GST_DROID_CAM_SRC_DEV_H__
 
-GST_DEBUG_CATEGORY (gst_droidcamsrc_debug);
+#include <gst/gst.h>
+#include <hardware/camera.h>
 
-// TODO: hardcoded
-#define DROID_CAM_SRC_CONFIG_DIR   "/etc/gst-droid/"
+G_BEGIN_DECLS
 
-#endif /* __PLUGIN_H__ */
+typedef struct _GstDroidCamSrcDev GstDroidCamSrcDev;
+
+struct _GstDroidCamSrcDev
+{
+  camera_module_t *hw;
+  camera_device_t *dev;
+};
+
+GstDroidCamSrcDev *gst_droidcamsrc_dev_new (camera_module_t *hw);
+gboolean gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, const gchar *id);
+void gst_droidcamsrc_dev_close (GstDroidCamSrcDev * dev);
+void gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev);
+
+G_END_DECLS
+
+#endif /* __GST_DROID_CAM_SRC_DEV_H__ */

@@ -23,9 +23,9 @@
 #define __GST_DROID_CAM_SRC_H__
 
 #include <gst/gst.h>
-#include <hardware/hardware.h>
+#include "gstdroidcamsrcdev.h"
+
 #include <hardware/camera.h>
-#include <system/camera.h>
 
 G_BEGIN_DECLS
 
@@ -69,10 +69,9 @@ struct _GstDroidCamSrc
 {
   GstElement parent;
 
-  GstDroidCamSrcCamInfo info[MAX_CAMERAS];
-
   camera_module_t *hw;
-  camera_device_t *dev;
+  GstDroidCamSrcDev *dev;
+  GstDroidCamSrcCamInfo info[MAX_CAMERAS];
 
   GstPad *vfsrc;
   GstPad *imgsrc;

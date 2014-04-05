@@ -28,7 +28,7 @@
 #define gst_droidcamsrc_parent_class parent_class
 G_DEFINE_TYPE (GstDroidCamSrc, gst_droidcamsrc, GST_TYPE_ELEMENT);
 
-GST_DEBUG_CATEGORY (gst_droidcamsrc_debug);
+GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 #define GST_CAT_DEFAULT gst_droidcamsrc_debug
 
 static void
@@ -124,42 +124,6 @@ gst_droid_cam_src_get_hw (GstDroidCamSrc * src)
   return TRUE;
 }
 
-static gboolean
-gst_droid_cam_src_open_hw (GstDroidCamSrc * src)
-{
-  int err;
-
-  GST_DEBUG_OBJECT (src, "open hw");
-
-  err =
-      src->hw->common.methods->open ((const struct hw_module_t *) src->hw, "0",
-      (struct hw_device_t **) &src->dev);
-  if (err < 0) {
-    src->dev = NULL;
-    GST_ERROR_OBJECT (src, "error 0x%x opening camera", err);
-    return FALSE;
-  }
-
-  return TRUE;
-}
-
-static void
-gst_droid_cam_src_close_hw (GstDroidCamSrc * src)
-{
-  int err;
-
-  GST_DEBUG_OBJECT (src, "close hw %p", src->dev);
-
-  if (src->dev) {
-    err = src->dev->common.close (&src->dev->common);
-    src->dev = NULL;
-
-    if (err < 0) {
-      GST_ERROR_OBJECT (src, "error 0x%x closing camera", err);
-    }
-  }
-}
-
 static GstStateChangeReturn
 gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 {
@@ -174,11 +138,13 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         ret = GST_STATE_CHANGE_FAILURE;
       }
 
+      src->dev = gst_droidcamsrc_dev_new (src->hw);
+
       break;
 
     case GST_STATE_CHANGE_READY_TO_PAUSED:
-      if (!gst_droid_cam_src_open_hw (src)) {
-
+      if (!gst_droidcamsrc_dev_open (src->dev, "0")) {
+        ret = GST_STATE_CHANGE_FAILURE;
       }
 
       break;
@@ -207,11 +173,13 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       break;
 
     case GST_STATE_CHANGE_PAUSED_TO_READY:
-
+      gst_droidcamsrc_dev_close (src->dev);
       break;
 
     case GST_STATE_CHANGE_READY_TO_NULL:
-      gst_droid_cam_src_close_hw (src);
+      gst_droidcamsrc_dev_destroy (src->dev);
+      src->dev = NULL;
+      src->hw = NULL;
       break;
 
     default:
