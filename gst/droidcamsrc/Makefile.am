@@ -11,9 +11,11 @@ libgstdroidcamsrc_la_LIBTOOLFLAGS = --tag=disable-static
 libgstdroidcamsrc_la_SOURCES = \
 	plugin.c \
 	gstdroidcamsrc.c \
-	gstdroidcamsrcdev.c
+	gstdroidcamsrcdev.c \
+	gstdroidcamsrcdevmemory.c
 
 noinst_HEADERS = \
 	plugin.h \
 	gstdroidcamsrc.h \
-	gstdroidcamsrcdev.h
+	gstdroidcamsrcdev.h \
+	gstdroidcamsrcdevmemory.h

@@ -24,9 +24,20 @@
 #endif
 
 #include "gstdroidcamsrcdev.h"
+#include "gstdroidcamsrcdevmemory.h"
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 #define GST_CAT_DEFAULT gst_droidcamsrc_debug
+
+static camera_memory_t *
+gst_droidcamsrc_dev_request_memory (int fd, size_t buf_size,
+    unsigned int num_bufs, void *user)
+{
+  GST_DEBUG ("dev request memory fd=%d, buf_size=%d, num_bufs=%d", fd, buf_size,
+      num_bufs);
+
+  return gst_droidcamsrc_dev_memory_get (fd, buf_size, num_bufs);
+}
 
 GstDroidCamSrcDev *
 gst_droidcamsrc_dev_new (camera_module_t * hw)
@@ -87,4 +98,22 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
   dev->hw = NULL;
   g_slice_free (GstDroidCamSrcDev, dev);
   dev = NULL;
+}
+
+gboolean
+gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
+{
+  GST_DEBUG ("dev init");
+
+  dev->dev->ops->set_callbacks (dev->dev, NULL, NULL, NULL,
+      gst_droidcamsrc_dev_request_memory, dev);
+
+  // TODO:
+  return TRUE;
+}
+
+void
+gst_droidcamsrc_dev_deinit (GstDroidCamSrcDev * dev)
+{
+  GST_DEBUG ("dev deinit");
 }

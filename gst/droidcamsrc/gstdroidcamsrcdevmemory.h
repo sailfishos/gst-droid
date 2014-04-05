@@ -19,30 +19,17 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef __GST_DROID_CAM_SRC_DEV_H__
-#define __GST_DROID_CAM_SRC_DEV_H__
+#ifndef __GST_DROID_CAM_SRC_DEV_MEMORY_H__
+#define __GST_DROID_CAM_SRC_DEV_MEMORY_H__
 
 #include <gst/gst.h>
 #include <hardware/camera.h>
 
 G_BEGIN_DECLS
 
-typedef struct _GstDroidCamSrcDev GstDroidCamSrcDev;
-
-struct _GstDroidCamSrcDev
-{
-  camera_module_t *hw;
-  camera_device_t *dev;
-};
-
-GstDroidCamSrcDev *gst_droidcamsrc_dev_new (camera_module_t *hw);
-gboolean gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, const gchar *id);
-void gst_droidcamsrc_dev_close (GstDroidCamSrcDev * dev);
-void gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev);
-
-gboolean gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev);
-void gst_droidcamsrc_dev_deinit (GstDroidCamSrcDev * dev);
+camera_memory_t *gst_droidcamsrc_dev_memory_get (int fd, size_t buf_size,
+    unsigned int num_bufs);
 
 G_END_DECLS
 
-#endif /* __GST_DROID_CAM_SRC_DEV_H__ */
+#endif /* __GST_DROID_CAM_SRC_DEV_MEMORY_H__ */
