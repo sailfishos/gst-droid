@@ -629,7 +629,7 @@ gst_droid_codec_get (void)
   G_LOCK (codec);
 
   if (!codec) {
-    codec = g_slice_new (GstDroidCodec);
+    codec = g_slice_new0 (GstDroidCodec);
     codec->cores = g_hash_table_new_full (g_str_hash, g_str_equal, g_free,
         (GDestroyNotify) gst_droid_codec_destroy_handle);
     g_mutex_init (&codec->lock);
