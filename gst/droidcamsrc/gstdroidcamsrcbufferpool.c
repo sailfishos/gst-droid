@@ -541,7 +541,7 @@ gst_droidcamsrc_buffer_pool_set_config (GstDroidCamSrcBufferPool * pool)
   }
 
   gst_caps_replace (&pool->pad->caps, caps);
-
+  gst_caps_unref (caps);
   g_mutex_unlock (&pool->pad->lock);
 
   return TRUE;
