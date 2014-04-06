@@ -467,6 +467,7 @@ gst_droidcamsrc_buffer_pool_set_config (GstDroidCamSrcBufferPool * pool)
   GstCaps *caps;
   GstVideoFormat fmt;
   GstVideoInfo info;
+  GstCapsFeatures *feature;
 
   GST_DEBUG_OBJECT (pool, "set config");
 
@@ -514,6 +515,9 @@ gst_droidcamsrc_buffer_pool_set_config (GstDroidCamSrcBufferPool * pool)
   GST_VIDEO_INFO_FPS_D (&info) = 1;
 
   caps = gst_video_info_to_caps (&info);
+  /* set our caps features */
+  feature = gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_SURFACE, NULL);
+  gst_caps_set_features (caps, 0, feature);
 
   /* set our config */
   gst_buffer_pool_config_set_params (config, caps, 0, count, count);
