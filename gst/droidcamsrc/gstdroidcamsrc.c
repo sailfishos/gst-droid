@@ -383,6 +383,9 @@ out:
         GST_PAD_NAME (data->pad), current);
     if (!gst_pad_set_caps (data->pad, caps)) {
       GST_ERROR_OBJECT (src, "failed to set caps");
+    } else {
+      // TODO: what should we really do here?
+      gst_pad_check_reconfigure (data->pad);
     }
   }
 
