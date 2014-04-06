@@ -269,6 +269,12 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       break;
   }
 
+  if (ret == GST_STATE_CHANGE_SUCCESS
+      && (transition == GST_STATE_CHANGE_READY_TO_PAUSED
+          || transition == GST_STATE_CHANGE_PLAYING_TO_PAUSED)) {
+    ret = GST_STATE_CHANGE_NO_PREROLL;
+  }
+
   return ret;
 }
 
