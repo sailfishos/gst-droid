@@ -73,6 +73,7 @@ struct _GstDroidCamSrcPad
   GCond cond;
   GMutex lock;
   gboolean running;
+  GstCaps *caps;
 };
 
 struct _GstDroidCamSrc

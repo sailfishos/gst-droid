@@ -69,6 +69,7 @@ gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
   g_cond_init (&pad->cond);
   pad->queue = g_queue_new ();
   pad->running = FALSE;
+  pad->caps = NULL;
 
   gst_element_add_pad (GST_ELEMENT (src), pad->pad);
 
@@ -84,6 +85,10 @@ gst_droidcamsrc_destroy_pad (GstDroidCamSrcPad * pad)
   }
 
   /* we don't destroy the pad itself */
+  if (pad->caps) {
+    gst_caps_unref (pad->caps);
+  }
+
   g_mutex_clear (&pad->lock);
   g_cond_clear (&pad->cond);
   g_queue_free (pad->queue);
@@ -365,10 +370,22 @@ gst_droidcamsrc_activate_mode (GstPad * pad, GstObject * parent,
       return FALSE;
     }
   } else {
+    gboolean ret = FALSE;
     if (!gst_pad_stop_task (pad)) {
       GST_ERROR_OBJECT (src, "failed to stop pad task");
-      return FALSE;
+      ret = FALSE;
+    } else {
+      ret = TRUE;
     }
+
+    g_mutex_lock (&data->lock);
+    if (data->caps) {
+      gst_caps_unref (data->caps);
+      data->caps = NULL;
+    }
+    g_mutex_unlock (&data->lock);
+
+    return ret;
   }
 
   return TRUE;

@@ -40,7 +40,6 @@ struct _GstDroidCamSrcBufferPool
 {
   GstBufferPool parent;
   preview_stream_ops_t window;
-  GstCaps *caps;
   GstAllocator *allocator;
   GHashTable *map;
   GMutex lock;

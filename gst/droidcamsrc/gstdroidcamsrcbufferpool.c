@@ -152,7 +152,7 @@ gst_droidcamsrc_buffer_pool_enqueue_buffer (struct preview_stream_ops *w,
     g_mutex_unlock (&pool->lock);
     return -1;
   }
-
+  // TODO: pts, dts, duration, offset, offset_end ...
   g_hash_table_remove (pool->map, buffer);
   g_mutex_unlock (&pool->lock);
 
@@ -428,7 +428,6 @@ gst_droidcamsrc_buffer_pool_init (GstDroidCamSrcBufferPool * pool)
 {
   pool->map = g_hash_table_new (g_direct_hash, g_direct_equal);
 
-  pool->caps = NULL;
   pool->allocator = gst_gralloc_allocator_new ();
 
   g_mutex_init (&pool->lock);
@@ -532,7 +531,18 @@ gst_droidcamsrc_buffer_pool_set_config (GstDroidCamSrcBufferPool * pool)
     return FALSE;
   }
 
-  gst_caps_replace (&pool->caps, caps);
+  /* wait for the queue to be empty before replacing the caps */
+  g_mutex_lock (&pool->pad->lock);
+  while (pool->pad->queue->length) {
+    g_mutex_unlock (&pool->pad->lock);
+    GST_DEBUG_OBJECT (pool, "waiting for pad queue to become empty");
+    usleep (ACAUIRE_BUFFER_TIMEOUT);
+    g_mutex_lock (&pool->pad->lock);
+  }
+
+  gst_caps_replace (&pool->pad->caps, caps);
+
+  g_mutex_unlock (&pool->pad->lock);
 
   return TRUE;
 }
