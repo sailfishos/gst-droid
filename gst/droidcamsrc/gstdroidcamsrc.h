@@ -76,6 +76,7 @@ struct _GstDroidCamSrcPad
   gboolean open_stream;
   gboolean open_segment;
   GstCaps *caps;
+  GstSegment segment;
 };
 
 struct _GstDroidCamSrc

@@ -50,8 +50,12 @@ GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_IMAGE_PAD_NAME,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE ("image/jpeg")));
 
-static gboolean gst_droidcamsrc_activate_mode (GstPad * pad, GstObject * parent,
-    GstPadMode mode, gboolean active);
+static gboolean gst_droidcamsrc_pad_activate_mode (GstPad * pad,
+    GstObject * parent, GstPadMode mode, gboolean active);
+//static gboolean gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent,
+//    GstEvent * event);
+static gboolean gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent,
+    GstQuery * query);
 
 static GstDroidCamSrcPad *
 gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
@@ -63,13 +67,18 @@ gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
   gst_pad_use_fixed_caps (pad->pad);
   gst_pad_set_element_private (pad->pad, pad);
 
-  gst_pad_set_activatemode_function (pad->pad, gst_droidcamsrc_activate_mode);
+  gst_pad_set_activatemode_function (pad->pad,
+      gst_droidcamsrc_pad_activate_mode);
+  //  gst_pad_set_event_function (pad->pad, gst_droidcamsrc_pad_event);
+  gst_pad_set_query_function (pad->pad, gst_droidcamsrc_pad_query);
 
   g_mutex_init (&pad->lock);
   g_cond_init (&pad->cond);
   pad->queue = g_queue_new ();
   pad->running = FALSE;
   pad->caps = NULL;
+
+  gst_segment_init (&pad->segment, GST_FORMAT_TIME);
 
   gst_element_add_pad (GST_ELEMENT (src), pad->pad);
 
@@ -379,14 +388,12 @@ out:
 
   /* segment */
   if (G_UNLIKELY (data->open_segment)) {
-    GstSegment segment;
     GstEvent *event;
 
     GST_DEBUG_OBJECT (src, "Pushing SEGMENT");
 
     // TODO: consider buffer timestamp as start?
-    gst_segment_init (&segment, GST_FORMAT_TIME);
-    event = gst_event_new_segment (&segment);
+    event = gst_event_new_segment (&data->segment);
 
     if (!gst_pad_push_event (data->pad, event)) {
       GST_ERROR_OBJECT (src, "failed to push SEGMENT event");
@@ -414,7 +421,7 @@ out:
 }
 
 static gboolean
-gst_droidcamsrc_activate_mode (GstPad * pad, GstObject * parent,
+gst_droidcamsrc_pad_activate_mode (GstPad * pad, GstObject * parent,
     GstPadMode mode, gboolean active)
 {
   GstDroidCamSrc *src = GST_DROIDCAMSRC (parent);
@@ -466,4 +473,85 @@ gst_droidcamsrc_activate_mode (GstPad * pad, GstObject * parent,
   }
 
   return TRUE;
+}
+
+#if 0
+static gboolean
+gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent, GstEvent * event)
+{
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (parent);
+
+  GST_DEBUG_OBJECT (src, "pad %s %" GST_PTR_FORMAT, GST_PAD_NAME (pad), event);
+
+  return FALSE;
+}
+#endif
+
+static gboolean
+gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
+{
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (parent);
+  gboolean ret = FALSE;
+  GstDroidCamSrcPad *data = gst_pad_get_element_private (pad);
+
+  GST_DEBUG_OBJECT (src, "pad %s %" GST_PTR_FORMAT, GST_PAD_NAME (pad), query);
+
+  switch (GST_QUERY_TYPE (query)) {
+    case GST_QUERY_POSITION:
+    case GST_QUERY_DURATION:
+    case GST_QUERY_SEEKING:
+    case GST_QUERY_JITTER:
+    case GST_QUERY_RATE:
+    case GST_QUERY_CONVERT:
+    case GST_QUERY_BUFFERING:
+    case GST_QUERY_URI:
+    case GST_QUERY_DRAIN:
+    case GST_QUERY_CONTEXT:
+    case GST_QUERY_UNKNOWN:
+    case GST_QUERY_CUSTOM:
+    case GST_QUERY_ACCEPT_CAPS:
+    case GST_QUERY_ALLOCATION:
+    case GST_QUERY_SEGMENT:
+      ret = FALSE;
+      break;
+
+    case GST_QUERY_SCHEDULING:
+      gst_query_add_scheduling_mode (query, GST_PAD_MODE_PUSH);
+      ret = TRUE;
+      break;
+
+    case GST_QUERY_FORMATS:
+      gst_query_set_formats (query, 1, GST_FORMAT_TIME);
+      ret = TRUE;
+      break;
+
+    case GST_QUERY_LATENCY:
+      // TODO: this assummes 7 buffers @ 30 FPS. Query from either bufferpool or camera params
+      gst_query_set_latency (query, TRUE, 33, 33 * 7);
+      ret = TRUE;
+      break;
+
+
+    case GST_QUERY_CAPS:
+      g_mutex_lock (&data->lock);
+      if (data->caps) {
+        gst_query_set_caps_result (query, data->caps);
+        ret = TRUE;
+      } else {
+        // TODO: should we add the pad template caps ?
+        ret = FALSE;
+      }
+
+      g_mutex_unlock (&data->lock);
+
+      break;
+  }
+
+  if (ret) {
+    GST_LOG_OBJECT (src, "replying to %" GST_PTR_FORMAT, query);
+  } else {
+    GST_LOG_OBJECT (src, "discarding %" GST_PTR_FORMAT, query);
+  }
+
+  return ret;
 }
