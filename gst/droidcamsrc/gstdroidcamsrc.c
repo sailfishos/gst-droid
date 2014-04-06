@@ -50,6 +50,13 @@ GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_IMAGE_PAD_NAME,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE ("image/jpeg")));
 
+// TODO: fix that when we know it
+static GstStaticPadTemplate vid_src_template_factory =
+GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME,
+    GST_PAD_SRC,
+    GST_PAD_ALWAYS,
+    GST_STATIC_CAPS_ANY);
+
 static gboolean gst_droidcamsrc_pad_activate_mode (GstPad * pad,
     GstObject * parent, GstPadMode mode, gboolean active);
 static gboolean gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent,
@@ -88,11 +95,6 @@ gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
 static void
 gst_droidcamsrc_destroy_pad (GstDroidCamSrcPad * pad)
 {
-  if (!pad) {
-    // TODO:
-    return;
-  }
-
   /* we don't destroy the pad itself */
   if (pad->caps) {
     gst_caps_unref (pad->caps);
@@ -115,7 +117,8 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   src->imgsrc = gst_droidcamsrc_create_pad (src,
       &img_src_template_factory, GST_BASE_CAMERA_SRC_IMAGE_PAD_NAME);
 
-  src->vidsrc = NULL;
+  src->vidsrc = gst_droidcamsrc_create_pad (src,
+      &vid_src_template_factory, GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME);
 
   GST_OBJECT_FLAG_SET (src, GST_ELEMENT_FLAG_SOURCE);
 }
@@ -515,6 +518,7 @@ gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent, GstEvent * event)
     case GST_EVENT_CAPS:
     case GST_EVENT_LATENCY:
     case GST_EVENT_RECONFIGURE:
+      // TODO:
       ret = TRUE;
       break;
 
