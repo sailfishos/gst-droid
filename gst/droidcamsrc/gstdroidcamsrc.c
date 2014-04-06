@@ -52,8 +52,8 @@ GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_IMAGE_PAD_NAME,
 
 static gboolean gst_droidcamsrc_pad_activate_mode (GstPad * pad,
     GstObject * parent, GstPadMode mode, gboolean active);
-//static gboolean gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent,
-//    GstEvent * event);
+static gboolean gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent,
+    GstEvent * event);
 static gboolean gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent,
     GstQuery * query);
 
@@ -69,7 +69,7 @@ gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
 
   gst_pad_set_activatemode_function (pad->pad,
       gst_droidcamsrc_pad_activate_mode);
-  //  gst_pad_set_event_function (pad->pad, gst_droidcamsrc_pad_event);
+  gst_pad_set_event_function (pad->pad, gst_droidcamsrc_pad_event);
   gst_pad_set_query_function (pad->pad, gst_droidcamsrc_pad_query);
 
   g_mutex_init (&pad->lock);
@@ -475,17 +475,61 @@ gst_droidcamsrc_pad_activate_mode (GstPad * pad, GstObject * parent,
   return TRUE;
 }
 
-#if 0
 static gboolean
 gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent, GstEvent * event)
 {
   GstDroidCamSrc *src = GST_DROIDCAMSRC (parent);
+  gboolean ret = FALSE;
+  //  GstDroidCamSrcPad *data = gst_pad_get_element_private (pad);
 
   GST_DEBUG_OBJECT (src, "pad %s %" GST_PTR_FORMAT, GST_PAD_NAME (pad), event);
 
-  return FALSE;
+  switch (GST_EVENT_TYPE (event)) {
+    case GST_EVENT_SEEK:
+    case GST_EVENT_STREAM_START:
+    case GST_EVENT_TAG:
+    case GST_EVENT_BUFFERSIZE:
+    case GST_EVENT_SINK_MESSAGE:
+    case GST_EVENT_SEGMENT:
+    case GST_EVENT_EOS:
+    case GST_EVENT_TOC:
+    case GST_EVENT_SEGMENT_DONE:
+    case GST_EVENT_GAP:
+    case GST_EVENT_QOS:
+    case GST_EVENT_NAVIGATION:
+    case GST_EVENT_STEP:
+    case GST_EVENT_TOC_SELECT:
+    case GST_EVENT_CUSTOM_UPSTREAM:
+    case GST_EVENT_CUSTOM_DOWNSTREAM:
+    case GST_EVENT_CUSTOM_DOWNSTREAM_OOB:
+    case GST_EVENT_CUSTOM_DOWNSTREAM_STICKY:
+    case GST_EVENT_CUSTOM_BOTH:
+    case GST_EVENT_CUSTOM_BOTH_OOB:
+    case GST_EVENT_UNKNOWN:
+      ret = FALSE;
+      break;
+
+    case GST_EVENT_CAPS:
+    case GST_EVENT_LATENCY:
+    case GST_EVENT_RECONFIGURE:
+      ret = TRUE;
+      break;
+
+    case GST_EVENT_FLUSH_START:
+    case GST_EVENT_FLUSH_STOP:
+      ret = TRUE;
+      // TODO: what do we do here?
+      break;
+  }
+
+  if (ret) {
+    GST_LOG_OBJECT (src, "replying to %" GST_PTR_FORMAT, event);
+  } else {
+    GST_LOG_OBJECT (src, "discarding %" GST_PTR_FORMAT, event);
+  }
+
+  return ret;
 }
-#endif
 
 static gboolean
 gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
