@@ -359,9 +359,20 @@ out:
     data->open_stream = FALSE;
   }
 
-  /* new segment */
+  /* segment */
   if (G_UNLIKELY (data->open_segment)) {
-    // TODO: new segment
+    GstSegment segment;
+    GstEvent *event;
+
+    GST_DEBUG_OBJECT (src, "Pushing SEGMENT");
+
+    // TODO: consider buffer timestamp as start?
+    gst_segment_init (&segment, GST_FORMAT_TIME);
+    event = gst_event_new_segment (&segment);
+
+    if (!gst_pad_push_event (data->pad, event)) {
+      GST_ERROR_OBJECT (src, "failed to push SEGMENT event");
+    }
 
     data->open_segment = FALSE;
   }

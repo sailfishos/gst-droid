@@ -142,7 +142,7 @@ gst_droidcamsrc_buffer_pool_enqueue_buffer (struct preview_stream_ops *w,
 
   pool = container_of (w, GstDroidCamSrcBufferPool, window);
 
-  GST_LOG_OBJECT (pool, "enqueue buffer %p", buffer);
+  GST_DEBUG_OBJECT (pool, "enqueue buffer %p", buffer);
 
   g_mutex_lock (&pool->lock);
   buff = g_hash_table_lookup (pool->map, buffer);
