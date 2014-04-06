@@ -50,6 +50,9 @@ GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_IMAGE_PAD_NAME,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE ("image/jpeg")));
 
+static gboolean gst_droidcamsrc_activate_mode (GstPad * pad, GstObject * parent,
+    GstPadMode mode, gboolean active);
+
 static GstDroidCamSrcPad *
 gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
     const gchar * name)
@@ -58,12 +61,16 @@ gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
 
   pad->pad = gst_pad_new_from_static_template (tpl, name);
   gst_pad_use_fixed_caps (pad->pad);
-  gst_element_add_pad (GST_ELEMENT (src), pad->pad);
   gst_pad_set_element_private (pad->pad, pad);
+
+  gst_pad_set_activatemode_function (pad->pad, gst_droidcamsrc_activate_mode);
+
   g_mutex_init (&pad->lock);
   g_cond_init (&pad->cond);
   pad->queue = g_queue_new ();
   pad->running = FALSE;
+
+  gst_element_add_pad (GST_ELEMENT (src), pad->pad);
 
   return pad;
 }
@@ -282,4 +289,87 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
   gobject_class->finalize = gst_droidcamsrc_finalize;
   gstelement_class->change_state =
       GST_DEBUG_FUNCPTR (gst_droidcamsrc_change_state);
+}
+
+static void
+gst_droidcamsrc_loop (gpointer user_data)
+{
+  GstDroidCamSrcPad *data = (GstDroidCamSrcPad *) user_data;
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (data->pad));
+  GstBuffer *buffer = NULL;
+
+  GST_LOG_OBJECT (src, "loop %s", GST_PAD_NAME (data->pad));
+
+  g_mutex_lock (&data->lock);
+  if (!data->running) {
+    GST_DEBUG_OBJECT (src, "task is not running");
+    goto unlock_and_out;
+  }
+
+  buffer = g_queue_pop_head (data->queue);
+  if (buffer) {
+    g_mutex_unlock (&data->lock);
+    goto out;
+  }
+
+  if (!buffer) {
+    g_cond_wait (&data->cond, &data->lock);
+    buffer = g_queue_pop_head (data->queue);
+  }
+
+  if (!buffer) {
+    /* we got signaled to exit */
+    goto unlock_and_out;
+  } else {
+    g_mutex_unlock (&data->lock);
+    goto out;
+  }
+
+
+unlock_and_out:
+  g_mutex_unlock (&data->lock);
+  return;
+
+out:
+  // TODO:
+  gst_buffer_unref (buffer);
+}
+
+static gboolean
+gst_droidcamsrc_activate_mode (GstPad * pad, GstObject * parent,
+    GstPadMode mode, gboolean active)
+{
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (parent);
+  GstDroidCamSrcPad *data = gst_pad_get_element_private (pad);
+
+  GST_INFO_OBJECT (src, "activating pad %s %d", GST_PAD_NAME (pad), active);
+
+  if (mode != GST_PAD_MODE_PUSH) {
+    GST_ERROR_OBJECT (src, "can activate pads in push mode only");
+    return FALSE;
+  }
+
+  if (!data) {
+    GST_ERROR_OBJECT (src, "cannot get pad private data");
+    return FALSE;
+  }
+
+  g_mutex_lock (&data->lock);
+  data->running = active;
+  g_cond_signal (&data->cond);
+  g_mutex_unlock (&data->lock);
+
+  if (active) {
+    if (!gst_pad_start_task (pad, gst_droidcamsrc_loop, data, NULL)) {
+      GST_ERROR_OBJECT (src, "failed to start pad task");
+      return FALSE;
+    }
+  } else {
+    if (!gst_pad_stop_task (pad)) {
+      GST_ERROR_OBJECT (src, "failed to stop pad task");
+      return FALSE;
+    }
+  }
+
+  return TRUE;
 }
