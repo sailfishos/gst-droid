@@ -553,11 +553,26 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
     case GST_QUERY_CONTEXT:
     case GST_QUERY_UNKNOWN:
     case GST_QUERY_CUSTOM:
-    case GST_QUERY_ACCEPT_CAPS:
     case GST_QUERY_ALLOCATION:
     case GST_QUERY_SEGMENT:
       ret = FALSE;
       break;
+
+    case GST_QUERY_ACCEPT_CAPS:
+    {
+      GstCaps *caps = NULL;
+      gst_query_parse_accept_caps (query, &caps);
+      g_mutex_lock (&data->lock);
+      if (caps && gst_caps_is_equal (caps, data->caps)) {
+        gst_query_set_accept_caps_result (query, TRUE);
+      } else {
+        gst_query_set_accept_caps_result (query, FALSE);
+      }
+      g_mutex_unlock (&data->lock);
+
+      ret = TRUE;
+      break;
+    }
 
     case GST_QUERY_SCHEDULING:
       gst_query_add_scheduling_mode (query, GST_PAD_MODE_PUSH);
