@@ -24,6 +24,12 @@
 #endif
 
 #include "gstdroidcamsrc.h"
+#include <gst/video/video.h>
+#include <gst/memory/gstgralloc.h>
+#ifndef GST_USE_UNSTABLE_API
+#define GST_USE_UNSTABLE_API
+#include <gst/basecamerabinsrc/gstbasecamerasrc.h>
+#endif /* GST_USE_UNSTABLE_API */
 
 #define gst_droidcamsrc_parent_class parent_class
 G_DEFINE_TYPE (GstDroidCamSrc, gst_droidcamsrc, GST_TYPE_ELEMENT);
@@ -31,14 +37,66 @@ G_DEFINE_TYPE (GstDroidCamSrc, gst_droidcamsrc, GST_TYPE_ELEMENT);
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 #define GST_CAT_DEFAULT gst_droidcamsrc_debug
 
+static GstStaticPadTemplate vf_src_template_factory =
+GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_VIEWFINDER_PAD_NAME,
+    GST_PAD_SRC,
+    GST_PAD_ALWAYS,
+    GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
+        (GST_CAPS_FEATURE_MEMORY_DROID_SURFACE, "{ENCODED, YV12}")));
+
+static GstStaticPadTemplate img_src_template_factory =
+GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_IMAGE_PAD_NAME,
+    GST_PAD_SRC,
+    GST_PAD_ALWAYS,
+    GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE ("image/jpeg")));
+
+static GstDroidCamSrcPad *
+gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
+    const gchar * name)
+{
+  GstDroidCamSrcPad *pad = g_slice_new0 (GstDroidCamSrcPad);
+
+  pad->pad = gst_pad_new_from_static_template (tpl, name);
+  gst_pad_use_fixed_caps (pad->pad);
+  gst_element_add_pad (GST_ELEMENT (src), pad->pad);
+  gst_pad_set_element_private (pad->pad, pad);
+  g_mutex_init (&pad->lock);
+  g_cond_init (&pad->cond);
+  pad->queue = g_queue_new ();
+  pad->running = FALSE;
+
+  return pad;
+}
+
+static void
+gst_droidcamsrc_destroy_pad (GstDroidCamSrcPad * pad)
+{
+  if (!pad) {
+    // TODO:
+    return;
+  }
+
+  /* we don't destroy the pad itself */
+  g_mutex_clear (&pad->lock);
+  g_cond_clear (&pad->cond);
+  g_queue_free (pad->queue);
+  g_slice_free (GstDroidCamSrcPad, pad);
+}
+
 static void
 gst_droidcamsrc_init (GstDroidCamSrc * src)
 {
   src->hw = NULL;
   src->dev = NULL;
-  src->vfsrc = NULL;
-  src->imgsrc = NULL;
+
+  src->vfsrc = gst_droidcamsrc_create_pad (src,
+      &vf_src_template_factory, GST_BASE_CAMERA_SRC_VIEWFINDER_PAD_NAME);
+  src->imgsrc = gst_droidcamsrc_create_pad (src,
+      &img_src_template_factory, GST_BASE_CAMERA_SRC_IMAGE_PAD_NAME);
+
   src->vidsrc = NULL;
+
+  GST_OBJECT_FLAG_SET (src, GST_ELEMENT_FLAG_SOURCE);
 }
 
 static void
@@ -49,6 +107,10 @@ gst_droidcamsrc_finalize (GObject * object)
   src = GST_DROIDCAMSRC (object);
 
   GST_DEBUG_OBJECT (src, "finalize");
+
+  gst_droidcamsrc_destroy_pad (src->vfsrc);
+  gst_droidcamsrc_destroy_pad (src->imgsrc);
+  gst_droidcamsrc_destroy_pad (src->vidsrc);
 
   // TODO:
 
@@ -207,6 +269,12 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
   gst_element_class_set_static_metadata (gstelement_class,
       "Camera source", "Source/Video/Device",
       "Android HAL camera source", "Mohammed Sameer <msameer@foolab.org>");
+
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_static_pad_template_get (&vf_src_template_factory));
+
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_static_pad_template_get (&img_src_template_factory));
 
   gobject_class->finalize = gst_droidcamsrc_finalize;
   gstelement_class->change_state =

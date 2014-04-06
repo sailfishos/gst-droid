@@ -84,9 +84,9 @@ struct _GstDroidCamSrc
   GstDroidCamSrcDev *dev;
   GstDroidCamSrcCamInfo info[MAX_CAMERAS];
 
-  GstPad *vfsrc;
-  GstPad *imgsrc;
-  GstPad *vidsrc;
+  GstDroidCamSrcPad *vfsrc;
+  GstDroidCamSrcPad *imgsrc;
+  GstDroidCamSrcPad *vidsrc;
 };
 
 struct _GstDroidCamSrcClass
