@@ -25,6 +25,7 @@
 
 #include "gstdroidcamsrcbufferpool.h"
 #include "gst/memory/gstgralloc.h"
+#include "gstdroidcamsrc.h"
 #include <unistd.h>
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
@@ -155,8 +156,24 @@ gst_droidcamsrc_buffer_pool_enqueue_buffer (struct preview_stream_ops *w,
   g_hash_table_remove (pool->map, buffer);
   g_mutex_unlock (&pool->lock);
 
-  gst_buffer_unref (buff);
-  // TODO:
+  g_mutex_lock (&pool->pad->lock);
+  if (GST_BUFFER_POOL_IS_FLUSHING (GST_BUFFER_POOL (pool))) {
+    gst_buffer_unref (buff);
+    GST_DEBUG_OBJECT (pool, "unreffing buffer because buffer pool is flushing");
+    goto unlock_and_out;
+  }
+
+  if (!pool->pad->running) {
+    gst_buffer_unref (buff);
+    GST_DEBUG_OBJECT (pool, "unreffing buffer because pad task is not running");
+    goto unlock_and_out;
+  }
+
+  g_queue_push_tail (pool->pad->queue, buff);
+  g_cond_signal (&pool->pad->cond);
+
+unlock_and_out:
+  g_mutex_unlock (&pool->pad->lock);
 
   return 0;
 }

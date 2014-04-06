@@ -34,6 +34,7 @@ G_BEGIN_DECLS
 
 typedef struct _GstDroidCamSrcBufferPool GstDroidCamSrcBufferPool;
 typedef struct _GstDroidCamSrcBufferPoolClass GstDroidCamSrcBufferPoolClass;
+typedef struct _GstDroidCamSrcPad GstDroidCamSrcPad;
 
 struct _GstDroidCamSrcBufferPool
 {
@@ -43,6 +44,8 @@ struct _GstDroidCamSrcBufferPool
   GstAllocator *allocator;
   GHashTable *map;
   GMutex lock;
+
+  GstDroidCamSrcPad *pad;
 };
 
 struct _GstDroidCamSrcBufferPoolClass

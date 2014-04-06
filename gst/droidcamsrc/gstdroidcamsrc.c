@@ -211,6 +211,9 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         ret = GST_STATE_CHANGE_FAILURE;
       }
 
+      /* our buffer pool will push buffers to the queue so it needs to know about it */
+      src->dev->pool->pad = src->vfsrc;
+
       break;
 
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
