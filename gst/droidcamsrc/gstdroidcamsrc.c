@@ -302,6 +302,7 @@ gst_droidcamsrc_loop (gpointer user_data)
   GstDroidCamSrcPad *data = (GstDroidCamSrcPad *) user_data;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (data->pad));
   GstBuffer *buffer = NULL;
+  GstCaps *caps = NULL;
 
   GST_LOG_OBJECT (src, "loop %s", GST_PAD_NAME (data->pad));
 
@@ -313,6 +314,7 @@ gst_droidcamsrc_loop (gpointer user_data)
 
   buffer = g_queue_pop_head (data->queue);
   if (buffer) {
+    caps = gst_caps_ref (data->caps);
     g_mutex_unlock (&data->lock);
     goto out;
   }
@@ -326,6 +328,7 @@ gst_droidcamsrc_loop (gpointer user_data)
     /* we got signaled to exit */
     goto unlock_and_out;
   } else {
+    caps = gst_caps_ref (data->caps);
     g_mutex_unlock (&data->lock);
     goto out;
   }
@@ -336,7 +339,39 @@ unlock_and_out:
   return;
 
 out:
+  /* stream start */
+  if (G_UNLIKELY (data->open_stream)) {
+    gchar *stream_id;
+    GstEvent *event;
+
+    stream_id =
+        gst_pad_create_stream_id (data->pad, GST_ELEMENT_CAST (src),
+        GST_PAD_NAME (data->pad));
+
+    GST_DEBUG_OBJECT (src, "Pushing STREAM_START");
+    event = gst_event_new_stream_start (stream_id);
+    gst_event_set_group_id (event, gst_util_group_id_next ());
+    if (!gst_pad_push_event (data->pad, event)) {
+      GST_ERROR_OBJECT (src, "failed to push STREAM_START event");
+    }
+
+    g_free (stream_id);
+    data->open_stream = FALSE;
+  }
+
+  /* new segment */
+  if (G_UNLIKELY (data->open_segment)) {
+    // TODO: new segment
+
+    data->open_segment = FALSE;
+  }
+  // TODO: caps negotiation
+  // TODO: push buffer
   // TODO:
+  if (caps) {
+    gst_caps_unref (caps);
+  }
+
   gst_buffer_unref (buffer);
 }
 
@@ -365,6 +400,10 @@ gst_droidcamsrc_activate_mode (GstPad * pad, GstObject * parent,
   g_mutex_unlock (&data->lock);
 
   if (active) {
+    // TODO: review locking for the remaining 2 pads
+    /* No need for locking here since the task is not running */
+    data->open_stream = TRUE;
+    data->open_segment = TRUE;
     if (!gst_pad_start_task (pad, gst_droidcamsrc_loop, data, NULL)) {
       GST_ERROR_OBJECT (src, "failed to start pad task");
       return FALSE;
