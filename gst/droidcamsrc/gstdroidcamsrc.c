@@ -59,6 +59,7 @@ static gboolean gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent,
     GstEvent * event);
 static gboolean gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent,
     GstQuery * query);
+static gboolean gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data);
 
 enum
 {
@@ -91,6 +92,7 @@ gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
   pad->queue = g_queue_new ();
   pad->running = FALSE;
   pad->caps = NULL;
+  pad->negotiate = NULL;
 
   gst_segment_init (&pad->segment, GST_FORMAT_TIME);
 
@@ -125,9 +127,10 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
 
   src->vfsrc = gst_droidcamsrc_create_pad (src,
       &vf_src_template_factory, GST_BASE_CAMERA_SRC_VIEWFINDER_PAD_NAME);
+  src->vfsrc->negotiate = gst_droidcamsrc_vfsrc_negotiate;
+
   src->imgsrc = gst_droidcamsrc_create_pad (src,
       &img_src_template_factory, GST_BASE_CAMERA_SRC_IMAGE_PAD_NAME);
-
   src->vidsrc = gst_droidcamsrc_create_pad (src,
       &vid_src_template_factory, GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME);
 
@@ -454,6 +457,21 @@ gst_droidcamsrc_loop (gpointer user_data)
     goto unlock_and_out;
   }
 
+  if (gst_pad_check_reconfigure (data->pad)) {
+    gboolean res = FALSE;
+
+    GST_DEBUG_OBJECT (src, "pad %s needs negotiation",
+        GST_PAD_NAME (data->pad));
+    if (data->negotiate) {
+      res = data->negotiate (data);
+    }
+
+    if (!res) {
+      // TODO: error
+    }
+
+  }
+
   buffer = g_queue_pop_head (data->queue);
   if (buffer) {
     caps = gst_caps_ref (data->caps);
@@ -744,6 +762,43 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
     GST_LOG_OBJECT (src, "replying to %" GST_PTR_FORMAT, query);
   } else {
     GST_LOG_OBJECT (src, "discarding %" GST_PTR_FORMAT, query);
+  }
+
+  return ret;
+}
+
+static gboolean
+gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
+{
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (data->pad));
+  gboolean ret = FALSE;
+  GstCaps *peer = NULL;
+  GstCaps *our_caps = NULL;
+
+  GST_DEBUG_OBJECT (src, "vfsrc negotiate");
+
+  our_caps = gst_droidcamsrc_params_get_viewfinder_caps (src->dev->params);
+  GST_DEBUG_OBJECT (src, "our caps %" GST_PTR_FORMAT, our_caps);
+
+  if (!our_caps || gst_caps_is_empty (our_caps)) {
+    goto out;
+  }
+
+  peer = gst_pad_peer_query_caps (data->pad, our_caps);
+  GST_DEBUG_OBJECT (src, "peer caps %" GST_PTR_FORMAT, peer);
+
+  if (!peer || gst_caps_is_empty (peer)) {
+    goto out;
+  }
+  // TODO:
+
+out:
+  if (peer) {
+    gst_caps_unref (peer);
+  }
+
+  if (our_caps) {
+    gst_caps_unref (our_caps);
   }
 
   return ret;

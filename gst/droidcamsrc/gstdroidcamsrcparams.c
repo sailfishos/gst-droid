@@ -24,6 +24,9 @@
 #endif
 
 #include "gstdroidcamsrcparams.h"
+#include <stdlib.h>
+#include <gst/video/video.h>
+#include "gst/memory/gstgralloc.h"
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 #define GST_CAT_DEFAULT gst_droidcamsrc_debug
@@ -85,6 +88,55 @@ gst_droidcamsrc_params_parse (GstDroidCamSrcParams * params, const char *part)
 
 out:
   g_strfreev (parts);
+}
+
+static GList *
+gst_droidcamsrc_params_get_item_locked (GstDroidCamSrcParams * params,
+    const char *key)
+{
+  GList *list = g_hash_table_lookup (params->params, key);
+  if (!list) {
+    return NULL;
+  }
+
+  return list;
+}
+
+#if 0
+static gchar *
+gst_droidcamsrc_params_get_string_locked (GstDroidCamSrcParams * params,
+    const char *key)
+{
+  GList *list = gst_droidcamsrc_params_get_item_locked (params, key);
+  if (!list) {
+    return NULL;
+  }
+
+  return list->data;
+}
+#endif
+static int
+gst_droidcamsrc_params_get_int_locked (GstDroidCamSrcParams * params,
+    const char *key)
+{
+  GList *list = gst_droidcamsrc_params_get_item_locked (params, key);
+  if (!list) {
+    return -1;
+  }
+
+  return atoi (list->data);
+}
+
+static gboolean
+gst_droidcamsrc_params_parse_dimension (char *d, int *w, int *h)
+{
+  char **sizes = g_strsplit (d, "x", -1);
+  *w = sizes && sizes[0] ? atoi (sizes[0]) : -1;
+  *h = *w != -1 && sizes[1] ? atoi (sizes[1]) : -1;
+
+  g_strfreev (sizes);
+
+  return *w != -1 && *h != -1;
 }
 
 GstDroidCamSrcParams *
@@ -184,4 +236,77 @@ gst_droidcamsrc_params_is_dirty (GstDroidCamSrcParams * params)
   g_mutex_unlock (&params->lock);
 
   return is_dirty;
+}
+
+GstCaps *
+gst_droidcamsrc_params_get_viewfinder_caps (GstDroidCamSrcParams * params)
+{
+  int fps;
+  GstVideoInfo info;
+  GstCapsFeatures *feature;
+  GstCaps *caps = gst_caps_new_empty ();
+  GList *item;
+
+  g_mutex_lock (&params->lock);
+
+  fps = gst_droidcamsrc_params_get_int_locked (params, "preview-frame-rate");
+  if (fps == -1) {
+    goto unlock_and_out;
+  }
+
+  item = gst_droidcamsrc_params_get_item_locked (params, "preview-size-values");
+  if (!item) {
+    goto unlock_and_out;
+  }
+
+  while (item) {
+    int width, height;
+    GstCaps *caps2;
+
+    if (gst_droidcamsrc_params_parse_dimension (item->data, &width, &height)) {
+      gst_video_info_init (&info);
+      gst_video_info_set_format (&info, GST_VIDEO_FORMAT_ENCODED, width,
+          height);
+
+      GST_VIDEO_INFO_FPS_N (&info) = fps;
+      GST_VIDEO_INFO_FPS_D (&info) = 1;
+      caps2 = gst_video_info_to_caps (&info);
+      feature =
+          gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_SURFACE, NULL);
+      gst_caps_set_features (caps2, 0, feature);
+
+      caps = gst_caps_merge (caps, caps2);
+    }
+
+    item = g_list_next (item);
+  }
+
+unlock_and_out:
+  g_mutex_unlock (&params->lock);
+
+  return caps;
+}
+
+GstCaps *
+gst_droidcamsrc_params_get_video_caps (GstDroidCamSrcParams * params)
+{
+  GstCaps *caps = NULL;
+
+  g_mutex_lock (&params->lock);
+
+  g_mutex_unlock (&params->lock);
+
+  return caps;
+}
+
+GstCaps *
+gst_droidcamsrc_params_get_image_caps (GstDroidCamSrcParams * params)
+{
+  GstCaps *caps = NULL;
+
+  g_mutex_lock (&params->lock);
+
+  g_mutex_unlock (&params->lock);
+
+  return caps;
 }

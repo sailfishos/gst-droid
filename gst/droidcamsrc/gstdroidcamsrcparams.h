@@ -41,6 +41,10 @@ void gst_droidcamsrc_params_destroy (GstDroidCamSrcParams *params);
 gchar *gst_droidcamsrc_params_to_string (GstDroidCamSrcParams *params);
 gboolean gst_droidcamsrc_params_is_dirty (GstDroidCamSrcParams *params);
 
+GstCaps *gst_droidcamsrc_params_get_viewfinder_caps (GstDroidCamSrcParams *params);
+GstCaps *gst_droidcamsrc_params_get_video_caps (GstDroidCamSrcParams *params);
+GstCaps *gst_droidcamsrc_params_get_image_caps (GstDroidCamSrcParams *params);
+
 G_END_DECLS
 
 #endif /* __GST_DROID_CAM_SRC_PARAMS_H__ */

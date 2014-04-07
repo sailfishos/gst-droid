@@ -52,6 +52,8 @@ typedef struct _GstDroidCamSrcClass GstDroidCamSrcClass;
 typedef struct _GstDroidCamSrcCamInfo GstDroidCamSrcCamInfo;
 typedef struct _GstDroidCamSrcPad GstDroidCamSrcPad;
 
+typedef gboolean (* GstDroidCamSrcNegotiateCallback)(GstDroidCamSrcPad * pad);
+
 typedef enum {
   GST_DROID_CAM_SRC_DIRECTION_BACK = CAMERA_FACING_BACK,
   GST_DROID_CAM_SRC_DIRECTION_FRONT = CAMERA_FACING_FRONT,
@@ -82,6 +84,7 @@ struct _GstDroidCamSrcPad
   gboolean open_segment;
   GstCaps *caps;
   GstSegment segment;
+  GstDroidCamSrcNegotiateCallback negotiate;
 };
 
 struct _GstDroidCamSrc
