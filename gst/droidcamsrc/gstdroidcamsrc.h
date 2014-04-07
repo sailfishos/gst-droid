@@ -98,6 +98,8 @@ struct _GstDroidCamSrc
 
   GstDroidCamSrcCameraDevice camera_device;
   GstCameraBinMode mode;
+  gboolean ready_for_capture;
+  GMutex capture_lock;
 };
 
 struct _GstDroidCamSrcClass

@@ -65,6 +65,7 @@ enum
   PROP_0,
   PROP_CAMERA_DEVICE,
   PROP_MODE,
+  PROP_READY_FOR_CAPTURE,
 };
 
 #define DEFAULT_CAMERA_DEVICE GST_DROIDCAMSRC_CAMERA_DEVICE_PRIMARY
@@ -119,6 +120,8 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   src->dev = NULL;
   src->camera_device = DEFAULT_CAMERA_DEVICE;
   src->mode = DEFAULT_MODE;
+  src->ready_for_capture = TRUE;
+  g_mutex_init (&src->capture_lock);
 
   src->vfsrc = gst_droidcamsrc_create_pad (src,
       &vf_src_template_factory, GST_BASE_CAMERA_SRC_VIEWFINDER_PAD_NAME);
@@ -144,6 +147,12 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
 
     case PROP_MODE:
       g_value_set_enum (value, src->mode);
+      break;
+
+    case PROP_READY_FOR_CAPTURE:
+      g_mutex_lock (&src->capture_lock);
+      g_value_set_boolean (value, src->ready_for_capture);
+      g_mutex_unlock (&src->capture_lock);
       break;
 
     default:
@@ -188,6 +197,7 @@ gst_droidcamsrc_finalize (GObject * object)
   gst_droidcamsrc_destroy_pad (src->imgsrc);
   gst_droidcamsrc_destroy_pad (src->vidsrc);
 
+  g_mutex_clear (&src->capture_lock);
   // TODO:
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
@@ -335,6 +345,9 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         ret = GST_STATE_CHANGE_FAILURE;
       }
 
+      src->ready_for_capture = TRUE;
+      g_object_notify (G_OBJECT (src), "ready-for-capture");
+
       break;
 
     default:
@@ -417,6 +430,11 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
           "Capture mode (image or video)",
           GST_TYPE_CAMERABIN_MODE,
           DEFAULT_MODE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_READY_FOR_CAPTURE,
+      g_param_spec_boolean ("ready-for-capture", "Ready for capture",
+          "Element is ready for another capture",
+          TRUE, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 }
 
 static void
