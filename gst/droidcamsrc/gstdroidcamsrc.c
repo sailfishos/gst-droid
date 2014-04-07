@@ -463,6 +463,9 @@ gst_droidcamsrc_loop (gpointer user_data)
         GST_PAD_NAME (data->pad));
     if (data->negotiate) {
       res = data->negotiate (data);
+    } else {
+      // TODO:
+      res = TRUE;
     }
 
     if (!res) {
