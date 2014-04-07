@@ -45,7 +45,7 @@ gst_droidcamsrc_params_parse_key_values (GstDroidCamSrcParams * params,
   GList *list = NULL;
 
   while (*val) {
-    list = g_list_append (NULL, g_strdup (*val));
+    list = g_list_append (list, g_strdup (*val));
     ++val;
   }
 
