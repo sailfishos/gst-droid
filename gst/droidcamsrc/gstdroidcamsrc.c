@@ -768,6 +768,7 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   GST_DEBUG_OBJECT (src, "our caps %" GST_PTR_FORMAT, our_caps);
 
   if (!our_caps || gst_caps_is_empty (our_caps)) {
+    GST_ERROR_OBJECT (src, "no caps");
     goto out;
   }
 
@@ -775,6 +776,7 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   GST_DEBUG_OBJECT (src, "peer caps %" GST_PTR_FORMAT, peer);
 
   if (!peer || gst_caps_is_empty (peer)) {
+    GST_ERROR_OBJECT (src, "no common caps");
     goto out;
   }
   // TODO:
