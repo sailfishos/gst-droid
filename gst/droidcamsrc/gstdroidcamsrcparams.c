@@ -59,7 +59,7 @@ gst_droidcamsrc_params_parse_key_value (GstDroidCamSrcParams * params,
     const char *key, const char *value)
 {
   if (g_strrstr (value, ",")) {
-    /* needs darther splitting */
+    /* needs farther splitting */
     gst_droidcamsrc_params_parse_key_values (params, key, value);
   } else {
     /* we are done */
