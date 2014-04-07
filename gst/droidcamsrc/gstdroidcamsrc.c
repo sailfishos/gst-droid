@@ -447,7 +447,6 @@ gst_droidcamsrc_loop (gpointer user_data)
   GstDroidCamSrcPad *data = (GstDroidCamSrcPad *) user_data;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (data->pad));
   GstBuffer *buffer = NULL;
-  GstCaps *caps = NULL, *current = NULL;
 
   GST_LOG_OBJECT (src, "loop %s", GST_PAD_NAME (data->pad));
 
@@ -475,7 +474,6 @@ gst_droidcamsrc_loop (gpointer user_data)
 
   buffer = g_queue_pop_head (data->queue);
   if (buffer) {
-    caps = gst_caps_ref (data->caps);
     g_mutex_unlock (&data->lock);
     goto out;
   }
@@ -489,7 +487,6 @@ gst_droidcamsrc_loop (gpointer user_data)
     /* we got signaled to exit */
     goto unlock_and_out;
   } else {
-    caps = gst_caps_ref (data->caps);
     g_mutex_unlock (&data->lock);
     goto out;
   }
@@ -523,20 +520,6 @@ out:
     data->open_stream = FALSE;
   }
 
-  /* caps */
-  current = gst_pad_get_current_caps (data->pad);
-
-  if (!current || !gst_caps_is_equal (caps, current)) {
-    GST_DEBUG_OBJECT (src, "current caps for pad %s: %" GST_PTR_FORMAT,
-        GST_PAD_NAME (data->pad), current);
-    if (!gst_pad_set_caps (data->pad, caps)) {
-      GST_ERROR_OBJECT (src, "failed to set caps");
-    } else {
-      // TODO: what should we really do here?
-      gst_pad_check_reconfigure (data->pad);
-    }
-  }
-
   /* segment */
   if (G_UNLIKELY (data->open_segment)) {
     GstEvent *event;
@@ -560,14 +543,6 @@ out:
     // TODO:
     GST_ERROR_OBJECT (src, "error %s pushing buffer through pad %s",
         gst_flow_get_name (ret), GST_PAD_NAME (data->pad));
-  }
-
-  if (caps) {
-    gst_caps_unref (caps);
-  }
-
-  if (current) {
-    gst_caps_unref (current);
   }
 }
 
