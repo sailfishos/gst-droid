@@ -476,6 +476,10 @@ gst_droidcamsrc_pad_activate_mode (GstPad * pad, GstObject * parent,
       gst_caps_unref (data->caps);
       data->caps = NULL;
     }
+
+    /* toss the queue */
+    g_queue_foreach (data->queue, (GFunc) gst_buffer_unref, NULL);
+    g_queue_clear (data->queue);
     g_mutex_unlock (&data->lock);
 
     return ret;
