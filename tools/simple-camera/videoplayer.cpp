@@ -86,6 +86,9 @@ bool VideoPlayer::start() {
     m_sink = m_renderer->sinkElement();
     gst_bin_add (GST_BIN (m_bin), m_sink);
     gst_element_link_pads (m_src, "vfsrc", m_sink, "sink");
+  } else {
+    // This will allow resetting EGLDisplay
+    m_renderer->sinkElement();
   }
 
   if (gst_element_set_state(m_bin, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
@@ -98,9 +101,11 @@ bool VideoPlayer::start() {
 
 bool VideoPlayer::stop() {
   if (gst_element_set_state(m_bin, GST_STATE_NULL) == GST_STATE_CHANGE_FAILURE) {
-    qmlInfo(this) << "error setting pipeline to PLAYING";
+    qmlInfo(this) << "error setting pipeline to NULL";
     return false;
   }
+
+  m_renderer->reset();
 
   return true;
 }

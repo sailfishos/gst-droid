@@ -186,7 +186,7 @@ void QtCamViewfinderRendererNemo::resize(const QSizeF& size) {
 void QtCamViewfinderRendererNemo::reset() {
   QMutexLocker locker(&m_frameMutex);
   m_frame = -1;
-
+  m_displaySet = false;
   // TODO: more? delete m_progrem, m_img and set m_needsInit?
 }
 
