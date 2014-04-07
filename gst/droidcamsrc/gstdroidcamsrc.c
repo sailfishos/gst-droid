@@ -780,7 +780,24 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
     GST_ERROR_OBJECT (src, "no common caps");
     goto out;
   }
-  // TODO:
+
+  gst_caps_unref (our_caps);
+  our_caps = NULL;
+
+  peer = gst_caps_make_writable (peer);
+  peer = gst_caps_truncate (peer);
+
+  if (!gst_pad_set_caps (data->pad, peer)) {
+    GST_ERROR_OBJECT (src, "failed to set caps");
+    goto out;
+  }
+
+  GST_DEBUG_OBJECT (src, "pad %s using caps %" GST_PTR_FORMAT,
+      GST_PAD_NAME (data->pad), peer);
+
+  // TODO: configure hal
+
+  ret = TRUE;
 
 out:
   if (peer) {
