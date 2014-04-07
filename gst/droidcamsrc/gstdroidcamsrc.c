@@ -456,6 +456,26 @@ gst_droidcamsrc_loop (gpointer user_data)
     goto unlock_and_out;
   }
 
+  /* stream start */
+  if (G_UNLIKELY (data->open_stream)) {
+    gchar *stream_id;
+    GstEvent *event;
+
+    stream_id =
+        gst_pad_create_stream_id (data->pad, GST_ELEMENT_CAST (src),
+        GST_PAD_NAME (data->pad));
+
+    GST_DEBUG_OBJECT (src, "Pushing STREAM_START");
+    event = gst_event_new_stream_start (stream_id);
+    gst_event_set_group_id (event, gst_util_group_id_next ());
+    if (!gst_pad_push_event (data->pad, event)) {
+      GST_ERROR_OBJECT (src, "failed to push STREAM_START event");
+    }
+
+    g_free (stream_id);
+    data->open_stream = FALSE;
+  }
+
   if (gst_pad_check_reconfigure (data->pad)) {
     gboolean res = FALSE;
 
@@ -503,26 +523,6 @@ unlock_and_out:
   return;
 
 out:
-  /* stream start */
-  if (G_UNLIKELY (data->open_stream)) {
-    gchar *stream_id;
-    GstEvent *event;
-
-    stream_id =
-        gst_pad_create_stream_id (data->pad, GST_ELEMENT_CAST (src),
-        GST_PAD_NAME (data->pad));
-
-    GST_DEBUG_OBJECT (src, "Pushing STREAM_START");
-    event = gst_event_new_stream_start (stream_id);
-    gst_event_set_group_id (event, gst_util_group_id_next ());
-    if (!gst_pad_push_event (data->pad, event)) {
-      GST_ERROR_OBJECT (src, "failed to push STREAM_START event");
-    }
-
-    g_free (stream_id);
-    data->open_stream = FALSE;
-  }
-
   /* segment */
   if (G_UNLIKELY (data->open_segment)) {
     GstEvent *event;
@@ -702,6 +702,7 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
       } else {
         gst_query_set_accept_caps_result (query, FALSE);
       }
+
       g_mutex_unlock (&data->lock);
 
       ret = TRUE;
