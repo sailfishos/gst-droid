@@ -467,9 +467,10 @@ gst_droidcamsrc_loop (gpointer user_data)
     }
 
     if (!res) {
-      // TODO: error
+      GST_ELEMENT_ERROR (src, STREAM, FORMAT, (NULL),
+          ("failed to negotiate %s.", GST_PAD_NAME (data->pad)));
+      goto error;
     }
-
   }
 
   buffer = g_queue_pop_head (data->queue);
@@ -493,6 +494,9 @@ gst_droidcamsrc_loop (gpointer user_data)
     goto out;
   }
 
+  return;
+error:
+  gst_pad_pause_task (data->pad);
 
 unlock_and_out:
   g_mutex_unlock (&data->lock);
