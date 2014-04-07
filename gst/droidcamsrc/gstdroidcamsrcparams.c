@@ -94,6 +94,8 @@ gst_droidcamsrc_params_new (const gchar * params)
   gchar **parts = g_strsplit (params, ";", -1);
   gchar **part = parts;
 
+  GST_DEBUG ("params new");
+
   param->params = g_hash_table_new_full (g_str_hash, g_str_equal,
       (GDestroyNotify) g_free,
       (GDestroyNotify) gst_droidcamsrc_params_destroy_list);
@@ -107,13 +109,79 @@ gst_droidcamsrc_params_new (const gchar * params)
 
   g_mutex_init (&param->lock);
 
+  param->is_dirty = FALSE;
+
   return param;
 }
 
 void
 gst_droidcamsrc_params_destroy (GstDroidCamSrcParams * params)
 {
+  GST_DEBUG ("params destroy");
+
   g_mutex_clear (&params->lock);
   g_hash_table_unref (params->params);
   g_slice_free (GstDroidCamSrcParams, params);
+}
+
+gchar *
+gst_droidcamsrc_params_to_string (GstDroidCamSrcParams * params)
+{
+  gchar *string = NULL;
+  GHashTableIter iter;
+  gpointer key, value;
+
+  g_mutex_lock (&params->lock);
+
+  g_hash_table_iter_init (&iter, params->params);
+
+  /* ugly is the least to be said */
+  while (g_hash_table_iter_next (&iter, &key, &value)) {
+    GList *list = (GList *) value;
+    gchar *str = NULL;
+    int len = g_list_length (list);
+    g_assert (len > 0);
+
+    if (len == 1) {
+      /* simple case */
+      str = g_strdup_printf ("%s=%s", (gchar *) key, (gchar *) list->data);
+    } else {
+      int x;
+      for (x = 0; x < len; x++) {
+        GList *item = g_list_nth (list, x);
+        if (str == NULL) {
+          str = g_strdup_printf ("%s=%s", (gchar *) key, (gchar *) item->data);
+        } else {
+          gchar *new_str = g_strjoin (",", str, (gchar *) item->data, NULL);
+          g_free (str);
+          str = new_str;
+        }
+      }
+    }
+
+    if (string == NULL) {
+      string = str;
+    } else {
+      gchar *new_string = g_strjoin (";", string, str, NULL);
+      g_free (string);
+      g_free (str);
+      string = new_string;
+    }
+  }
+
+  g_mutex_unlock (&params->lock);
+
+  return string;
+}
+
+gboolean
+gst_droidcamsrc_params_is_dirty (GstDroidCamSrcParams * params)
+{
+  gboolean is_dirty;
+
+  g_mutex_lock (&params->lock);
+  is_dirty = params->is_dirty;
+  g_mutex_unlock (&params->lock);
+
+  return is_dirty;
 }

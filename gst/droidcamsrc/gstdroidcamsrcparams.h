@@ -31,11 +31,15 @@ typedef struct _GstDroidCamSrcParams GstDroidCamSrcParams;
 struct _GstDroidCamSrcParams
 {
   GHashTable *params;
+  gboolean is_dirty;
   GMutex lock;
 };
 
 GstDroidCamSrcParams * gst_droidcamsrc_params_new (const gchar * params);
 void gst_droidcamsrc_params_destroy (GstDroidCamSrcParams *params);
+
+gchar *gst_droidcamsrc_params_to_string (GstDroidCamSrcParams *params);
+gboolean gst_droidcamsrc_params_is_dirty (GstDroidCamSrcParams *params);
 
 G_END_DECLS
 
