@@ -731,8 +731,13 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
         gst_query_set_caps_result (query, data->caps);
         ret = TRUE;
       } else {
-        // TODO: should we add the pad template caps ?
-        ret = FALSE;
+        GstPadTemplate *tpl = gst_pad_get_pad_template (pad);
+        GstCaps *caps =
+            gst_caps_make_writable (gst_pad_template_get_caps (tpl));
+        gst_query_set_caps_result (query, caps);
+        gst_caps_unref (caps);
+        gst_object_unref (tpl);
+        ret = TRUE;
       }
 
       g_mutex_unlock (&data->lock);
