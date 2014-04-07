@@ -26,10 +26,6 @@
 #include "gstdroidcamsrc.h"
 #include <gst/video/video.h>
 #include <gst/memory/gstgralloc.h>
-#ifndef GST_USE_UNSTABLE_API
-#define GST_USE_UNSTABLE_API
-#include <gst/basecamerabinsrc/gstbasecamerasrc.h>
-#endif /* GST_USE_UNSTABLE_API */
 
 #define gst_droidcamsrc_parent_class parent_class
 G_DEFINE_TYPE (GstDroidCamSrc, gst_droidcamsrc, GST_TYPE_ELEMENT);
@@ -68,9 +64,11 @@ enum
 {
   PROP_0,
   PROP_CAMERA_DEVICE,
+  PROP_MODE,
 };
 
 #define DEFAULT_CAMERA_DEVICE GST_DROIDCAMSRC_CAMERA_DEVICE_PRIMARY
+#define DEFAULT_MODE          MODE_IMAGE
 
 static GstDroidCamSrcPad *
 gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
@@ -120,6 +118,7 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   src->hw = NULL;
   src->dev = NULL;
   src->camera_device = DEFAULT_CAMERA_DEVICE;
+  src->mode = DEFAULT_MODE;
 
   src->vfsrc = gst_droidcamsrc_create_pad (src,
       &vf_src_template_factory, GST_BASE_CAMERA_SRC_VIEWFINDER_PAD_NAME);
@@ -143,6 +142,10 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
       g_value_set_enum (value, src->camera_device);
       break;
 
+    case PROP_MODE:
+      g_value_set_enum (value, src->mode);
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -160,6 +163,10 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
     case PROP_CAMERA_DEVICE:
       src->camera_device = g_value_get_enum (value);
       GST_DEBUG_OBJECT (src, "camera device set to %d", src->camera_device);
+      break;
+
+    case PROP_MODE:
+      src->mode = g_value_get_enum (value);
       break;
 
     default:
@@ -405,6 +412,11 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
           GST_TYPE_DROIDCAMSRC_CAMERA_DEVICE,
           DEFAULT_CAMERA_DEVICE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_MODE,
+      g_param_spec_enum ("mode", "Mode",
+          "Capture mode (image or video)",
+          GST_TYPE_CAMERABIN_MODE,
+          DEFAULT_MODE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 }
 
 static void

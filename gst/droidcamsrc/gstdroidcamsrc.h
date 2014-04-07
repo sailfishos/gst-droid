@@ -26,6 +26,11 @@
 #include "gstdroidcamsrcdev.h"
 #include "gstdroidcamsrcenums.h"
 #include <hardware/camera.h>
+#ifndef GST_USE_UNSTABLE_API
+#define GST_USE_UNSTABLE_API
+#include <gst/basecamerabinsrc/gstcamerabin-enum.h>
+#include <gst/basecamerabinsrc/gstbasecamerasrc.h>
+#endif /* GST_USE_UNSTABLE_API */
 
 G_BEGIN_DECLS
 
@@ -92,6 +97,7 @@ struct _GstDroidCamSrc
   GstDroidCamSrcPad *vidsrc;
 
   GstDroidCamSrcCameraDevice camera_device;
+  GstCameraBinMode mode;
 };
 
 struct _GstDroidCamSrcClass

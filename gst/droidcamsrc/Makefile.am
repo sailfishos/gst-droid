@@ -4,7 +4,9 @@ libgstdroidcamsrc_la_CFLAGS = $(GST_CFLAGS) $(NGI_CFLAGS) $(EGL_CFLAGS) $(DROID_
                                -I$(top_builddir)/inc/hybris/
 
 libgstdroidcamsrc_la_LIBADD = $(GST_LIBS) $(NGI_LIBS) $(EGL_LIBS) $(DROID_LIBS) \
-                              $(top_builddir)/gst-libs/gst/memory/libgstdroidmemory-@GST_API_VERSION@.la
+                              $(top_builddir)/gst-libs/gst/memory/libgstdroidmemory-@GST_API_VERSION@.la \
+                              -lgstbasecamerabinsrc-1.0
+
 libgstdroidcamsrc_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstdroidcamsrc_la_LIBTOOLFLAGS = --tag=disable-static
 
