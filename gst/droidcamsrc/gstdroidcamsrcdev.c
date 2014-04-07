@@ -156,10 +156,14 @@ gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
   err = dev->dev->ops->set_preview_window (dev->dev, &dev->pool->window);
   if (err != 0) {
     GST_ERROR ("error 0x%x setting preview window", err);
-    return FALSE;
+    goto err;
   }
 
   return TRUE;
+
+err:
+  gst_droidcamsrc_dev_deinit (dev);
+  return FALSE;
 }
 
 void
@@ -167,11 +171,15 @@ gst_droidcamsrc_dev_deinit (GstDroidCamSrcDev * dev)
 {
   GST_DEBUG ("dev deinit");
 
-  gst_object_unref (GST_OBJECT (dev->pool));
-  dev->pool = NULL;
+  if (dev->pool) {
+    gst_object_unref (GST_OBJECT (dev->pool));
+    dev->pool = NULL;
+  }
 
-  gst_droidcamsrc_params_destroy (dev->params);
-  dev->params = NULL;
+  if (dev->params) {
+    gst_droidcamsrc_params_destroy (dev->params);
+    dev->params = NULL;
+  }
 }
 
 gboolean
@@ -184,11 +192,15 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev)
   err = dev->dev->ops->start_preview (dev->dev);
   if (err != 0) {
     GST_ERROR ("error 0x%x starting preview", err);
-    return FALSE;
+    goto error;
   }
-  // TODO:
+  // TODO: set params?
 
   return TRUE;
+
+error:
+  gst_droid_cam_src_buffer_pool_reset (dev->pool);
+  return FALSE;
 }
 
 void
