@@ -44,7 +44,7 @@ static GstStaticPadTemplate img_src_template_factory =
 GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_IMAGE_PAD_NAME,
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
-    GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE ("image/jpeg")));
+    GST_STATIC_CAPS ("image/jpeg"));
 
 // TODO: fix that when we know it
 static GstStaticPadTemplate vid_src_template_factory =
