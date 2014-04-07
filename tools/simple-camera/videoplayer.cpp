@@ -58,7 +58,8 @@ void VideoPlayer::classBegin() {
   m_bin = gst_element_factory_make("camerabin", NULL);
   m_src = gst_element_factory_make("droidcamsrc", NULL);
   GstElement *src = gst_element_factory_make ("pulsesrc", NULL);
-  g_object_set (m_bin, "audio-source", src, "camera-source", m_src, NULL);
+  g_object_set (m_bin, "audio-source", src, "camera-source", m_src, "flags",
+		0x00000001 | 0x00000002 | 0x00000004 | 0x00000008, NULL);
 
   GstBus *bus = gst_element_get_bus(m_bin);
   gst_bus_add_watch(bus, bus_call, this);
