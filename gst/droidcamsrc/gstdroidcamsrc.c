@@ -64,6 +64,14 @@ static gboolean gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent,
 static gboolean gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent,
     GstQuery * query);
 
+enum
+{
+  PROP_0,
+  PROP_CAMERA_DEVICE,
+};
+
+#define DEFAULT_CAMERA_DEVICE GST_DROIDCAMSRC_CAMERA_DEVICE_PRIMARY
+
 static GstDroidCamSrcPad *
 gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
     const gchar * name)
@@ -111,6 +119,7 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
 {
   src->hw = NULL;
   src->dev = NULL;
+  src->camera_device = DEFAULT_CAMERA_DEVICE;
 
   src->vfsrc = gst_droidcamsrc_create_pad (src,
       &vf_src_template_factory, GST_BASE_CAMERA_SRC_VIEWFINDER_PAD_NAME);
@@ -121,6 +130,42 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
       &vid_src_template_factory, GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME);
 
   GST_OBJECT_FLAG_SET (src, GST_ELEMENT_FLAG_SOURCE);
+}
+
+static void
+gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
+    GParamSpec * pspec)
+{
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (object);
+
+  switch (prop_id) {
+    case PROP_CAMERA_DEVICE:
+      g_value_set_enum (value, src->camera_device);
+      break;
+
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+      break;
+  }
+}
+
+
+static void
+gst_droidcamsrc_set_property (GObject * object, guint prop_id,
+    const GValue * value, GParamSpec * pspec)
+{
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (object);
+
+  switch (prop_id) {
+    case PROP_CAMERA_DEVICE:
+      src->camera_device = g_value_get_enum (value);
+      GST_DEBUG_OBJECT (src, "camera device set to %d", src->camera_device);
+      break;
+
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+      break;
+  }
 }
 
 static void
@@ -210,6 +255,26 @@ gst_droid_cam_src_get_hw (GstDroidCamSrc * src)
   return TRUE;
 }
 
+static gchar *
+gst_droidcamsrc_find_camera_device (GstDroidCamSrc * src)
+{
+  int x;
+  GstDroidCamSrcCamDirection direction =
+      src->camera_device ==
+      GST_DROIDCAMSRC_CAMERA_DEVICE_SECONDARY ?
+      GST_DROID_CAM_SRC_DIRECTION_FRONT : GST_DROID_CAM_SRC_DIRECTION_BACK;
+
+  for (x = 0; x < MAX_CAMERAS; x++) {
+    if (src->info[x].direction == direction) {
+      return g_strdup_printf ("%d", src->info[x].num);
+    }
+  }
+
+  GST_ERROR_OBJECT (src, "cannot find camera %d", src->camera_device);
+
+  return NULL;
+}
+
 static GstStateChangeReturn
 gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 {
@@ -230,7 +295,21 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       break;
 
     case GST_STATE_CHANGE_READY_TO_PAUSED:
-      if (!gst_droidcamsrc_dev_open (src->dev, "0")) {
+    {
+      /* find the device */
+      gboolean res;
+      gchar *id = gst_droidcamsrc_find_camera_device (src);
+
+      if (!id) {
+        ret = GST_STATE_CHANGE_FAILURE;
+        break;
+      }
+
+      GST_DEBUG_OBJECT (src, "using camera device %s", id);
+
+      res = gst_droidcamsrc_dev_open (src->dev, id);
+      g_free (id);
+      if (!res) {
         ret = GST_STATE_CHANGE_FAILURE;
         break;
       } else if (!gst_droidcamsrc_dev_init (src->dev)) {
@@ -240,6 +319,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 
       /* our buffer pool will push buffers to the queue so it needs to know about it */
       src->dev->pool->pad = src->vfsrc;
+    }
 
       break;
 
@@ -312,9 +392,19 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
   gst_element_class_add_pad_template (gstelement_class,
       gst_static_pad_template_get (&img_src_template_factory));
 
+  gobject_class->set_property = gst_droidcamsrc_set_property;
+  gobject_class->get_property = gst_droidcamsrc_get_property;
   gobject_class->finalize = gst_droidcamsrc_finalize;
+
   gstelement_class->change_state =
       GST_DEBUG_FUNCPTR (gst_droidcamsrc_change_state);
+
+  g_object_class_install_property (gobject_class, PROP_CAMERA_DEVICE,
+      g_param_spec_enum ("camera-device", "Camera device",
+          "Defines which camera device should be used",
+          GST_TYPE_DROIDCAMSRC_CAMERA_DEVICE,
+          DEFAULT_CAMERA_DEVICE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
 }
 
 static void

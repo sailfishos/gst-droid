@@ -24,7 +24,7 @@
 
 #include <gst/gst.h>
 #include "gstdroidcamsrcdev.h"
-
+#include "gstdroidcamsrcenums.h"
 #include <hardware/camera.h>
 
 G_BEGIN_DECLS
@@ -90,6 +90,8 @@ struct _GstDroidCamSrc
   GstDroidCamSrcPad *vfsrc;
   GstDroidCamSrcPad *imgsrc;
   GstDroidCamSrcPad *vidsrc;
+
+  GstDroidCamSrcCameraDevice camera_device;
 };
 
 struct _GstDroidCamSrcClass

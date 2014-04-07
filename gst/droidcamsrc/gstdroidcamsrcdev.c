@@ -85,7 +85,7 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, const gchar * id)
   GST_DEBUG ("dev open");
 
   err =
-      dev->hw->common.methods->open ((const struct hw_module_t *) dev->hw, "0",
+      dev->hw->common.methods->open ((const struct hw_module_t *) dev->hw, id,
       (struct hw_device_t **) &dev->dev);
   if (err < 0) {
     dev->dev = NULL;
