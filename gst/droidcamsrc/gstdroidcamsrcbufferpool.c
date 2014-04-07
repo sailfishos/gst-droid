@@ -519,11 +519,8 @@ gst_droidcamsrc_buffer_pool_set_config (GstDroidCamSrcBufferPool * pool)
   feature = gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_SURFACE, NULL);
   gst_caps_set_features (caps, 0, feature);
 
-  /* set our config. we add 1 extra buffer on purpose
-   * because we need to restart the pipeline after image capture.
-   * Camera HAL wants all buffers but GStreamer is holding one.
-   */
-  gst_buffer_pool_config_set_params (config, caps, 0, count, count + 1);
+  /* set our config */
+  gst_buffer_pool_config_set_params (config, caps, 0, count, count);
   gst_buffer_pool_config_set_allocator (config, pool->allocator, NULL);
 
   if (!gst_buffer_pool_set_config (GST_BUFFER_POOL (pool), config)) {
