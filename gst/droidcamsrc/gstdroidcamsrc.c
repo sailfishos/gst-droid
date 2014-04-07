@@ -222,6 +222,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
     case GST_STATE_CHANGE_NULL_TO_READY:
       if (!gst_droid_cam_src_get_hw (src)) {
         ret = GST_STATE_CHANGE_FAILURE;
+        break;
       }
 
       src->dev = gst_droidcamsrc_dev_new (src->hw);
@@ -231,8 +232,10 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
     case GST_STATE_CHANGE_READY_TO_PAUSED:
       if (!gst_droidcamsrc_dev_open (src->dev, "0")) {
         ret = GST_STATE_CHANGE_FAILURE;
+        break;
       } else if (!gst_droidcamsrc_dev_init (src->dev)) {
         ret = GST_STATE_CHANGE_FAILURE;
+        break;
       }
 
       /* our buffer pool will push buffers to the queue so it needs to know about it */
