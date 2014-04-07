@@ -55,9 +55,10 @@ void VideoPlayer::componentComplete() {
 void VideoPlayer::classBegin() {
   QQuickPaintedItem::classBegin();
 
-  m_bin = gst_pipeline_new (NULL);
+  m_bin = gst_element_factory_make("camerabin", NULL);
   m_src = gst_element_factory_make("droidcamsrc", NULL);
-  gst_bin_add (GST_BIN (m_bin), m_src);
+  GstElement *src = gst_element_factory_make ("pulsesrc", NULL);
+  g_object_set (m_bin, "audio-source", src, "camera-source", m_src, NULL);
 
   GstBus *bus = gst_element_get_bus(m_bin);
   gst_bus_add_watch(bus, bus_call, this);
@@ -84,8 +85,7 @@ bool VideoPlayer::start() {
 
   if (!m_sink) {
     m_sink = m_renderer->sinkElement();
-    gst_bin_add (GST_BIN (m_bin), m_sink);
-    gst_element_link_pads (m_src, "vfsrc", m_sink, "sink");
+    g_object_set (m_bin, "viewfinder-sink", m_sink, NULL);
   } else {
     // This will allow resetting EGLDisplay
     m_renderer->sinkElement();
