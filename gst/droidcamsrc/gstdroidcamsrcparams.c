@@ -25,7 +25,6 @@
 
 #include "gstdroidcamsrcparams.h"
 #include <stdlib.h>
-#include <gst/video/video.h>
 #include "gst/memory/gstgralloc.h"
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
@@ -242,7 +241,6 @@ GstCaps *
 gst_droidcamsrc_params_get_viewfinder_caps (GstDroidCamSrcParams * params)
 {
   int fps;
-  GstVideoInfo info;
   GstCapsFeatures *feature;
   GstCaps *caps = gst_caps_new_empty ();
   GList *item;
@@ -264,13 +262,12 @@ gst_droidcamsrc_params_get_viewfinder_caps (GstDroidCamSrcParams * params)
     GstCaps *caps2;
 
     if (gst_droidcamsrc_params_parse_dimension (item->data, &width, &height)) {
-      gst_video_info_init (&info);
-      gst_video_info_set_format (&info, GST_VIDEO_FORMAT_ENCODED, width,
-          height);
+      caps2 = gst_caps_new_simple ("video/x-raw",
+          "format", G_TYPE_STRING, "ENCODED",
+          "width", G_TYPE_INT, width,
+          "height", G_TYPE_INT, height,
+          "framerate", GST_TYPE_FRACTION, fps, 1, NULL);
 
-      GST_VIDEO_INFO_FPS_N (&info) = fps;
-      GST_VIDEO_INFO_FPS_D (&info) = 1;
-      caps2 = gst_video_info_to_caps (&info);
       feature =
           gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_SURFACE, NULL);
       gst_caps_set_features (caps2, 0, feature);
