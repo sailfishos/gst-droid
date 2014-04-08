@@ -60,6 +60,8 @@ static gboolean gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent,
 static gboolean gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent,
     GstQuery * query);
 static gboolean gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data);
+static void gst_droidcamsrc_start_capture (GstDroidCamSrc * src);
+static void gst_droidcamsrc_stop_capture (GstDroidCamSrc * src);
 
 enum
 {
@@ -68,6 +70,17 @@ enum
   PROP_MODE,
   PROP_READY_FOR_CAPTURE,
 };
+
+enum
+{
+  /* action signals */
+  START_CAPTURE_SIGNAL,
+  STOP_CAPTURE_SIGNAL,
+  /* emit signals */
+  LAST_SIGNAL
+};
+
+static guint droidcamsrc_signals[LAST_SIGNAL];
 
 #define DEFAULT_CAMERA_DEVICE GST_DROIDCAMSRC_CAMERA_DEVICE_PRIMARY
 #define DEFAULT_MODE          MODE_IMAGE
@@ -438,6 +451,22 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
       g_param_spec_boolean ("ready-for-capture", "Ready for capture",
           "Element is ready for another capture",
           TRUE, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  /* Signals */
+  droidcamsrc_signals[START_CAPTURE_SIGNAL] =
+      g_signal_new_class_handler ("start-capture",
+      G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
+      G_CALLBACK (gst_droidcamsrc_start_capture),
+      NULL, NULL, g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0);
+
+  droidcamsrc_signals[STOP_CAPTURE_SIGNAL] =
+      g_signal_new_class_handler ("stop-capture",
+      G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
+      G_CALLBACK (gst_droidcamsrc_stop_capture),
+      NULL, NULL, g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0);
+
 }
 
 static void
@@ -795,6 +824,7 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   GST_DEBUG_OBJECT (src, "pad %s using caps %" GST_PTR_FORMAT,
       GST_PAD_NAME (data->pad), peer);
 
+
   // TODO: configure hal
 
   ret = TRUE;
@@ -809,4 +839,16 @@ out:
   }
 
   return ret;
+}
+
+static void
+gst_droidcamsrc_start_capture (GstDroidCamSrc * src)
+{
+  // TODO:
+}
+
+static void
+gst_droidcamsrc_stop_capture (GstDroidCamSrc * src)
+{
+  // TODO:
 }
