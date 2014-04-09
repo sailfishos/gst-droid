@@ -811,20 +811,21 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   }
 
   gst_caps_unref (our_caps);
-  our_caps = NULL;
+  our_caps = peer;
+  peer = NULL;
 
-  peer = gst_caps_make_writable (peer);
-  peer = gst_caps_truncate (peer);
+  our_caps = gst_caps_make_writable (our_caps);
+  our_caps = gst_caps_truncate (our_caps);
 
-  if (!gst_pad_set_caps (data->pad, peer)) {
+  if (!gst_pad_set_caps (data->pad, our_caps)) {
     GST_ERROR_OBJECT (src, "failed to set caps");
     goto out;
   }
 
   GST_DEBUG_OBJECT (src, "pad %s using caps %" GST_PTR_FORMAT,
-      GST_PAD_NAME (data->pad), peer);
+      GST_PAD_NAME (data->pad), our_caps);
 
-  if (!gst_video_info_from_caps (&info, peer)) {
+  if (!gst_video_info_from_caps (&info, our_caps)) {
     GST_ERROR_OBJECT (src, "failed to parse caps");
     goto out;
   }
