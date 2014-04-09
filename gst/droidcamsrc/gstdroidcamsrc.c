@@ -522,6 +522,10 @@ gst_droidcamsrc_loop (gpointer user_data)
           ("failed to negotiate %s.", GST_PAD_NAME (data->pad)));
       goto error;
     }
+
+    /* toss our queue */
+    g_queue_foreach (data->queue, (GFunc) gst_buffer_unref, NULL);
+    g_queue_clear (data->queue);
   }
 
   buffer = g_queue_pop_head (data->queue);
