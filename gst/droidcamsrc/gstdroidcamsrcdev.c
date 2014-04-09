@@ -64,7 +64,7 @@ gst_droidcamsrc_dev_data_timestamp_callback (int64_t timestamp,
 }
 
 GstDroidCamSrcDev *
-gst_droidcamsrc_dev_new (camera_module_t * hw, GstDroidCamSrcPad * pad)
+gst_droidcamsrc_dev_new (camera_module_t * hw, GstDroidCamSrcPad * vfsrc)
 {
   GstDroidCamSrcDev *dev;
 
@@ -73,7 +73,7 @@ gst_droidcamsrc_dev_new (camera_module_t * hw, GstDroidCamSrcPad * pad)
   dev = g_slice_new0 (GstDroidCamSrcDev);
 
   dev->hw = hw;
-  dev->pad = pad;
+  dev->vfsrc = vfsrc;
 
   g_mutex_init (&dev->lock);
 
@@ -149,7 +149,7 @@ gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
 
   g_mutex_lock (&dev->lock);
 
-  dev->win = gst_droid_cam_src_stream_window_new (dev->pad);
+  dev->win = gst_droid_cam_src_stream_window_new (dev->vfsrc);
 
   params = dev->dev->ops->get_parameters (dev->dev);
 
