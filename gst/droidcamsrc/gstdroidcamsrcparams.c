@@ -302,10 +302,38 @@ gst_droidcamsrc_params_get_video_caps (GstDroidCamSrcParams * params)
 GstCaps *
 gst_droidcamsrc_params_get_image_caps (GstDroidCamSrcParams * params)
 {
-  GstCaps *caps = NULL;
+  GstCaps *caps = gst_caps_new_empty ();
+  GList *item;
+  int fps;
 
   g_mutex_lock (&params->lock);
-  // TODO:
+  fps = gst_droidcamsrc_params_get_int_locked (params, "preview-frame-rate");
+  if (fps == -1) {
+    goto unlock_and_out;
+  }
+
+  item = gst_droidcamsrc_params_get_item_locked (params, "picture-size-values");
+  if (!item) {
+    goto unlock_and_out;
+  }
+
+  while (item) {
+    int width, height;
+    GstCaps *caps2;
+
+    if (gst_droidcamsrc_params_parse_dimension (item->data, &width, &height)) {
+      caps2 = gst_caps_new_simple ("image/jpeg",
+          "width", G_TYPE_INT, width,
+          "height", G_TYPE_INT, height,
+          "framerate", GST_TYPE_FRACTION, fps, 1, NULL);
+
+      caps = gst_caps_merge (caps, caps2);
+    }
+
+    item = g_list_next (item);
+  }
+
+unlock_and_out:
   g_mutex_unlock (&params->lock);
 
   return caps;
