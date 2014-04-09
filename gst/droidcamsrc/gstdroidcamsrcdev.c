@@ -75,6 +75,8 @@ gst_droidcamsrc_dev_new (camera_module_t * hw, GstDroidCamSrcPad * pad)
   dev->hw = hw;
   dev->pad = pad;
 
+  g_mutex_init (&dev->lock);
+
   return dev;
 }
 
@@ -85,14 +87,21 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, const gchar * id)
 
   GST_DEBUG ("dev open");
 
+  g_mutex_lock (&dev->lock);
+
   err =
       dev->hw->common.methods->open ((const struct hw_module_t *) dev->hw, id,
       (struct hw_device_t **) &dev->dev);
   if (err < 0) {
     dev->dev = NULL;
+
+    g_mutex_unlock (&dev->lock);
+
     GST_ERROR ("error 0x%x opening camera", err);
     return FALSE;
   }
+
+  g_mutex_unlock (&dev->lock);
 
   return TRUE;
 }
@@ -104,6 +113,8 @@ gst_droidcamsrc_dev_close (GstDroidCamSrcDev * dev)
 
   GST_DEBUG ("dev close");
 
+  g_mutex_lock (&dev->lock);
+
   if (dev->dev) {
     dev->dev->ops->release (dev->dev);
     err = dev->dev->common.close (&dev->dev->common);
@@ -113,6 +124,8 @@ gst_droidcamsrc_dev_close (GstDroidCamSrcDev * dev)
       GST_ERROR ("error 0x%x closing camera", err);
     }
   }
+
+  g_mutex_unlock (&dev->lock);
 }
 
 void
@@ -121,6 +134,7 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
   GST_DEBUG ("dev destroy");
 
   dev->hw = NULL;
+  g_mutex_clear (&dev->lock);
   g_slice_free (GstDroidCamSrcDev, dev);
   dev = NULL;
 }
@@ -132,6 +146,8 @@ gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
   int err;
 
   GST_DEBUG ("dev init");
+
+  g_mutex_lock (&dev->lock);
 
   dev->win = gst_droid_cam_src_stream_window_new (dev->pad);
 
@@ -160,9 +176,11 @@ gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
     goto err;
   }
 
+  g_mutex_unlock (&dev->lock);
   return TRUE;
 
 err:
+  g_mutex_unlock (&dev->lock);
   gst_droidcamsrc_dev_deinit (dev);
   return FALSE;
 }
@@ -172,6 +190,8 @@ gst_droidcamsrc_dev_deinit (GstDroidCamSrcDev * dev)
 {
   GST_DEBUG ("dev deinit");
 
+  g_mutex_lock (&dev->lock);
+
   if (dev->params) {
     gst_droidcamsrc_params_destroy (dev->params);
     dev->params = NULL;
@@ -180,26 +200,30 @@ gst_droidcamsrc_dev_deinit (GstDroidCamSrcDev * dev)
   if (dev->win) {
     gst_droid_cam_src_stream_window_destroy (dev->win);
   }
+
+  g_mutex_unlock (&dev->lock);
 }
 
 gboolean
 gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev)
 {
   int err;
+  gboolean ret = FALSE;
 
   GST_DEBUG ("dev start");
-
+  g_mutex_lock (&dev->lock);
   err = dev->dev->ops->start_preview (dev->dev);
   if (err != 0) {
     GST_ERROR ("error 0x%x starting preview", err);
-    goto error;
+    goto out;
   }
   // TODO: set params?
 
-  return TRUE;
+  ret = TRUE;
 
-error:
-  return FALSE;
+out:
+  g_mutex_unlock (&dev->lock);
+  return ret;
 }
 
 void
@@ -207,7 +231,37 @@ gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev)
 {
   GST_DEBUG ("dev stop");
 
+  g_mutex_lock (&dev->lock);
+
   dev->dev->ops->stop_preview (dev->dev);
 
   gst_droid_cam_src_stream_window_clear (dev->win);
+
+  g_mutex_unlock (&dev->lock);
+}
+
+gboolean
+gst_droidcamsrc_dev_set_params (GstDroidCamSrcDev * dev, const gchar * params)
+{
+  int err;
+  gboolean ret = FALSE;
+
+  g_mutex_lock (&dev->lock);
+  if (!dev->dev) {
+    GST_ERROR ("camera device is not open");
+    goto out;
+  }
+
+  err = dev->dev->ops->set_parameters (dev->dev, params);
+  if (err != 0) {
+    GST_ERROR ("error 0x%x setting parameters", err);
+    goto out;
+  }
+
+  ret = TRUE;
+
+out:
+  g_mutex_unlock (&dev->lock);
+
+  return ret;
 }

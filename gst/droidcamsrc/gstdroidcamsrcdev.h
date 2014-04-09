@@ -39,6 +39,7 @@ struct _GstDroidCamSrcDev
   GstDroidCamSrcParams *params;
   GstDroidCamSrcStreamWindow *win;
   GstDroidCamSrcPad *pad;
+  GMutex lock;
 };
 
 GstDroidCamSrcDev *gst_droidcamsrc_dev_new (camera_module_t *hw, GstDroidCamSrcPad *pad);
@@ -52,6 +53,8 @@ void gst_droidcamsrc_dev_deinit (GstDroidCamSrcDev * dev);
 
 gboolean gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev);
 void gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev);
+
+gboolean gst_droidcamsrc_dev_set_params (GstDroidCamSrcDev * dev, const gchar *params);
 
 G_END_DECLS
 
