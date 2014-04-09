@@ -103,6 +103,14 @@ gst_droidcamsrc_dev_data_callback (int32_t msg_type,
         g_cond_signal (&dev->imgsrc->cond);
         g_mutex_unlock (&dev->imgsrc->lock);
       }
+
+      gst_droidcamsrc_dev_start (dev);
+
+      g_mutex_lock (&src->capture_lock);
+      --src->captures;
+      g_mutex_unlock (&src->capture_lock);
+
+      g_object_notify (G_OBJECT (src), "ready-for-capture");
     }
       break;
 
