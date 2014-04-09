@@ -321,7 +321,7 @@ gst_droidcamsrc_params_set_string (GstDroidCamSrcParams * params,
   GST_DEBUG ("setting param %s to %s", key, value);
 
   g_mutex_lock (&params->lock);
-  item = gst_droidcamsrc_params_get_item_locked (params, value);
+  item = gst_droidcamsrc_params_get_item_locked (params, key);
   if (g_list_length (item) > 1) {
     GST_ERROR ("item %s has more than 1 value", key);
     goto out;
