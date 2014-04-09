@@ -88,7 +88,7 @@ static guint droidcamsrc_signals[LAST_SIGNAL];
 
 static GstDroidCamSrcPad *
 gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
-    const gchar * name)
+    const gchar * name, gboolean capture_pad)
 {
   GstDroidCamSrcPad *pad = g_slice_new0 (GstDroidCamSrcPad);
 
@@ -107,6 +107,7 @@ gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
   pad->running = FALSE;
   pad->caps = NULL;
   pad->negotiate = NULL;
+  pad->capture_pad = capture_pad;
 
   gst_segment_init (&pad->segment, GST_FORMAT_TIME);
 
@@ -140,13 +141,14 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   g_mutex_init (&src->capture_lock);
 
   src->vfsrc = gst_droidcamsrc_create_pad (src,
-      &vf_src_template_factory, GST_BASE_CAMERA_SRC_VIEWFINDER_PAD_NAME);
+      &vf_src_template_factory, GST_BASE_CAMERA_SRC_VIEWFINDER_PAD_NAME, FALSE);
   src->vfsrc->negotiate = gst_droidcamsrc_vfsrc_negotiate;
 
   src->imgsrc = gst_droidcamsrc_create_pad (src,
-      &img_src_template_factory, GST_BASE_CAMERA_SRC_IMAGE_PAD_NAME);
+      &img_src_template_factory, GST_BASE_CAMERA_SRC_IMAGE_PAD_NAME, TRUE);
+
   src->vidsrc = gst_droidcamsrc_create_pad (src,
-      &vid_src_template_factory, GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME);
+      &vid_src_template_factory, GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME, TRUE);
 
   GST_OBJECT_FLAG_SET (src, GST_ELEMENT_FLAG_SOURCE);
 }
@@ -640,7 +642,7 @@ gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent, GstEvent * event)
 {
   GstDroidCamSrc *src = GST_DROIDCAMSRC (parent);
   gboolean ret = FALSE;
-  //  GstDroidCamSrcPad *data = gst_pad_get_element_private (pad);
+  GstDroidCamSrcPad *data = gst_pad_get_element_private (pad);
 
   GST_DEBUG_OBJECT (src, "pad %s %" GST_PTR_FORMAT, GST_PAD_NAME (pad), event);
 
@@ -671,9 +673,29 @@ gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent, GstEvent * event)
 
     case GST_EVENT_CAPS:
     case GST_EVENT_LATENCY:
-    case GST_EVENT_RECONFIGURE:
-      // TODO:
       ret = TRUE;
+      // TODO:
+      break;
+
+    case GST_EVENT_RECONFIGURE:
+      g_mutex_lock (&src->capture_lock);
+      if (data->capture_pad && !src->ready_for_capture) {
+        GST_ERROR_OBJECT (src, "cannot reconfigure pad %s while capturing",
+            GST_PAD_NAME (data->pad));
+        ret = FALSE;
+      } else if (data->capture_pad) {
+        /* wake pad up to renegotiate */
+        g_mutex_lock (&data->lock);
+        g_cond_signal (&data->cond);
+        g_mutex_unlock (&data->lock);
+        ret = TRUE;
+      } else {
+        /* pad will negotiate later */
+        ret = TRUE;
+      }
+
+      g_mutex_unlock (&src->capture_lock);
+
       break;
 
     case GST_EVENT_FLUSH_START:
