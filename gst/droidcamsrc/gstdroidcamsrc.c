@@ -62,6 +62,7 @@ static gboolean gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent,
 static gboolean gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data);
 static void gst_droidcamsrc_start_capture (GstDroidCamSrc * src);
 static void gst_droidcamsrc_stop_capture (GstDroidCamSrc * src);
+static gboolean gst_droidcamsrc_apply_params (GstDroidCamSrc * src);
 
 enum
 {
@@ -833,6 +834,25 @@ out:
 
   if (our_caps) {
     gst_caps_unref (our_caps);
+  }
+
+  return ret;
+}
+
+static gboolean
+gst_droidcamsrc_apply_params (GstDroidCamSrc * src)
+{
+  gchar *params;
+  gboolean ret = FALSE;
+
+  GST_DEBUG_OBJECT (src, "apply params");
+
+  params = gst_droidcamsrc_params_to_string (src->dev->params);
+  ret = gst_droidcamsrc_dev_set_params (src->dev, params);
+  g_free (params);
+
+  if (!ret) {
+    GST_ERROR_OBJECT (src, "failed to apply camera parameters");
   }
 
   return ret;
