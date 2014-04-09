@@ -46,19 +46,22 @@ gst_droidcamsrc_dev_notify_callback (int32_t msg_type,
     int32_t ext1, int32_t ext2, void *user)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
-  //  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+
+  // TODO: more messages
 
   switch (msg_type) {
     case CAMERA_MSG_SHUTTER:
       g_mutex_lock (&dev->lock);
       dev->dev->ops->disable_msg_type (dev->dev, CAMERA_MSG_SHUTTER);
+      gst_droidcamsrc_post_message (src,
+          gst_structure_new_empty (GST_DROIDCAMSRC_CAPTURE_START));
       g_mutex_unlock (&dev->lock);
       break;
 
     default:
       GST_WARNING ("unknown message type 0x%x", msg_type);
   }
-  // TODO:
 }
 
 static void
@@ -67,10 +70,11 @@ gst_droidcamsrc_dev_data_callback (int32_t msg_type,
     camera_frame_metadata_t * metadata, void *user)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
-  //  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
   switch (msg_type) {
     case CAMERA_MSG_RAW_IMAGE:
+      // TODO:
       break;
 
     case CAMERA_MSG_COMPRESSED_IMAGE:
@@ -78,13 +82,22 @@ gst_droidcamsrc_dev_data_callback (int32_t msg_type,
       size_t size;
       void *addr = gst_droidcamsrc_dev_memory_get_data (data, index, &size);
       if (!addr) {
-        // TODO: error
+        GST_ERROR_OBJECT (src, "invalid memory from camera hal");
       } else {
         GstBuffer *buffer;
         void *d = g_malloc (size);
         memcpy (d, addr, size);
         buffer = gst_buffer_new_wrapped (d, size);
-        // TODO: pts, dts, ... extract and post exif, preview, ...
+        if (!dev->image_preview_sent) {
+          gst_droidcamsrc_post_message (src,
+              gst_structure_new_empty (GST_DROIDCAMSRC_CAPTURE_END));
+          // TODO: generate and send preview.
+          dev->image_preview_sent = TRUE;
+        }
+
+        gst_droidcamsrc_timestamp (src, buffer);
+
+        // TODO: extract and post exif
         g_mutex_lock (&dev->imgsrc->lock);
         g_queue_push_tail (dev->imgsrc->queue, buffer);
         g_cond_signal (&dev->imgsrc->cond);
@@ -327,6 +340,7 @@ gst_droidcamsrc_dev_capture_image (GstDroidCamSrcDev * dev)
   g_mutex_lock (&dev->lock);
 
   dev->dev->ops->enable_msg_type (dev->dev, msg_type);
+  dev->image_preview_sent = FALSE;
 
   err = dev->dev->ops->take_picture (dev->dev);
   if (err != 0) {

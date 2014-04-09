@@ -40,6 +40,7 @@ struct _GstDroidCamSrcDev
   GstDroidCamSrcStreamWindow *win;
   GstDroidCamSrcPad *vfsrc;
   GstDroidCamSrcPad *imgsrc;
+  gboolean image_preview_sent;
   GMutex lock;
 };
 
