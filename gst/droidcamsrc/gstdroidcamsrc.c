@@ -789,6 +789,8 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   gboolean ret = FALSE;
   GstCaps *peer = NULL;
   GstCaps *our_caps = NULL;
+  gchar *preview;
+  GstVideoInfo info;
 
   GST_DEBUG_OBJECT (src, "vfsrc negotiate");
 
@@ -822,8 +824,24 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   GST_DEBUG_OBJECT (src, "pad %s using caps %" GST_PTR_FORMAT,
       GST_PAD_NAME (data->pad), peer);
 
+  if (!gst_video_info_from_caps (&info, peer)) {
+    GST_ERROR_OBJECT (src, "failed to parse caps");
+    goto out;
+  }
 
-  // TODO: configure hal
+  preview = g_strdup_printf ("%ix%i", info.width, info.height);
+  if (!gst_droidcamsrc_params_set_string (src->dev->params, "preview-size",
+          preview)) {
+    g_free (preview);
+    GST_ERROR_OBJECT (src, "failed to set preview-size");
+    goto out;
+  }
+
+  g_free (preview);
+
+  if (!gst_droidcamsrc_apply_params (src)) {
+    goto out;
+  }
 
   ret = TRUE;
 
