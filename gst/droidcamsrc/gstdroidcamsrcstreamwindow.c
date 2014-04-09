@@ -161,6 +161,8 @@ gst_droidcamsrc_stream_window_enqueue_buffer (struct preview_stream_ops *w,
   if (!buff) {
     GST_ERROR ("no buffer corresponding to handle %p", buffer);
     ret = -1;
+    // TODO: an idea would be to keep the old hash values and match buffers against
+    // our pool when we dequeue and enqueue
     goto unlock_and_out;
   }
 
