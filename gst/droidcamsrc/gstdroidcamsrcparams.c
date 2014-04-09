@@ -26,6 +26,7 @@
 #include "gstdroidcamsrcparams.h"
 #include <stdlib.h>
 #include "gst/memory/gstgralloc.h"
+#include <string.h>
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 #define GST_CAT_DEFAULT gst_droidcamsrc_debug
@@ -292,7 +293,7 @@ gst_droidcamsrc_params_get_video_caps (GstDroidCamSrcParams * params)
   GstCaps *caps = NULL;
 
   g_mutex_lock (&params->lock);
-
+  // TODO:
   g_mutex_unlock (&params->lock);
 
   return caps;
@@ -304,8 +305,38 @@ gst_droidcamsrc_params_get_image_caps (GstDroidCamSrcParams * params)
   GstCaps *caps = NULL;
 
   g_mutex_lock (&params->lock);
-
+  // TODO:
   g_mutex_unlock (&params->lock);
 
   return caps;
+}
+
+gboolean
+gst_droidcamsrc_params_set_string (GstDroidCamSrcParams * params,
+    const gchar * key, const gchar * value)
+{
+  GList *item;
+  gboolean ret = FALSE;
+
+  GST_DEBUG ("setting param %s to %s", key, value);
+
+  g_mutex_lock (&params->lock);
+  item = gst_droidcamsrc_params_get_item_locked (params, value);
+  if (g_list_length (item) > 1) {
+    GST_ERROR ("item %s has more than 1 value", key);
+    goto out;
+  }
+
+  /* update only if not equal */
+  if (strcmp (item->data, value)) {
+    g_free (item->data);
+    item->data = g_strdup (value);
+    params->is_dirty = TRUE;
+  }
+
+  ret = TRUE;
+
+out:
+  g_mutex_unlock (&params->lock);
+  return ret;
 }

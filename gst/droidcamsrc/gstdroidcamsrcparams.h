@@ -45,6 +45,9 @@ GstCaps *gst_droidcamsrc_params_get_viewfinder_caps (GstDroidCamSrcParams *param
 GstCaps *gst_droidcamsrc_params_get_video_caps (GstDroidCamSrcParams *params);
 GstCaps *gst_droidcamsrc_params_get_image_caps (GstDroidCamSrcParams *params);
 
+gboolean gst_droidcamsrc_params_set_string (GstDroidCamSrcParams *params, const gchar *key,
+					const gchar *value);
+
 G_END_DECLS
 
 #endif /* __GST_DROID_CAM_SRC_PARAMS_H__ */
