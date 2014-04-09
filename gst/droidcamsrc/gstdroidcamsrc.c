@@ -138,7 +138,7 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   src->dev = NULL;
   src->camera_device = DEFAULT_CAMERA_DEVICE;
   src->mode = DEFAULT_MODE;
-  src->ready_for_capture = TRUE;
+  src->captures = 0;
   g_mutex_init (&src->capture_lock);
 
   src->vfsrc = gst_droidcamsrc_create_pad (src,
@@ -172,7 +172,7 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
 
     case PROP_READY_FOR_CAPTURE:
       g_mutex_lock (&src->capture_lock);
-      g_value_set_boolean (value, src->ready_for_capture);
+      g_value_set_boolean (value, src->captures == 0);
       g_mutex_unlock (&src->capture_lock);
       break;
 
@@ -363,7 +363,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         ret = GST_STATE_CHANGE_FAILURE;
       }
 
-      src->ready_for_capture = TRUE;
+      src->captures = 0;
       g_object_notify (G_OBJECT (src), "ready-for-capture");
 
       break;
@@ -385,6 +385,8 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
   switch (transition) {
     case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
       gst_droidcamsrc_dev_stop (src->dev);
+      src->captures = 0;
+
       break;
 
     case GST_STATE_CHANGE_PAUSED_TO_READY:
@@ -685,7 +687,7 @@ gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent, GstEvent * event)
 
     case GST_EVENT_RECONFIGURE:
       g_mutex_lock (&src->capture_lock);
-      if (data->capture_pad && !src->ready_for_capture) {
+      if (data->capture_pad && src->captures > 0) {
         GST_ERROR_OBJECT (src, "cannot reconfigure pad %s while capturing",
             GST_PAD_NAME (data->pad));
         ret = FALSE;
