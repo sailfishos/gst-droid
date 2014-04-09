@@ -116,6 +116,8 @@ struct _GstDroidCamSrcClass
 };
 
 GType gst_droidcamsrc_get_type (void);
+void gst_droidcamsrc_post_message (GstDroidCamSrc * src, GstStructure * s);
+void gst_droidcamsrc_timestamp (GstDroidCamSrc * src, GstBuffer * buffer);
 
 G_END_DECLS
 

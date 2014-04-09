@@ -1044,3 +1044,48 @@ out:
   g_mutex_unlock (&src->capture_lock);
   // TODO:
 }
+
+void
+gst_droidcamsrc_post_message (GstDroidCamSrc * src, GstStructure * s)
+{
+  GstMessage *msg;
+
+  GST_DEBUG_OBJECT (src, "sending %s message", gst_structure_get_name (s));
+
+  msg = gst_message_new_element (GST_OBJECT (src), s);
+
+  if (gst_element_post_message (GST_ELEMENT (src), msg) == FALSE) {
+    GST_WARNING_OBJECT (src,
+        "this element has no bus, therefore no message sent!");
+  }
+}
+
+void
+gst_droidcamsrc_timestamp (GstDroidCamSrc * src, GstBuffer * buffer)
+{
+  GstClockTime base_time, ts;
+  GstClock *clock;
+
+  GST_DEBUG_OBJECT (src, "timestamp %p", buffer);
+
+  GST_OBJECT_LOCK (src);
+  clock = GST_ELEMENT_CLOCK (src);
+  if (clock) {
+    gst_object_ref (clock);
+  }
+
+  base_time = GST_ELEMENT_CAST (src)->base_time;
+  GST_OBJECT_UNLOCK (src);
+
+  if (!clock) {
+    GST_WARNING_OBJECT (src, "cannot timestamp without a clock");
+    return;
+  }
+
+  ts = gst_clock_get_time (clock) - base_time;
+
+  gst_object_unref (clock);
+
+  GST_BUFFER_DTS (buffer) = ts;
+  GST_BUFFER_PTS (buffer) = ts;
+}
