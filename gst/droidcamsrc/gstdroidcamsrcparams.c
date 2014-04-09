@@ -220,6 +220,8 @@ gst_droidcamsrc_params_to_string (GstDroidCamSrcParams * params)
     }
   }
 
+  params->is_dirty = FALSE;
+
   g_mutex_unlock (&params->lock);
 
   return string;
