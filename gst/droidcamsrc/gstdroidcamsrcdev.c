@@ -265,3 +265,31 @@ out:
 
   return ret;
 }
+
+gboolean
+gst_droidcamsrc_dev_capture_image (GstDroidCamSrcDev * dev)
+{
+  int err;
+  gboolean ret = FALSE;
+  int msg_type =
+      CAMERA_MSG_SHUTTER | CAMERA_MSG_POSTVIEW_FRAME | CAMERA_MSG_RAW_IMAGE |
+      CAMERA_MSG_COMPRESSED_IMAGE;
+
+  GST_DEBUG ("dev capture image");
+
+  g_mutex_lock (&dev->lock);
+
+  dev->dev->ops->enable_msg_type (dev->dev, msg_type);
+
+  err = dev->dev->ops->take_picture (dev->dev);
+  if (err != 0) {
+    GST_ERROR ("error 0x%x capturing image", err);
+    goto out;
+  }
+
+  ret = TRUE;
+
+out:
+  g_mutex_unlock (&dev->lock);
+  return ret;
+}

@@ -56,6 +56,8 @@ void gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev);
 
 gboolean gst_droidcamsrc_dev_set_params (GstDroidCamSrcDev * dev, const gchar *params);
 
+gboolean gst_droidcamsrc_dev_capture_image (GstDroidCamSrcDev * dev);
+
 G_END_DECLS
 
 #endif /* __GST_DROID_CAM_SRC_DEV_H__ */
