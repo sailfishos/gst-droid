@@ -29,6 +29,7 @@ G_BEGIN_DECLS
 
 camera_memory_t *gst_droidcamsrc_dev_memory_get (int fd, size_t buf_size,
     unsigned int num_bufs);
+void *gst_droidcamsrc_dev_memory_get_data (camera_memory_t * mem, unsigned int index, size_t * buf_size);
 
 G_END_DECLS
 

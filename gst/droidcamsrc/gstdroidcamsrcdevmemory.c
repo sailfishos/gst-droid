@@ -30,16 +30,25 @@
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 #define GST_CAT_DEFAULT gst_droidcamsrc_debug
 
+typedef struct _GstDroidCamSrcDevMemory GstDroidCamSrcDevMemory;
+
+struct _GstDroidCamSrcDevMemory
+{
+  int fd;
+  unsigned int num_bufs;
+  size_t buf_size;
+};
+
 static void
 gst_droidcamsrc_dev_memory_release (struct camera_memory *mem)
 {
-  int fd;
+  GstDroidCamSrcDevMemory *info;
 
   GST_DEBUG ("dev mem release");
 
-  fd = GPOINTER_TO_INT (mem->handle);
+  info = (GstDroidCamSrcDevMemory *) mem->handle;
 
-  if (fd < 0) {
+  if (info->fd < 0) {
     g_free (mem->data);
   } else {
     if (munmap (mem->data, mem->size) == -1) {
@@ -47,7 +56,9 @@ gst_droidcamsrc_dev_memory_release (struct camera_memory *mem)
     }
   }
 
+  g_slice_free (GstDroidCamSrcDevMemory, info);
   g_slice_free (camera_memory_t, mem);
+
   mem = NULL;
 }
 
@@ -87,11 +98,42 @@ gst_droidcamsrc_dev_memory_get (int fd, size_t buf_size, unsigned int num_bufs)
     g_slice_free (camera_memory_t, mem);
     mem = NULL;
   } else {
+    GstDroidCamSrcDevMemory *info = g_slice_new (GstDroidCamSrcDevMemory);
+    info->fd = fd;
+    info->num_bufs = num_bufs;
+    info->buf_size = buf_size;
+
     mem->data = mem_base;
     mem->size = requested_size;
-    mem->handle = GINT_TO_POINTER (fd);
+    mem->handle = info;
     mem->release = gst_droidcamsrc_dev_memory_release;
   }
 
   return mem;
+}
+
+void *
+gst_droidcamsrc_dev_memory_get_data (camera_memory_t * mem, unsigned int index,
+    size_t * buf_size)
+{
+  GstDroidCamSrcDevMemory *info;
+  size_t off;
+  void *addr;
+
+  if (!mem->handle) {
+    return NULL;
+  }
+
+  info = (GstDroidCamSrcDevMemory *) mem->handle;
+
+  if (index >= info->num_bufs) {
+    return NULL;
+  }
+
+  *buf_size = info->buf_size;
+
+  off = index * info->buf_size;
+  addr = mem->data;
+  addr += off;
+  return addr;
 }
