@@ -31,10 +31,13 @@ class QtCamViewfinderRenderer;
 
 class VideoPlayer : public QQuickPaintedItem {
   Q_OBJECT
+  Q_PROPERTY(bool running READ running NOTIFY runningChanged);
 
 public:
   VideoPlayer(QQuickItem *parent = 0);
   ~VideoPlayer();
+
+  bool running();
 
   virtual void componentComplete();
   virtual void classBegin();
@@ -44,8 +47,12 @@ public:
   Q_INVOKABLE bool start();
   Q_INVOKABLE bool stop();
 
+public slots:
+  void capture();
+
 signals:
   void error(const QString& message, int code, const QString& debug);
+  void runningChanged();
 
 protected:
   void geometryChanged(const QRectF& newGeometry, const QRectF& oldGeometry);

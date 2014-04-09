@@ -97,6 +97,8 @@ bool VideoPlayer::start() {
     return false;
   }
 
+  emit runningChanged();
+
   return true;
 }
 
@@ -107,6 +109,8 @@ bool VideoPlayer::stop() {
   }
 
   m_renderer->reset();
+
+  emit runningChanged();
 
   return true;
 }
@@ -179,4 +183,14 @@ gboolean VideoPlayer::bus_call(GstBus *bus, GstMessage *msg, gpointer data) {
 
 void VideoPlayer::updateRequested() {
   update();
+}
+
+bool VideoPlayer::running() {
+  GstState st;
+
+  return gst_element_get_state(m_bin, &st, NULL, GST_CLOCK_TIME_NONE) != GST_STATE_CHANGE_FAILURE && st == GST_STATE_PLAYING;
+}
+
+void VideoPlayer::capture() {
+  g_signal_emit_by_name (m_bin, "start-capture", NULL);
 }

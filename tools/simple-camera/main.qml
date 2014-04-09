@@ -33,14 +33,20 @@ Rectangle {
         Button {
                 anchors.bottom: parent.bottom
                 anchors.left: parent.left
-                text: "Start"
-                onClicked: player.start()
+                text: player.running ? "Stop" : "Start"
+                onClicked: {
+                        if (player.running) {
+                                player.stop()
+                        } else {
+                                player.start()
+                        }
+                }
         }
 
         Button {
                 anchors.bottom: parent.bottom
                 anchors.right: parent.right
-                text: "Stop"
-                onClicked: player.stop()
+                text: "Capture"
+                onClicked: player.capture()
         }
 }
