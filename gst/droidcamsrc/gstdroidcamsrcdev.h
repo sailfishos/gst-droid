@@ -39,10 +39,12 @@ struct _GstDroidCamSrcDev
   GstDroidCamSrcParams *params;
   GstDroidCamSrcStreamWindow *win;
   GstDroidCamSrcPad *vfsrc;
+  GstDroidCamSrcPad *imgsrc;
   GMutex lock;
 };
 
-GstDroidCamSrcDev *gst_droidcamsrc_dev_new (camera_module_t *hw, GstDroidCamSrcPad *vfsrc);
+GstDroidCamSrcDev *gst_droidcamsrc_dev_new (camera_module_t *hw, GstDroidCamSrcPad *vfsrc,
+    GstDroidCamSrcPad *imgsrc);
 void gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev);
 
 gboolean gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, const gchar *id);

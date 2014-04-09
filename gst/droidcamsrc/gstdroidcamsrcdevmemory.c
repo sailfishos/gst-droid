@@ -113,8 +113,8 @@ gst_droidcamsrc_dev_memory_get (int fd, size_t buf_size, unsigned int num_bufs)
 }
 
 void *
-gst_droidcamsrc_dev_memory_get_data (camera_memory_t * mem, unsigned int index,
-    size_t * buf_size)
+gst_droidcamsrc_dev_memory_get_data (const camera_memory_t * mem,
+    unsigned int index, size_t * buf_size)
 {
   GstDroidCamSrcDevMemory *info;
   size_t off;

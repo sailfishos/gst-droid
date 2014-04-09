@@ -26,6 +26,7 @@
 #include "gstdroidcamsrcdev.h"
 #include "gstdroidcamsrcdevmemory.h"
 #include <stdlib.h>
+#include "gstdroidcamsrc.h"
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 #define GST_CAT_DEFAULT gst_droidcamsrc_debug
@@ -44,6 +45,19 @@ static void
 gst_droidcamsrc_dev_notify_callback (int32_t msg_type,
     int32_t ext1, int32_t ext2, void *user)
 {
+  GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
+  //  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+
+  switch (msg_type) {
+    case CAMERA_MSG_SHUTTER:
+      g_mutex_lock (&dev->lock);
+      dev->dev->ops->disable_msg_type (dev->dev, CAMERA_MSG_SHUTTER);
+      g_mutex_unlock (&dev->lock);
+      break;
+
+    default:
+      GST_WARNING ("unknown message type 0x%x", msg_type);
+  }
   // TODO:
 }
 
@@ -52,6 +66,37 @@ gst_droidcamsrc_dev_data_callback (int32_t msg_type,
     const camera_memory_t * data, unsigned int index,
     camera_frame_metadata_t * metadata, void *user)
 {
+  GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
+  //  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+
+  switch (msg_type) {
+    case CAMERA_MSG_RAW_IMAGE:
+      break;
+
+    case CAMERA_MSG_COMPRESSED_IMAGE:
+    {
+      size_t size;
+      void *addr = gst_droidcamsrc_dev_memory_get_data (data, index, &size);
+      if (!addr) {
+        // TODO: error
+      } else {
+        GstBuffer *buffer;
+        void *d = g_malloc (size);
+        memcpy (d, addr, size);
+        buffer = gst_buffer_new_wrapped (d, size);
+        // TODO: pts, dts, ... extract and post exif, preview, ...
+        g_mutex_lock (&dev->imgsrc->lock);
+        g_queue_push_tail (dev->imgsrc->queue, buffer);
+        g_cond_signal (&dev->imgsrc->cond);
+        g_mutex_unlock (&dev->imgsrc->lock);
+      }
+    }
+      break;
+
+    default:
+      GST_WARNING ("unknown message type 0x%x", msg_type);
+  }
+
   // TODO:
 }
 
@@ -64,7 +109,8 @@ gst_droidcamsrc_dev_data_timestamp_callback (int64_t timestamp,
 }
 
 GstDroidCamSrcDev *
-gst_droidcamsrc_dev_new (camera_module_t * hw, GstDroidCamSrcPad * vfsrc)
+gst_droidcamsrc_dev_new (camera_module_t * hw, GstDroidCamSrcPad * vfsrc,
+    GstDroidCamSrcPad * imgsrc)
 {
   GstDroidCamSrcDev *dev;
 
@@ -74,6 +120,7 @@ gst_droidcamsrc_dev_new (camera_module_t * hw, GstDroidCamSrcPad * vfsrc)
 
   dev->hw = hw;
   dev->vfsrc = vfsrc;
+  dev->imgsrc = imgsrc;
 
   g_mutex_init (&dev->lock);
 

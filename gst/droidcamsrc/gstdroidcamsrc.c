@@ -328,7 +328,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         break;
       }
 
-      src->dev = gst_droidcamsrc_dev_new (src->hw, src->vfsrc);
+      src->dev = gst_droidcamsrc_dev_new (src->hw, src->vfsrc, src->imgsrc);
 
       break;
 
@@ -983,14 +983,64 @@ gst_droidcamsrc_apply_params (GstDroidCamSrc * src)
   return ret;
 }
 
+static gboolean
+gst_droidcamsrc_start_image_capture_locked (GstDroidCamSrc * src)
+{
+  GST_DEBUG_OBJECT (src, "start image capture");
+
+  if (!gst_droidcamsrc_dev_capture_image (src->dev)) {
+    GST_ERROR_OBJECT (src, "failed to start image capture");
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
 static void
 gst_droidcamsrc_start_capture (GstDroidCamSrc * src)
 {
-  // TODO:
+  GST_DEBUG_OBJECT (src, "start capture");
+
+  g_mutex_lock (&src->capture_lock);
+
+  if (src->captures > 0) {
+    /* abort if we are capturing */
+    GST_ELEMENT_WARNING (src, RESOURCE, FAILED, (NULL), (NULL));
+    goto out;
+  }
+
+  if (src->mode == MODE_IMAGE) {
+    if (!gst_droidcamsrc_start_image_capture_locked (src)) {
+      GST_ELEMENT_WARNING (src, RESOURCE, FAILED, (NULL), (NULL));
+      goto out;
+    }
+  } else {
+
+  }
+
+out:
+  g_mutex_unlock (&src->capture_lock);
 }
 
 static void
 gst_droidcamsrc_stop_capture (GstDroidCamSrc * src)
 {
+  GST_DEBUG_OBJECT (src, "stop capture");
+
+  g_mutex_lock (&src->capture_lock);
+
+  if (src->captures == 0) {
+    /* abort if we are capturing */
+    GST_WARNING_OBJECT (src,
+        "trying to stop capturing while nothing is being captured");
+    goto out;
+  }
+
+  if (src->mode != MODE_IMAGE) {
+
+  }
+
+out:
+  g_mutex_unlock (&src->capture_lock);
   // TODO:
 }
