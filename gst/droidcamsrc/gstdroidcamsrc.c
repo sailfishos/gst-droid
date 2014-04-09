@@ -1001,6 +1001,8 @@ gst_droidcamsrc_start_image_capture_locked (GstDroidCamSrc * src)
 static void
 gst_droidcamsrc_start_capture (GstDroidCamSrc * src)
 {
+  gboolean started;
+
   GST_DEBUG_OBJECT (src, "start capture");
 
   g_mutex_lock (&src->capture_lock);
@@ -1008,22 +1010,26 @@ gst_droidcamsrc_start_capture (GstDroidCamSrc * src)
   if (src->captures > 0) {
     /* abort if we are capturing */
     GST_ELEMENT_WARNING (src, RESOURCE, FAILED, (NULL), (NULL));
+    started = FALSE;
     goto out;
   }
 
   if (src->mode == MODE_IMAGE) {
-    if (!gst_droidcamsrc_start_image_capture_locked (src)) {
-      GST_ELEMENT_WARNING (src, RESOURCE, FAILED, (NULL), (NULL));
-      goto out;
-    }
-
-    g_object_notify (G_OBJECT (src), "ready-for-capture");
+    started = gst_droidcamsrc_start_image_capture_locked (src);
   } else {
+    started = FALSE;
+  }
 
+  if (!started) {
+    GST_ELEMENT_WARNING (src, RESOURCE, FAILED, (NULL), (NULL));
   }
 
 out:
   g_mutex_unlock (&src->capture_lock);
+
+  if (started) {
+    g_object_notify (G_OBJECT (src), "ready-for-capture");
+  }
 }
 
 static void
