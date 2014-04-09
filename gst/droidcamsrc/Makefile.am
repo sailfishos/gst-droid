@@ -16,6 +16,7 @@ libgstdroidcamsrc_la_SOURCES = \
 	gstdroidcamsrcdev.c \
 	gstdroidcamsrcdevmemory.c \
 	gstdroidcamsrcbufferpool.c \
+	gstdroidcamsrcstreamwindow.c \
 	gstdroidcamsrcparams.c \
 	gstdroidcamsrcenums.c
 
@@ -25,5 +26,6 @@ noinst_HEADERS = \
 	gstdroidcamsrcdev.h \
 	gstdroidcamsrcdevmemory.h \
 	gstdroidcamsrcbufferpool.h \
+	gstdroidcamsrcstreamwindow.h \
 	gstdroidcamsrcparams.h \
 	gstdroidcamsrcenums.h

@@ -26,6 +26,7 @@
 #include <hardware/camera.h>
 #include "gstdroidcamsrcbufferpool.h"
 #include "gstdroidcamsrcparams.h"
+#include "gstdroidcamsrcstreamwindow.h"
 
 G_BEGIN_DECLS
 
@@ -35,11 +36,12 @@ struct _GstDroidCamSrcDev
 {
   camera_module_t *hw;
   camera_device_t *dev;
-  GstDroidCamSrcBufferPool *pool;
   GstDroidCamSrcParams *params;
+  GstDroidCamSrcStreamWindow *win;
+  GstDroidCamSrcPad *pad;
 };
 
-GstDroidCamSrcDev *gst_droidcamsrc_dev_new (camera_module_t *hw);
+GstDroidCamSrcDev *gst_droidcamsrc_dev_new (camera_module_t *hw, GstDroidCamSrcPad *pad);
 void gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev);
 
 gboolean gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, const gchar *id);

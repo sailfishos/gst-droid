@@ -323,7 +323,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         break;
       }
 
-      src->dev = gst_droidcamsrc_dev_new (src->hw);
+      src->dev = gst_droidcamsrc_dev_new (src->hw, src->vfsrc);
 
       break;
 
@@ -349,9 +349,6 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         ret = GST_STATE_CHANGE_FAILURE;
         break;
       }
-
-      /* our buffer pool will push buffers to the queue so it needs to know about it */
-      src->dev->pool->pad = src->vfsrc;
     }
 
       break;

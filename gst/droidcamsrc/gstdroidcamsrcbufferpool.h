@@ -23,7 +23,6 @@
 #define __GST_DROID_CAM_SRC_BUFFER_POOL_H__
 
 #include <gst/gst.h>
-#include <hardware/camera.h>
 
 G_BEGIN_DECLS
 
@@ -32,19 +31,22 @@ G_BEGIN_DECLS
 #define GST_DROIDCAMSRC_BUFFER_POOL(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), GST_TYPE_DROIDCAMSRC_BUFFER_POOL, GstDroidCamSrcBufferPool))
 #define GST_DROIDCAMSRC_BUFFER_POOL_CAST(obj) ((GstDroidCamSrcBufferPool*)(obj))
 
+#define GST_DROIDCAMSRC_BUFFER_POOL_USAGE_KEY  "usage"
+#define GST_DROIDCAMSRC_BUFFER_POOL_WIDTH_KEY  "width"
+#define GST_DROIDCAMSRC_BUFFER_POOL_HEIGHT_KEY "height"
+#define GST_DROIDCAMSRC_BUFFER_POOL_FORMAT_KEY "format"
+#define GST_DROIDCAMSRC_BUFFER_POOL_COUNT_KEY  "count"
+#define GST_DROIDCAMSRC_BUFFER_POOL_LEFT_KEY   "left"
+#define GST_DROIDCAMSRC_BUFFER_POOL_RIGHT_KEY  "right"
+#define GST_DROIDCAMSRC_BUFFER_POOL_TOP_KEY    "top"
+#define GST_DROIDCAMSRC_BUFFER_POOL_BOTTOM_KEY "bottom"
+
 typedef struct _GstDroidCamSrcBufferPool GstDroidCamSrcBufferPool;
 typedef struct _GstDroidCamSrcBufferPoolClass GstDroidCamSrcBufferPoolClass;
-typedef struct _GstDroidCamSrcPad GstDroidCamSrcPad;
 
 struct _GstDroidCamSrcBufferPool
 {
   GstBufferPool parent;
-  preview_stream_ops_t window;
-  GstAllocator *allocator;
-  GHashTable *map;
-  GMutex lock;
-
-  GstDroidCamSrcPad *pad;
 };
 
 struct _GstDroidCamSrcBufferPoolClass
@@ -53,7 +55,6 @@ struct _GstDroidCamSrcBufferPoolClass
 };
 
 GstDroidCamSrcBufferPool * gst_droid_cam_src_buffer_pool_new ();
-void gst_droid_cam_src_buffer_pool_reset (GstDroidCamSrcBufferPool * pool);
 
 G_END_DECLS
 
