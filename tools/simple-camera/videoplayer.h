@@ -54,9 +54,11 @@ public:
 
   Q_INVOKABLE bool start();
   Q_INVOKABLE bool stop();
+  Q_INVOKABLE bool readyForCapture();
 
 public slots:
   void capture();
+  void stopCapture();
 
 signals:
   void error(const QString& message, int code, const QString& debug);

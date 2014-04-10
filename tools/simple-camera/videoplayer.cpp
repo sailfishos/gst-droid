@@ -195,6 +195,18 @@ void VideoPlayer::capture() {
   g_signal_emit_by_name (m_bin, "start-capture", NULL);
 }
 
+void VideoPlayer::stopCapture() {
+  g_signal_emit_by_name (m_bin, "stop-capture", NULL);
+}
+
+bool VideoPlayer::readyForCapture() {
+  gboolean ready = FALSE;
+
+  g_object_get (m_src, "ready-for-capture", &ready, NULL);
+
+  return ready == TRUE;
+}
+
 int VideoPlayer::mode() {
   if (!m_bin) {
     return 1;

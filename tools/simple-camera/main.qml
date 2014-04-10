@@ -76,7 +76,19 @@ Rectangle {
                 Button {
                         width: parent.width / 4
                         text: "Capture"
-                        onClicked: player.capture()
+                        onClicked: {
+                                if (player.mode == 1) {
+                                        if (player.readyForCapture()) {
+                                                player.capture()
+                                        }
+                                } else {
+                                        if (player.readyForCapture()) {
+                                                player.capture();
+                                        } else {
+                                                player.stopCapture();
+                                        }
+                                }
+                        }
                 }
         }
 }
