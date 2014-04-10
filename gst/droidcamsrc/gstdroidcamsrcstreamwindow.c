@@ -148,6 +148,7 @@ gst_droidcamsrc_stream_window_enqueue_buffer (struct preview_stream_ops *w,
     buffer_handle_t * buffer)
 {
   GstDroidCamSrcStreamWindow *win;
+  GstDroidCamSrc *src;
   GstBuffer *buff;
   int ret;
 
@@ -156,6 +157,8 @@ gst_droidcamsrc_stream_window_enqueue_buffer (struct preview_stream_ops *w,
   win = container_of (w, GstDroidCamSrcStreamWindow, window);
 
   g_mutex_lock (&win->lock);
+
+  src = GST_DROIDCAMSRC (GST_PAD_PARENT (win->pad->pad));
   buff = g_hash_table_lookup (win->map, buffer);
 
   if (!buff) {
@@ -185,7 +188,8 @@ gst_droidcamsrc_stream_window_enqueue_buffer (struct preview_stream_ops *w,
     ret = 0;
     goto unlock_pad_and_out;
   }
-  // TODO: pts, dts, duration, offset, offset_end ...
+  // TODO: duration, offset, offset_end ...
+  gst_droidcamsrc_timestamp (src, buff);
   g_queue_push_tail (win->pad->queue, buff);
   g_cond_signal (&win->pad->cond);
 
