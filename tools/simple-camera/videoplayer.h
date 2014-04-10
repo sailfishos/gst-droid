@@ -32,12 +32,20 @@ class QtCamViewfinderRenderer;
 class VideoPlayer : public QQuickPaintedItem {
   Q_OBJECT
   Q_PROPERTY(bool running READ running NOTIFY runningChanged);
+  Q_PROPERTY(int mode READ mode WRITE setMode NOTIFY modeChanged);
+  Q_PROPERTY(int device READ device WRITE setDevice NOTIFY deviceChanged);
 
 public:
   VideoPlayer(QQuickItem *parent = 0);
   ~VideoPlayer();
 
   bool running();
+
+  int mode();
+  void setMode(int mode);
+
+  int device();
+  void setDevice(int device);
 
   virtual void componentComplete();
   virtual void classBegin();
@@ -53,6 +61,8 @@ public slots:
 signals:
   void error(const QString& message, int code, const QString& debug);
   void runningChanged();
+  void modeChanged();
+  void deviceChanged();
 
 protected:
   void geometryChanged(const QRectF& newGeometry, const QRectF& oldGeometry);

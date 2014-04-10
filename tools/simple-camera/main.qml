@@ -30,23 +30,53 @@ Rectangle {
                 anchors.fill: parent
         }
 
-        Button {
+        Row {
+                width: parent.width
+
                 anchors.bottom: parent.bottom
                 anchors.left: parent.left
-                text: player.running ? "Stop" : "Start"
-                onClicked: {
-                        if (player.running) {
-                                player.stop()
-                        } else {
-                                player.start()
+                anchors.right: parent.right
+
+                Button {
+                        width: parent.width / 4
+                        text: player.running ? "Stop" : "Start"
+                        onClicked: {
+                                if (player.running) {
+                                        player.stop()
+                                } else {
+                                        player.start()
+                                }
                         }
                 }
-        }
 
-        Button {
-                anchors.bottom: parent.bottom
-                anchors.right: parent.right
-                text: "Capture"
-                onClicked: player.capture()
+                Button {
+                        width: parent.width / 4
+                        text: player.mode == 1 ? "Image" : "Video"
+                        onClicked: {
+                                if (player.mode == 1) {
+                                        player.mode = 2
+                                } else {
+                                        player.mode = 1
+                                }
+                        }
+                }
+
+                Button {
+                        width: parent.width / 4
+                        text: player.device == 0 ? "Front" : "Back"
+                        onClicked: {
+                                if (player.device == 0) {
+                                        player.device = 1
+                                } else {
+                                        player.device = 0
+                                }
+                        }
+                }
+
+                Button {
+                        width: parent.width / 4
+                        text: "Capture"
+                        onClicked: player.capture()
+                }
         }
 }

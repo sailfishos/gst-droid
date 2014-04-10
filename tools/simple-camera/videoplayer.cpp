@@ -194,3 +194,55 @@ bool VideoPlayer::running() {
 void VideoPlayer::capture() {
   g_signal_emit_by_name (m_bin, "start-capture", NULL);
 }
+
+int VideoPlayer::mode() {
+  if (!m_bin) {
+    return 1;
+  }
+
+  int m;
+  g_object_get (m_bin, "mode", &m, NULL);
+
+  return m;
+}
+
+void VideoPlayer::setMode(int mode) {
+  if (VideoPlayer::mode() == mode) {
+    return;
+  }
+
+  g_object_set (m_bin, "mode", mode, NULL);
+
+  emit modeChanged();
+}
+
+int VideoPlayer::device() {
+  if (!m_src) {
+    return 0;
+  }
+
+  int d;
+  g_object_get (m_src, "camera-device", &d, NULL);
+
+  return d;
+}
+
+void VideoPlayer::setDevice(int device) {
+  if (VideoPlayer::device() == device) {
+    return;
+  }
+
+  bool r = running();
+
+  if (r) {
+    stop();
+  }
+
+  g_object_set (m_src, "camera-device", device, NULL);
+
+  if (r) {
+    start();
+  }
+
+  emit deviceChanged();
+}
