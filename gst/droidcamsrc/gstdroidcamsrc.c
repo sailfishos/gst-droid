@@ -328,7 +328,9 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         break;
       }
 
-      src->dev = gst_droidcamsrc_dev_new (src->hw, src->vfsrc, src->imgsrc);
+      src->dev =
+          gst_droidcamsrc_dev_new (src->hw, src->vfsrc, src->imgsrc,
+          src->vidsrc);
 
       break;
 

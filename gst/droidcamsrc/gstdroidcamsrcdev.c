@@ -155,7 +155,7 @@ gst_droidcamsrc_dev_data_timestamp_callback (int64_t timestamp,
 
 GstDroidCamSrcDev *
 gst_droidcamsrc_dev_new (camera_module_t * hw, GstDroidCamSrcPad * vfsrc,
-    GstDroidCamSrcPad * imgsrc)
+    GstDroidCamSrcPad * imgsrc, GstDroidCamSrcPad * vidsrc)
 {
   GstDroidCamSrcDev *dev;
 
@@ -166,6 +166,7 @@ gst_droidcamsrc_dev_new (camera_module_t * hw, GstDroidCamSrcPad * vfsrc,
   dev->hw = hw;
   dev->vfsrc = vfsrc;
   dev->imgsrc = imgsrc;
+  dev->vidsrc = vidsrc;
 
   g_mutex_init (&dev->lock);
 
