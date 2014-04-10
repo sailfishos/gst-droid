@@ -147,7 +147,7 @@ gst_droidcamsrc_dev_data_timestamp_callback (int64_t timestamp,
     GST_ERROR ("invalid memory from camera HAL");
   } else {
     g_mutex_lock (&dev->lock);
-    dev->dev->ops->release_recording_frame (dev->dev, data);
+    dev->dev->ops->release_recording_frame (dev->dev, addr);
     g_mutex_unlock (&dev->lock);
   }
   // TODO:
