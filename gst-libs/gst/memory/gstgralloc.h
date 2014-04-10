@@ -28,7 +28,7 @@
 G_BEGIN_DECLS
 
 #define GST_ALLOCATOR_GRALLOC                   "gralloc"
-#define GST_CAPS_FEATURE_MEMORY_DROID_SURFACE   "memory:DroidSurface"
+#define GST_CAPS_FEATURE_MEMORY_DROID_SURFACE   "memory:DroidHandle"
 
 typedef enum {
   /* buffer is never read in software */
