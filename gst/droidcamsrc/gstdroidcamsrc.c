@@ -993,8 +993,6 @@ gst_droidcamsrc_start_image_capture_locked (GstDroidCamSrc * src)
     return FALSE;
   }
 
-  ++src->captures;
-
   return TRUE;
 }
 
@@ -1022,6 +1020,8 @@ gst_droidcamsrc_start_capture (GstDroidCamSrc * src)
 
   if (!started) {
     GST_ELEMENT_WARNING (src, RESOURCE, FAILED, (NULL), (NULL));
+  } else {
+    ++src->captures;
   }
 
 out:
