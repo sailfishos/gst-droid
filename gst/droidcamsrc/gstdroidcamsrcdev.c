@@ -48,6 +48,8 @@ gst_droidcamsrc_dev_notify_callback (int32_t msg_type,
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
+  GST_DEBUG ("dev notify callback");
+
   // TODO: more messages
 
   switch (msg_type) {
@@ -71,6 +73,8 @@ gst_droidcamsrc_dev_data_callback (int32_t msg_type,
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+
+  GST_DEBUG ("dev data callback");
 
   switch (msg_type) {
     case CAMERA_MSG_RAW_IMAGE:
@@ -126,6 +130,26 @@ gst_droidcamsrc_dev_data_timestamp_callback (int64_t timestamp,
     int32_t msg_type, const camera_memory_t * data,
     unsigned int index, void *user)
 {
+  void *addr;
+  size_t size;
+  GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
+  //  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+
+  GST_DEBUG ("dev data timestamp callback");
+
+  /* unlikely but just in case */
+  if (msg_type != CAMERA_MSG_VIDEO_FRAME) {
+    GST_ERROR ("unknown message type 0x%x", msg_type);
+  }
+
+  addr = gst_droidcamsrc_dev_memory_get_data (data, index, &size);
+  if (!addr) {
+    GST_ERROR ("invalid memory from camera HAL");
+  } else {
+    g_mutex_lock (&dev->lock);
+    dev->dev->ops->release_recording_frame (dev->dev, data);
+    g_mutex_unlock (&dev->lock);
+  }
   // TODO:
 }
 
@@ -361,4 +385,42 @@ gst_droidcamsrc_dev_capture_image (GstDroidCamSrcDev * dev)
 out:
   g_mutex_unlock (&dev->lock);
   return ret;
+}
+
+gboolean
+gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
+{
+  int err;
+  gboolean ret = FALSE;
+  int msg_type = CAMERA_MSG_VIDEO_FRAME;
+
+  GST_DEBUG ("dev start video recording");
+
+  g_mutex_lock (&dev->lock);
+
+  dev->dev->ops->enable_msg_type (dev->dev, msg_type);
+
+  err = dev->dev->ops->start_recording (dev->dev);
+  if (err != 0) {
+    GST_ERROR ("error 0x%x starting video recording", err);
+    goto out;
+  }
+
+  ret = TRUE;
+
+out:
+  g_mutex_unlock (&dev->lock);
+  return ret;
+}
+
+void
+gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
+{
+  GST_DEBUG ("dev stop video recording");
+
+  g_mutex_lock (&dev->lock);
+  dev->dev->ops->stop_recording (dev->dev);
+  g_mutex_unlock (&dev->lock);
+
+  // TODO:
 }

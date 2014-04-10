@@ -996,6 +996,28 @@ gst_droidcamsrc_start_image_capture_locked (GstDroidCamSrc * src)
   return TRUE;
 }
 
+static gboolean
+gst_droidcamsrc_start_video_recording_locked (GstDroidCamSrc * src)
+{
+  GST_DEBUG_OBJECT (src, "start video recording");
+
+  if (!gst_droidcamsrc_dev_start_video_recording (src->dev)) {
+    GST_ERROR_OBJECT (src, "failed to start image capture");
+    return FALSE;
+  }
+  // TODO:
+
+  return TRUE;
+}
+
+static void
+gst_droidcamsrc_stop_video_recording_locked (GstDroidCamSrc * src)
+{
+  GST_DEBUG_OBJECT (src, "stop video recording");
+  gst_droidcamsrc_dev_stop_video_recording (src->dev);
+  // TODO:
+}
+
 static void
 gst_droidcamsrc_start_capture (GstDroidCamSrc * src)
 {
@@ -1015,7 +1037,7 @@ gst_droidcamsrc_start_capture (GstDroidCamSrc * src)
   if (src->mode == MODE_IMAGE) {
     started = gst_droidcamsrc_start_image_capture_locked (src);
   } else {
-    started = FALSE;
+    started = gst_droidcamsrc_start_video_recording_locked (src);
   }
 
   if (!started) {
@@ -1047,12 +1069,11 @@ gst_droidcamsrc_stop_capture (GstDroidCamSrc * src)
   }
 
   if (src->mode != MODE_IMAGE) {
-
+    gst_droidcamsrc_stop_video_recording_locked (src);
   }
 
 out:
   g_mutex_unlock (&src->capture_lock);
-  // TODO:
 }
 
 void
