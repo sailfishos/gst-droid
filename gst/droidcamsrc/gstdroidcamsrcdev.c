@@ -400,6 +400,14 @@ gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
 
   dev->dev->ops->enable_msg_type (dev->dev, msg_type);
 
+  // TODO: get that from caps
+  err = dev->dev->ops->store_meta_data_in_buffers (dev->dev, 1);
+  if (err != 0) {
+    GST_ERROR ("error 0x%x storing meta data in buffers for video recording",
+        err);
+    goto out;
+  }
+
   err = dev->dev->ops->start_recording (dev->dev);
   if (err != 0) {
     GST_ERROR ("error 0x%x starting video recording", err);
