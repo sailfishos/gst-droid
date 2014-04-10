@@ -39,7 +39,7 @@ GST_STATIC_PAD_TEMPLATE (GST_VIDEO_DECODER_SRC_NAME,
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
-        (GST_CAPS_FEATURE_MEMORY_DROID_SURFACE, "{ENCODED, YV12}")));
+        (GST_CAPS_FEATURE_MEMORY_DROID_HANDLE, "{ENCODED, YV12}")));
 
 static gboolean
 gst_droiddec_do_handle_frame (GstVideoDecoder * decoder,
@@ -133,7 +133,7 @@ gst_droiddec_configure_state (GstVideoDecoder * decoder, gsize width,
     out->caps = gst_video_info_to_caps (&out->info);
   }
 
-  feature = gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_SURFACE, NULL);
+  feature = gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_HANDLE, NULL);
   gst_caps_set_features (out->caps, 0, feature);
 
   GST_DEBUG_OBJECT (dec, "output caps %" GST_PTR_FORMAT, out->caps);

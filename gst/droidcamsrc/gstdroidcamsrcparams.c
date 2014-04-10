@@ -272,7 +272,7 @@ gst_droidcamsrc_params_get_viewfinder_caps (GstDroidCamSrcParams * params)
           "framerate", GST_TYPE_FRACTION, fps, 1, NULL);
 
       feature =
-          gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_SURFACE, NULL);
+          gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_HANDLE, NULL);
       gst_caps_set_features (caps2, 0, feature);
 
       caps = gst_caps_merge (caps, caps2);
