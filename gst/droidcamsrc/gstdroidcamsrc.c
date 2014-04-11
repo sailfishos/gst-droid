@@ -386,6 +386,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 
   switch (transition) {
     case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
+      // TODO: stop recording if we are recording
       gst_droidcamsrc_dev_stop (src->dev);
       src->captures = 0;
 
@@ -1017,7 +1018,7 @@ gst_droidcamsrc_stop_video_recording_locked (GstDroidCamSrc * src)
 {
   GST_DEBUG_OBJECT (src, "stop video recording");
   gst_droidcamsrc_dev_stop_video_recording (src->dev);
-  // TODO:
+  // TODO: wait until a few frames have been recorded.
 }
 
 static void

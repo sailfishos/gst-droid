@@ -42,6 +42,8 @@ struct _GstDroidCamSrcDev
   GstDroidCamSrcPad *imgsrc;
   GstDroidCamSrcPad *vidsrc;
   gboolean image_preview_sent;
+  unsigned long video_frames;
+  GstAllocator *allocator;
   GMutex lock;
 };
 

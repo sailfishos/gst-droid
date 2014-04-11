@@ -27,9 +27,13 @@
 #include "gstdroidcamsrcdevmemory.h"
 #include <stdlib.h>
 #include "gstdroidcamsrc.h"
+#include <gst/memory/gstwrappedmemory.h>
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 #define GST_CAT_DEFAULT gst_droidcamsrc_debug
+
+static void gst_droidcamsrc_dev_release_recording_frame (void *data,
+    GstDroidCamSrcDev * dev);
 
 static camera_memory_t *
 gst_droidcamsrc_dev_request_memory (int fd, size_t buf_size,
@@ -133,7 +137,7 @@ gst_droidcamsrc_dev_data_timestamp_callback (int64_t timestamp,
   void *addr;
   size_t size;
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
-  //  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
   GST_DEBUG ("dev data timestamp callback");
 
@@ -146,10 +150,21 @@ gst_droidcamsrc_dev_data_timestamp_callback (int64_t timestamp,
   if (!addr) {
     GST_ERROR ("invalid memory from camera HAL");
   } else {
-    g_mutex_lock (&dev->lock);
-    dev->dev->ops->release_recording_frame (dev->dev, addr);
-    g_mutex_unlock (&dev->lock);
+    GstBuffer *buffer = gst_buffer_new ();
+    GstMemory *mem = gst_wrapped_memory_allocator_wrap (dev->allocator,
+        addr, size, (GFunc) gst_droidcamsrc_dev_release_recording_frame, dev);
+    gst_buffer_insert_memory (buffer, 0, mem);
+
+    GST_BUFFER_OFFSET (buffer) = dev->video_frames++;
+    GST_BUFFER_OFFSET_END (buffer) = dev->video_frames;
+    gst_droidcamsrc_timestamp (src, buffer);
+
+    g_mutex_lock (&dev->vidsrc->lock);
+    g_queue_push_tail (dev->vidsrc->queue, buffer);
+    g_cond_signal (&dev->vidsrc->cond);
+    g_mutex_unlock (&dev->vidsrc->lock);
   }
+
   // TODO:
 }
 
@@ -163,6 +178,7 @@ gst_droidcamsrc_dev_new (camera_module_t * hw, GstDroidCamSrcPad * vfsrc,
 
   dev = g_slice_new0 (GstDroidCamSrcDev);
 
+  dev->allocator = gst_wrapped_memory_allocator_new ();
   dev->hw = hw;
   dev->vfsrc = vfsrc;
   dev->imgsrc = imgsrc;
@@ -227,6 +243,7 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
   GST_DEBUG ("dev destroy");
 
   dev->hw = NULL;
+  gst_object_unref (dev->allocator);
   g_mutex_clear (&dev->lock);
   g_slice_free (GstDroidCamSrcDev, dev);
   dev = NULL;
@@ -399,6 +416,7 @@ gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
 
   g_mutex_lock (&dev->lock);
 
+  dev->video_frames = 0;
   dev->dev->ops->enable_msg_type (dev->dev, msg_type);
 
   // TODO: get that from caps
@@ -432,4 +450,15 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
   g_mutex_unlock (&dev->lock);
 
   // TODO:
+}
+
+static void
+gst_droidcamsrc_dev_release_recording_frame (void *data,
+    GstDroidCamSrcDev * dev)
+{
+  GST_DEBUG ("dev release recording frame %p", data);
+
+  g_mutex_lock (&dev->lock);
+  dev->dev->ops->release_recording_frame (dev->dev, data);
+  g_mutex_unlock (&dev->lock);
 }
