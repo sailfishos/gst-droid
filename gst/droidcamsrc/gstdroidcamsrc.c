@@ -106,7 +106,6 @@ gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
   g_cond_init (&pad->cond);
   pad->queue = g_queue_new ();
   pad->running = FALSE;
-  pad->caps = NULL;
   pad->negotiate = NULL;
   pad->capture_pad = capture_pad;
 
@@ -121,10 +120,6 @@ static void
 gst_droidcamsrc_destroy_pad (GstDroidCamSrcPad * pad)
 {
   /* we don't destroy the pad itself */
-  if (pad->caps) {
-    gst_caps_unref (pad->caps);
-  }
-
   g_mutex_clear (&pad->lock);
   g_cond_clear (&pad->cond);
   g_queue_free (pad->queue);
@@ -632,11 +627,6 @@ gst_droidcamsrc_pad_activate_mode (GstPad * pad, GstObject * parent,
     }
 
     g_mutex_lock (&data->lock);
-    if (data->caps) {
-      gst_caps_unref (data->caps);
-      data->caps = NULL;
-    }
-
     /* toss the queue */
     g_queue_foreach (data->queue, (GFunc) gst_buffer_unref, NULL);
     g_queue_clear (data->queue);
@@ -731,6 +721,8 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
   GstDroidCamSrc *src = GST_DROIDCAMSRC (parent);
   gboolean ret = FALSE;
   GstDroidCamSrcPad *data = gst_pad_get_element_private (pad);
+  GstCaps *caps = NULL;
+  GstCaps *query_caps = NULL;
 
   GST_DEBUG_OBJECT (src, "pad %s %" GST_PTR_FORMAT, GST_PAD_NAME (pad), query);
 
@@ -754,16 +746,19 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
 
     case GST_QUERY_ACCEPT_CAPS:
     {
-      GstCaps *caps = NULL;
-      gst_query_parse_accept_caps (query, &caps);
-      g_mutex_lock (&data->lock);
-      if (caps && gst_caps_is_equal (caps, data->caps)) {
+      caps = gst_pad_get_pad_template_caps (data->pad);
+      gst_query_parse_accept_caps (query, &query_caps);
+
+      if (caps && query_caps && gst_caps_is_equal (caps, query_caps)) {
         gst_query_set_accept_caps_result (query, TRUE);
       } else {
         gst_query_set_accept_caps_result (query, FALSE);
       }
 
-      g_mutex_unlock (&data->lock);
+      if (caps) {
+        gst_caps_unref (caps);
+        caps = NULL;
+      }
 
       ret = TRUE;
       break;
@@ -787,22 +782,18 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
 
 
     case GST_QUERY_CAPS:
-      g_mutex_lock (&data->lock);
-      if (data->caps) {
-        gst_query_set_caps_result (query, data->caps);
+      caps = gst_pad_get_pad_template_caps (data->pad);
+      if (caps) {
+        gst_query_set_caps_result (query, caps);
         ret = TRUE;
       } else {
-        GstPadTemplate *tpl = gst_pad_get_pad_template (pad);
-        GstCaps *caps =
-            gst_caps_make_writable (gst_pad_template_get_caps (tpl));
+        caps =
+            gst_caps_make_writable (gst_pad_get_pad_template_caps (data->pad));
         gst_query_set_caps_result (query, caps);
-        gst_caps_unref (caps);
-        gst_object_unref (tpl);
         ret = TRUE;
       }
 
-      g_mutex_unlock (&data->lock);
-
+      gst_caps_unref (caps);
       break;
   }
 
