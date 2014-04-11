@@ -120,7 +120,7 @@ gst_droidcamsrc_dev_memory_get_data (const camera_memory_t * mem,
   size_t off;
   void *addr;
 
-  if (!mem->handle) {
+  if (!mem || !mem->handle) {
     return NULL;
   }
 
