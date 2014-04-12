@@ -94,6 +94,8 @@ gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
   GstDroidCamSrcPad *pad = g_slice_new0 (GstDroidCamSrcPad);
 
   pad->pad = gst_pad_new_from_static_template (tpl, name);
+
+  // TODO: I don't think this is needed
   gst_pad_use_fixed_caps (pad->pad);
   gst_pad_set_element_private (pad->pad, pad);
 
@@ -108,6 +110,7 @@ gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
   pad->running = FALSE;
   pad->negotiate = NULL;
   pad->capture_pad = capture_pad;
+  pad->pushed_buffers = 0;
 
   gst_segment_init (&pad->segment, GST_FORMAT_TIME);
 
@@ -582,6 +585,10 @@ out:
     GST_ERROR_OBJECT (src, "error %s pushing buffer through pad %s",
         gst_flow_get_name (ret), GST_PAD_NAME (data->pad));
   }
+
+  g_mutex_lock (&data->lock);
+  data->pushed_buffers++;
+  g_mutex_unlock (&data->lock);
 }
 
 static gboolean
@@ -613,6 +620,7 @@ gst_droidcamsrc_pad_activate_mode (GstPad * pad, GstObject * parent,
     /* No need for locking here since the task is not running */
     data->open_stream = TRUE;
     data->open_segment = TRUE;
+    data->pushed_buffers = 0;
     if (!gst_pad_start_task (pad, gst_droidcamsrc_loop, data, NULL)) {
       GST_ERROR_OBJECT (src, "failed to start pad task");
       return FALSE;

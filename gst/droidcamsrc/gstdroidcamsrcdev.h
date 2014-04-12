@@ -31,6 +31,8 @@
 G_BEGIN_DECLS
 
 typedef struct _GstDroidCamSrcDev GstDroidCamSrcDev;
+typedef struct _GstDroidCamSrcImageCaptureState GstDroidCamSrcImageCaptureState;
+typedef struct _GstDroidCamSrcVideoCaptureState GstDroidCamSrcVideoCaptureState;
 
 struct _GstDroidCamSrcDev
 {
@@ -41,10 +43,11 @@ struct _GstDroidCamSrcDev
   GstDroidCamSrcPad *vfsrc;
   GstDroidCamSrcPad *imgsrc;
   GstDroidCamSrcPad *vidsrc;
-  gboolean image_preview_sent;
-  unsigned long video_frames;
   GstAllocator *allocator;
   GMutex lock;
+
+  GstDroidCamSrcImageCaptureState *img;
+  GstDroidCamSrcVideoCaptureState *vid;
 };
 
 GstDroidCamSrcDev *gst_droidcamsrc_dev_new (camera_module_t *hw, GstDroidCamSrcPad *vfsrc,

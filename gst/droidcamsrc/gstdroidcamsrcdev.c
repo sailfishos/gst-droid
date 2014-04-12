@@ -28,9 +28,24 @@
 #include <stdlib.h>
 #include "gstdroidcamsrc.h"
 #include <gst/memory/gstwrappedmemory.h>
+#include <unistd.h>
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 #define GST_CAT_DEFAULT gst_droidcamsrc_debug
+
+struct _GstDroidCamSrcImageCaptureState
+{
+  gboolean image_preview_sent;
+};
+
+struct _GstDroidCamSrcVideoCaptureState
+{
+  unsigned long video_frames;
+  int queued_frames;
+  gboolean running;
+  gboolean eos_sent;
+  GMutex lock;
+};
 
 static void gst_droidcamsrc_dev_release_recording_frame (void *data,
     GstDroidCamSrcDev * dev);
@@ -96,11 +111,11 @@ gst_droidcamsrc_dev_data_callback (int32_t msg_type,
         void *d = g_malloc (size);
         memcpy (d, addr, size);
         buffer = gst_buffer_new_wrapped (d, size);
-        if (!dev->image_preview_sent) {
+        if (!dev->img->image_preview_sent) {
           gst_droidcamsrc_post_message (src,
               gst_structure_new_empty (GST_DROIDCAMSRC_CAPTURE_END));
           // TODO: generate and send preview.
-          dev->image_preview_sent = TRUE;
+          dev->img->image_preview_sent = TRUE;
         }
 
         gst_droidcamsrc_timestamp (src, buffer);
@@ -136,36 +151,59 @@ gst_droidcamsrc_dev_data_timestamp_callback (int64_t timestamp,
 {
   void *addr;
   size_t size;
+  gboolean drop_buffer;
+  GstBuffer *buffer;
+  GstMemory *mem;
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+
+  g_mutex_lock (&dev->vid->lock);
+
+  // TODO: not sure what to do with timestamp
 
   GST_DEBUG ("dev data timestamp callback");
 
   /* unlikely but just in case */
   if (msg_type != CAMERA_MSG_VIDEO_FRAME) {
     GST_ERROR ("unknown message type 0x%x", msg_type);
+    goto unlock_and_out;
   }
 
   addr = gst_droidcamsrc_dev_memory_get_data (data, index, &size);
   if (!addr) {
     GST_ERROR ("invalid memory from camera HAL");
+    goto unlock_and_out;
+  }
+
+  buffer = gst_buffer_new ();
+  mem = gst_wrapped_memory_allocator_wrap (dev->allocator,
+      addr, size, (GFunc) gst_droidcamsrc_dev_release_recording_frame, dev);
+  gst_buffer_insert_memory (buffer, 0, mem);
+
+  GST_BUFFER_OFFSET (buffer) = dev->vid->video_frames;
+  GST_BUFFER_OFFSET_END (buffer) = ++dev->vid->video_frames;
+  gst_droidcamsrc_timestamp (src, buffer);
+
+  g_mutex_lock (&dev->lock);
+
+  drop_buffer = !dev->vid->running;
+  if (!drop_buffer) {
+    ++dev->vid->queued_frames;
+  }
+
+  g_mutex_unlock (&dev->lock);
+
+  if (drop_buffer) {
+    gst_buffer_unref (buffer);
   } else {
-    GstBuffer *buffer = gst_buffer_new ();
-    GstMemory *mem = gst_wrapped_memory_allocator_wrap (dev->allocator,
-        addr, size, (GFunc) gst_droidcamsrc_dev_release_recording_frame, dev);
-    gst_buffer_insert_memory (buffer, 0, mem);
-
-    GST_BUFFER_OFFSET (buffer) = dev->video_frames++;
-    GST_BUFFER_OFFSET_END (buffer) = dev->video_frames;
-    gst_droidcamsrc_timestamp (src, buffer);
-
     g_mutex_lock (&dev->vidsrc->lock);
     g_queue_push_tail (dev->vidsrc->queue, buffer);
     g_cond_signal (&dev->vidsrc->cond);
     g_mutex_unlock (&dev->vidsrc->lock);
   }
 
-  // TODO:
+unlock_and_out:
+  g_mutex_unlock (&dev->vid->lock);
 }
 
 GstDroidCamSrcDev *
@@ -177,6 +215,10 @@ gst_droidcamsrc_dev_new (camera_module_t * hw, GstDroidCamSrcPad * vfsrc,
   GST_DEBUG ("dev new");
 
   dev = g_slice_new0 (GstDroidCamSrcDev);
+
+  dev->img = g_slice_new0 (GstDroidCamSrcImageCaptureState);
+  dev->vid = g_slice_new0 (GstDroidCamSrcVideoCaptureState);
+  g_mutex_init (&dev->vid->lock);
 
   dev->allocator = gst_wrapped_memory_allocator_new ();
   dev->hw = hw;
@@ -245,6 +287,9 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
   dev->hw = NULL;
   gst_object_unref (dev->allocator);
   g_mutex_clear (&dev->lock);
+  g_mutex_init (&dev->vid->lock);
+  g_slice_free (GstDroidCamSrcImageCaptureState, dev->img);
+  g_slice_free (GstDroidCamSrcVideoCaptureState, dev->vid);
   g_slice_free (GstDroidCamSrcDev, dev);
   dev = NULL;
 }
@@ -390,7 +435,7 @@ gst_droidcamsrc_dev_capture_image (GstDroidCamSrcDev * dev)
   g_mutex_lock (&dev->lock);
 
   dev->dev->ops->enable_msg_type (dev->dev, msg_type);
-  dev->image_preview_sent = FALSE;
+  dev->img->image_preview_sent = FALSE;
 
   err = dev->dev->ops->take_picture (dev->dev);
   if (err != 0) {
@@ -414,9 +459,15 @@ gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
 
   GST_DEBUG ("dev start video recording");
 
-  g_mutex_lock (&dev->lock);
+  g_mutex_lock (&dev->vidsrc->lock);
+  dev->vidsrc->pushed_buffers = 0;
+  g_mutex_unlock (&dev->vidsrc->lock);
 
-  dev->video_frames = 0;
+  g_mutex_lock (&dev->lock);
+  dev->vid->running = TRUE;
+  dev->vid->eos_sent = FALSE;
+  dev->vid->video_frames = 0;
+  dev->vid->queued_frames = 0;
   dev->dev->ops->enable_msg_type (dev->dev, msg_type);
 
   // TODO: get that from caps
@@ -445,11 +496,48 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
 {
   GST_DEBUG ("dev stop video recording");
 
+  // TODO: review all those locks
+  /* We need to make sure that some buffers have been pushed */
+  g_mutex_lock (&dev->vidsrc->lock);
+  while (dev->vid->video_frames <= 4) {
+    g_mutex_unlock (&dev->vidsrc->lock);
+    usleep (30000);             // TODO: bad
+    g_mutex_lock (&dev->vidsrc->lock);
+  }
+
+  g_mutex_unlock (&dev->vidsrc->lock);
+
+  /* Now stop pushing to the pad */
   g_mutex_lock (&dev->lock);
-  dev->dev->ops->stop_recording (dev->dev);
+  dev->vid->running = FALSE;
   g_mutex_unlock (&dev->lock);
 
-  // TODO:
+  /* now make sure nothing is being pushed to the queue */
+  g_mutex_lock (&dev->vid->lock);
+  g_mutex_unlock (&dev->vid->lock);
+
+  /* our pad task is either sleeping or still pushing buffers. We empty the queue. */
+  g_mutex_lock (&dev->vidsrc->lock);
+  g_queue_foreach (dev->vidsrc->queue, (GFunc) gst_buffer_unref, NULL);
+  g_mutex_unlock (&dev->vidsrc->lock);
+
+  /* now we are done. We just push eos */
+  if (!gst_pad_push_event (dev->vidsrc->pad, gst_event_new_eos ())) {
+    GST_ERROR ("failed to push EOS event");
+    dev->dev->ops->stop_recording (dev->dev);
+    return;
+  }
+
+  dev->dev->ops->stop_recording (dev->dev);
+
+  g_mutex_lock (&dev->lock);
+  while (dev->vid->queued_frames != 0) {
+    g_mutex_unlock (&dev->lock);
+    usleep (30000);             // TODO: bad
+    g_mutex_lock (&dev->lock);
+  }
+
+  g_mutex_unlock (&dev->lock);
 }
 
 static void
@@ -459,6 +547,7 @@ gst_droidcamsrc_dev_release_recording_frame (void *data,
   GST_DEBUG ("dev release recording frame %p", data);
 
   g_mutex_lock (&dev->lock);
+  --dev->vid->queued_frames;
   dev->dev->ops->release_recording_frame (dev->dev, data);
   g_mutex_unlock (&dev->lock);
 }

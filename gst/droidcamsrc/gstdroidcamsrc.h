@@ -86,6 +86,7 @@ struct _GstDroidCamSrcPad
   gboolean open_stream;
   gboolean open_segment;
   gboolean capture_pad;
+  unsigned pushed_buffers;
   GstSegment segment;
   GstDroidCamSrcNegotiateCallback negotiate;
 };
