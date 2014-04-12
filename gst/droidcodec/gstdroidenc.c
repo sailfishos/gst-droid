@@ -198,6 +198,14 @@ gst_droidenc_loop (GstDroidEnc * enc)
           buff->nFilledLen);
       gst_buffer_replace (&enc->out_state->codec_data, codec_data);
       gst_buffer_unref (buffer);
+
+      if (!gst_video_encoder_negotiate (GST_VIDEO_ENCODER (enc))) {
+        GST_ELEMENT_ERROR (enc, STREAM, FORMAT, (NULL),
+            ("failed to negotiate output format"));
+
+        continue;
+      }
+
       continue;
     }
 
@@ -383,10 +391,6 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
   /* now start */
   if (!gst_droid_codec_start_component (enc->comp, enc->in_state->caps,
           enc->out_state->caps)) {
-    return FALSE;
-  }
-
-  if (!gst_video_encoder_negotiate (encoder)) {
     return FALSE;
   }
 
