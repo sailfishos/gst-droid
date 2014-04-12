@@ -315,7 +315,7 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     return FALSE;
   }
 
-  type = gst_droid_codec_type_from_caps (state->caps);
+  type = gst_droid_codec_type_from_caps (state->caps, GST_DROID_CODEC_DECODER);
   if (!type) {
     return FALSE;
   }

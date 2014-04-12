@@ -31,7 +31,7 @@ typedef enum {
   GST_DROID_CODEC_ENCODER,
 } GstDroidCodecTypeType;
 
-const gchar *gst_droid_codec_type_from_caps (GstCaps * caps);
+const gchar *gst_droid_codec_type_from_caps (GstCaps * caps, GstDroidCodecTypeType type);
 GstCaps *gst_droid_codec_type_all_caps (GstDroidCodecTypeType type);
 
 G_END_DECLS

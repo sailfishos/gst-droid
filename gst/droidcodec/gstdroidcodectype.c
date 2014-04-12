@@ -53,20 +53,23 @@ struct _GstDroidCodecType
 };
 
 GstDroidCodecType types[] = {
+  /* decoders */
   {GST_DROID_CODEC_DECODER, "video/mpeg", "mpeg4videodecode", mpeg4v,
       "video/mpeg, mpegversion=4"},
   {GST_DROID_CODEC_DECODER, "video/x-h264", "h264decode", h264,
       "video/x-h264, alignment=au, stream-format=byte-stream"},
   {GST_DROID_CODEC_DECODER, "video/x-h263", "h263decode", NULL, "video/x-h263"},
   {GST_DROID_CODEC_DECODER, "video/x-divx", "divxdecode", NULL, "video/x-divx"},
+
+  /* encoders */
   {GST_DROID_CODEC_ENCODER, "video/mpeg", "mpeg4videoencode", mpeg4v,
-      "video/mpeg, mpegversion=4"},
+      "video/mpeg, mpegversion=4, systemstream=false"},
   {GST_DROID_CODEC_ENCODER, "video/x-h264", "h264encode", h264,
       "video/x-h264, alignment=au, stream-format=byte-stream"},
 };
 
 const gchar *
-gst_droid_codec_type_from_caps (GstCaps * caps)
+gst_droid_codec_type_from_caps (GstCaps * caps, GstDroidCodecTypeType type)
 {
   int x = 0;
   int len = sizeof (types) / sizeof (types[0]);
@@ -74,6 +77,10 @@ gst_droid_codec_type_from_caps (GstCaps * caps)
   const gchar *name = gst_structure_get_name (s);
 
   for (x = 0; x < len; x++) {
+    if (types[x].type == type) {
+      continue;
+    }
+
     gboolean is_equal = strcmp (types[x].media_type, name) == 0;
     if ((is_equal && !types[x].verify) || (is_equal && types[x].verify
             && types[x].verify (s))) {
