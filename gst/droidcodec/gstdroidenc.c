@@ -532,50 +532,6 @@ error:
   return GST_FLOW_ERROR;
 }
 
-#if 0
-static gboolean
-gst_droidenc_decide_allocation (GstVideoEncoder * encoder, GstQuery * query)
-{
-  gsize size;
-  GstStructure *conf;
-  GstDroidEnc *enc = GST_DROIDENC (encoder);
-
-  GST_DEBUG_OBJECT (enc, "decide allocation %" GST_PTR_FORMAT, query);
-
-  conf = gst_buffer_pool_get_config (enc->comp->out_port->buffers);
-
-  if (!gst_buffer_pool_config_get_params (conf, NULL, &size, NULL, NULL)) {
-    GST_ERROR_OBJECT (enc, "failed to get buffer pool configuration");
-    gst_structure_free (conf);
-    return FALSE;
-  }
-
-  gst_structure_free (conf);
-
-  if (gst_query_get_n_allocation_pools (query) > 0) {
-    gst_query_set_nth_allocation_pool (query, 0, enc->comp->out_port->buffers,
-        size, size, size);
-  } else {
-    gst_query_add_allocation_pool (query, enc->comp->out_port->buffers, size,
-        size, size);
-  }
-
-  return TRUE;
-}
-
-static gboolean
-gst_droidenc_propose_allocation (GstVideoEncoder * encoder, GstQuery * query)
-{
-  GstDroidEnc *enc = GST_DROIDENC (encoder);
-
-  GST_DEBUG_OBJECT (enc, "propose allocation %" GST_PTR_FORMAT, query);
-
-  // TODO:
-
-  return TRUE;
-}
-#endif
-
 static gboolean
 gst_droidenc_flush (GstVideoEncoder * encoder)
 {
@@ -626,53 +582,6 @@ gst_droidenc_change_state (GstElement * element, GstStateChange transition)
 
   return ret;
 }
-
-#if 0
-static gboolean
-gst_droidenc_negotiate (GstVideoEncoder * encoder)
-{
-  GstDroidEnc *enc;
-  GstPad *pad;
-  GstCaps *caps = NULL;
-  gboolean ret = FALSE;
-
-  enc = GST_DROIDENC (encoder);
-  pad = GST_VIDEO_ENCODER_SRC_PAD (encoder);
-
-  GST_DEBUG_OBJECT (enc, "negotiate");
-
-  if (!GST_VIDEO_ENCODER_CLASS (parent_class)->negotiate (encoder)) {
-    return FALSE;
-  }
-
-  /* We don't negotiate. We either use our caps or fail */
-  caps = gst_pad_peer_query_caps (pad, enc->out_state->caps);
-
-  GST_DEBUG_OBJECT (enc, "intersection %" GST_PTR_FORMAT, caps);
-
-  if (gst_caps_is_empty (caps)) {
-    goto error;
-  }
-
-  if (!gst_pad_set_caps (pad, caps)) {
-    goto error;
-  }
-
-  ret = TRUE;
-  goto out;
-
-error:
-  GST_ELEMENT_ERROR (enc, STREAM, FORMAT, (NULL),
-      ("failed to negotiate output format"));
-
-out:
-  if (caps) {
-    gst_caps_unref (caps);
-  }
-
-  return ret;
-}
-#endif
 
 static GstCaps *
 gst_droidenc_getcaps (GstVideoEncoder * encoder, GstCaps * filter)
@@ -741,15 +650,5 @@ gst_droidenc_class_init (GstDroidEncClass * klass)
   gstvideoencoder_class->finish = GST_DEBUG_FUNCPTR (gst_droidenc_finish);
   gstvideoencoder_class->handle_frame =
       GST_DEBUG_FUNCPTR (gst_droidenc_handle_frame);
-
-  /*
-     gstvideoencoder_class->decide_allocation =
-     GST_DEBUG_FUNCPTR (gst_droidenc_decide_allocation);
-     gstvideoencoder_class->propose_allocation =
-     GST_DEBUG_FUNCPTR (gst_droidenc_propose_allocation);
-   */
   gstvideoencoder_class->flush = GST_DEBUG_FUNCPTR (gst_droidenc_flush);
-  /*
-     gstvideoencoder_class->negotiate = GST_DEBUG_FUNCPTR (gst_droidenc_negotiate);
-   */
 }
