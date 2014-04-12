@@ -462,6 +462,7 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
   }
 
   if (!gst_droid_codec_is_running (enc->comp)) {
+    gst_video_encoder_finish_frame (encoder, frame);
     return GST_FLOW_FLUSHING;
   }
 #if 0

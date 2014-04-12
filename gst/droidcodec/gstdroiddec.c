@@ -420,6 +420,8 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   }
 
   if (!gst_droid_codec_is_running (dec->comp)) {
+    /* don't leak the frame */
+    gst_video_decoder_release_frame (decoder, frame);
     return GST_FLOW_FLUSHING;
   }
 
