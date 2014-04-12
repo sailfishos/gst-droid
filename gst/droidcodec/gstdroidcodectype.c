@@ -77,7 +77,7 @@ gst_droid_codec_type_from_caps (GstCaps * caps, GstDroidCodecTypeType type)
   const gchar *name = gst_structure_get_name (s);
 
   for (x = 0; x < len; x++) {
-    if (types[x].type == type) {
+    if (types[x].type != type) {
       continue;
     }
 
