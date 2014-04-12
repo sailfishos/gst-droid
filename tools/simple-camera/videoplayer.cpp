@@ -26,6 +26,21 @@
 #include <QPainter>
 #include <QMatrix4x4>
 #include <cmath>
+#include <gst/pbutils/encoding-profile.h>
+#include <gst/pbutils/encoding-target.h>
+
+static GstEncodingProfile *encodingProfile(const char *file, const char *name) {
+  GstEncodingTarget *target = gst_encoding_target_load_from_file(file, NULL);
+  if (!target) {
+    return NULL;
+  }
+
+  GstEncodingProfile *profile = gst_encoding_target_get_profile(target, name);
+
+  gst_encoding_target_unref (target);
+
+  return profile;
+}
 
 VideoPlayer::VideoPlayer(QQuickItem *parent) :
   QQuickPaintedItem(parent),
@@ -55,11 +70,15 @@ void VideoPlayer::componentComplete() {
 void VideoPlayer::classBegin() {
   QQuickPaintedItem::classBegin();
 
+  GstEncodingProfile *video = encodingProfile("video.gep", "video-profile");
+  GstEncodingProfile *image = encodingProfile("image.gep", "image-profile");
+
   m_bin = gst_element_factory_make("camerabin", NULL);
   m_src = gst_element_factory_make("droidcamsrc", NULL);
   GstElement *src = gst_element_factory_make ("pulsesrc", NULL);
   g_object_set (m_bin, "audio-source", src, "camera-source", m_src, "flags",
-		0x00000001 | 0x00000002 | 0x00000004 | 0x00000008, NULL);
+		0x00000001 | 0x00000002 | 0x00000004 | 0x00000008, "image-profile", image,
+		"video-profile", video, NULL);
 
   GstBus *bus = gst_element_get_bus(m_bin);
   gst_bus_add_watch(bus, bus_call, this);

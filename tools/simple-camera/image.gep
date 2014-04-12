@@ -1,0 +1,17 @@
+[GStreamer Encoding Target]
+name=image-profile
+category=device
+description=Image capturing profile
+
+[profile-image-profile]
+name=image-profile
+type=container
+description[c]=JPEG container
+format=image/jpeg
+
+[streamprofile-image-profile-0]
+parent=image-profile
+format=image/jpeg
+type=video
+presence=1
+variableframerate=true
