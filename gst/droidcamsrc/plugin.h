@@ -22,9 +22,14 @@
 #ifndef __PLUGIN_H__
 #define __PLUGIN_H__
 
-GST_DEBUG_CATEGORY (gst_droidcamsrc_debug);
+#include <gst/gst.h>
 
-// TODO: hardcoded
-#define DROID_CAM_SRC_CONFIG_DIR   "/etc/gst-droid/"
+G_BEGIN_DECLS
+
+GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
+
+#define GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA  "memory:DroidVideoMetaData"
+
+G_END_DECLS
 
 #endif /* __PLUGIN_H__ */

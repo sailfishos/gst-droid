@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include "gst/memory/gstgralloc.h"
 #include <string.h>
+#include "plugin.h"
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 #define GST_CAT_DEFAULT gst_droidcamsrc_debug
@@ -290,10 +291,45 @@ unlock_and_out:
 GstCaps *
 gst_droidcamsrc_params_get_video_caps (GstDroidCamSrcParams * params)
 {
-  GstCaps *caps = NULL;
+  GstCaps *caps = gst_caps_new_empty ();
+  GList *item;
+  int fps;
+  GstCapsFeatures *feature;
 
   g_mutex_lock (&params->lock);
-  // TODO:
+  fps = gst_droidcamsrc_params_get_int_locked (params, "preview-frame-rate");
+  if (fps == -1) {
+    goto unlock_and_out;
+  }
+
+  item = gst_droidcamsrc_params_get_item_locked (params, "video-size-values");
+  if (!item) {
+    goto unlock_and_out;
+  }
+
+  while (item) {
+    int width, height;
+    GstCaps *caps2;
+
+    if (gst_droidcamsrc_params_parse_dimension (item->data, &width, &height)) {
+      caps2 = gst_caps_new_simple ("video/x-raw",
+          "format", G_TYPE_STRING, "ENCODED",
+          "width", G_TYPE_INT, width,
+          "height", G_TYPE_INT, height,
+          "framerate", GST_TYPE_FRACTION, fps, 1, NULL);
+
+      feature =
+          gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA,
+          NULL);
+      gst_caps_set_features (caps2, 0, feature);
+
+      caps = gst_caps_merge (caps, caps2);
+    }
+
+    item = g_list_next (item);
+  }
+
+unlock_and_out:
   g_mutex_unlock (&params->lock);
 
   return caps;
