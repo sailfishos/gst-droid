@@ -53,7 +53,7 @@ struct _GstDroidCodecType
 };
 
 GstDroidCodecType types[] = {
-  {GST_DROID_CODEC_DECODER, "video/mpeg", "mpeg4videodec", mpeg4v,
+  {GST_DROID_CODEC_DECODER, "video/mpeg", "mpeg4videodecode", mpeg4v,
       "video/mpeg, mpegversion=4"},
   {GST_DROID_CODEC_DECODER, "video/x-h264", "h264decode", h264,
       "video/x-h264, alignment=au, stream-format=byte-stream"},
