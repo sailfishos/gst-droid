@@ -510,6 +510,9 @@ gst_droid_codec_get_component (GstDroidCodec * codec, const gchar * type,
   GstDroidComponent *component = NULL;
   GstDroidCodecHandle *handle;
   OMX_ERRORTYPE err;
+  if (!codec) {
+    return NULL;
+  }
 
   g_mutex_lock (&codec->lock);
 
