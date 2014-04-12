@@ -647,7 +647,7 @@ gst_droiddec_class_init (GstDroidDecClass * klass)
       "Video decoder", "Decoder/Video/Device",
       "Android HAL decoder", "Mohammed Sameer <msameer@foolab.org>");
 
-  caps = gst_droid_codec_type_all_caps ();
+  caps = gst_droid_codec_type_all_caps (GST_DROID_CODEC_DECODER);
   tpl = gst_pad_template_new (GST_VIDEO_DECODER_SINK_NAME,
       GST_PAD_SINK, GST_PAD_ALWAYS, caps);
   gst_element_class_add_pad_template (gstelement_class, tpl);

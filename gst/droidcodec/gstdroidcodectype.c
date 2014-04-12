@@ -45,6 +45,7 @@ h264 (GstStructure * s)
 
 struct _GstDroidCodecType
 {
+  GstDroidCodecTypeType type;
   const gchar *media_type;
   const gchar *codec_type;
     gboolean (*verify) (GstStructure * s);
@@ -52,11 +53,12 @@ struct _GstDroidCodecType
 };
 
 GstDroidCodecType types[] = {
-  {"video/mpeg", "mpeg4videodec", mpeg4v, "video/mpeg, mpegversion=4"},
-  {"video/x-h264", "h264decode", h264,
+  {GST_DROID_CODEC_DECODER, "video/mpeg", "mpeg4videodec", mpeg4v,
+      "video/mpeg, mpegversion=4"},
+  {GST_DROID_CODEC_DECODER, "video/x-h264", "h264decode", h264,
       "video/x-h264, alignment=au, stream-format=byte-stream"},
-  {"video/x-h263", "h263decode", NULL, "video/x-h263"},
-  {"video/x-divx", "divxdecode", NULL, "video/x-divx"},
+  {GST_DROID_CODEC_DECODER, "video/x-h263", "h263decode", NULL, "video/x-h263"},
+  {GST_DROID_CODEC_DECODER, "video/x-divx", "divxdecode", NULL, "video/x-divx"},
 };
 
 const gchar *
@@ -79,13 +81,17 @@ gst_droid_codec_type_from_caps (GstCaps * caps)
 }
 
 GstCaps *
-gst_droid_codec_type_all_caps ()
+gst_droid_codec_type_all_caps (GstDroidCodecTypeType type)
 {
   GstCaps *caps = gst_caps_new_empty ();
   int x = 0;
   int len = sizeof (types) / sizeof (types[0]);
 
   for (x = 0; x < len; x++) {
+    if (types[x].type != type) {
+      continue;
+    }
+
     gchar *file = g_strdup_printf ("%s/%s.conf", DROID_CODEC_CONFIG_DIR,
         types[x].codec_type);
     if (g_file_test (file, G_FILE_TEST_IS_REGULAR | G_FILE_TEST_EXISTS)) {

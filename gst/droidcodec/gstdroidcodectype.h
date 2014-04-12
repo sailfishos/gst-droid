@@ -26,8 +26,13 @@
 
 G_BEGIN_DECLS
 
+typedef enum {
+  GST_DROID_CODEC_DECODER,
+  GST_DROID_CODEC_ENCODER,
+} GstDroidCodecTypeType;
+
 const gchar *gst_droid_codec_type_from_caps (GstCaps * caps);
-GstCaps *gst_droid_codec_type_all_caps ();
+GstCaps *gst_droid_codec_type_all_caps (GstDroidCodecTypeType type);
 
 G_END_DECLS
 
