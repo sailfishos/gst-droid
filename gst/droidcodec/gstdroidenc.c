@@ -28,6 +28,7 @@
 #include "gst/memory/gstgralloc.h"
 #include "gstdroidcodectype.h"
 #include "plugin.h"
+#include <string.h>
 
 #define gst_droidenc_parent_class parent_class
 G_DEFINE_TYPE (GstDroidEnc, gst_droidenc, GST_TYPE_VIDEO_ENCODER);
@@ -73,6 +74,11 @@ gst_droidenc_stop_loop (GstVideoEncoder * encoder)
   GstDroidEnc *enc = GST_DROIDENC (encoder);
 
   GST_DEBUG_OBJECT (enc, "stop loop");
+
+  if (!enc->comp) {
+    /* nothing to do here */
+    return;
+  }
 
   gst_droid_codec_set_running (enc->comp, FALSE);
 
@@ -137,6 +143,7 @@ gst_droidenc_loop (GstDroidEnc * enc)
   OMX_BUFFERHEADERTYPE *buff;
   GstBuffer *buffer;
   GstVideoCodecFrame *frame;
+  GstMapInfo map = GST_MAP_INFO_INIT;
 
   while (gst_droid_codec_is_running (enc->comp)) {
     if (gst_droid_codec_has_error (enc->comp)) {
@@ -202,13 +209,37 @@ gst_droidenc_loop (GstDroidEnc * enc)
       continue;
     }
 
-    frame->output_buffer = buffer;
+    if (!buff->nFilledLen) {
+      GST_WARNING_OBJECT (enc, "received empty buffer");
+      gst_video_codec_frame_unref (frame);      /* we have an extra ref from _get_oldest_frame */
+      gst_video_encoder_finish_frame (GST_VIDEO_ENCODER (enc), frame);
+      gst_buffer_unref (buffer);
+      continue;
+    }
+
+    frame->output_buffer =
+        gst_video_encoder_allocate_output_buffer (GST_VIDEO_ENCODER (enc),
+        buff->nFilledLen);
+
+    gst_buffer_map (frame->output_buffer, &map, GST_MAP_WRITE);
+    memcpy (map.data, buff->pBuffer + buff->nOffset, buff->nFilledLen);
+    gst_buffer_unmap (frame->output_buffer, &map);
 
     GST_DEBUG_OBJECT (enc, "finishing frame %p", frame);
 
-    // TODO: PTS, DTS, duration, ...
+    GST_BUFFER_PTS (frame->output_buffer) =
+        gst_util_uint64_scale (buff->nTimeStamp, GST_SECOND,
+        OMX_TICKS_PER_SECOND);
+
+    if (buff->nTickCount != 0) {
+      GST_BUFFER_DURATION (frame->output_buffer) =
+          gst_util_uint64_scale (buff->nTickCount, GST_SECOND,
+          OMX_TICKS_PER_SECOND);
+    }
+
     gst_video_encoder_finish_frame (GST_VIDEO_ENCODER (enc), frame);
     gst_video_codec_frame_unref (frame);
+    gst_buffer_unref (buffer);
   }
 
   if (!gst_droid_codec_is_running (enc->comp)) {
@@ -401,9 +432,7 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
   if (!gst_droid_codec_is_running (enc->comp)) {
     if (GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame)) {
       GST_WARNING_OBJECT (enc, "dropping non sync frame");
-      // TODO:
-      gst_video_codec_frame_unref (frame);
-      //      gst_video_encoder_drop_frame (encoder, frame);
+      gst_video_encoder_finish_frame (encoder, frame);
       return GST_FLOW_OK;
     }
 
@@ -491,9 +520,7 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
 #endif
 error:
   /* don't leak the frame */
-  // TODO: 
-  //  gst_video_encoder_release_frame (encoder, frame);
-  gst_video_codec_frame_unref (frame);
+  gst_video_encoder_finish_frame (encoder, frame);
 
   return GST_FLOW_ERROR;
 }
