@@ -27,6 +27,8 @@
 #include "plugin.h"
 #include "gstdroidcamsrc.h"
 
+GST_DEBUG_CATEGORY (gst_droidcamsrc_debug);
+
 static gboolean
 plugin_init (GstPlugin * plugin)
 {

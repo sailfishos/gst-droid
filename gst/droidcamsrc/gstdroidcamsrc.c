@@ -23,6 +23,7 @@
 #include <config.h>
 #endif
 
+#include "plugin.h"
 #include "gstdroidcamsrc.h"
 #include <gst/video/video.h>
 #include <gst/memory/gstgralloc.h>
@@ -46,12 +47,12 @@ GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_IMAGE_PAD_NAME,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS ("image/jpeg"));
 
-// TODO: fix that when we know it
 static GstStaticPadTemplate vid_src_template_factory =
 GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME,
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
-    GST_STATIC_CAPS_ANY);
+    GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
+        (GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA, "{ENCODED, YV12}")));
 
 static gboolean gst_droidcamsrc_pad_activate_mode (GstPad * pad,
     GstObject * parent, GstPadMode mode, gboolean active);
@@ -61,6 +62,7 @@ static gboolean gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent,
     GstQuery * query);
 static gboolean gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data);
 static gboolean gst_droidcamsrc_imgsrc_negotiate (GstDroidCamSrcPad * data);
+static gboolean gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data);
 static void gst_droidcamsrc_start_capture (GstDroidCamSrc * src);
 static void gst_droidcamsrc_stop_capture (GstDroidCamSrc * src);
 static gboolean gst_droidcamsrc_apply_params (GstDroidCamSrc * src);
@@ -149,6 +151,7 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
 
   src->vidsrc = gst_droidcamsrc_create_pad (src,
       &vid_src_template_factory, GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME, TRUE);
+  src->vidsrc->negotiate = gst_droidcamsrc_vidsrc_negotiate;
 
   GST_OBJECT_FLAG_SET (src, GST_ELEMENT_FLAG_SOURCE);
 }
@@ -432,6 +435,9 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
 
   gst_element_class_add_pad_template (gstelement_class,
       gst_static_pad_template_get (&img_src_template_factory));
+
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_static_pad_template_get (&vid_src_template_factory));
 
   gobject_class->set_property = gst_droidcamsrc_set_property;
   gobject_class->get_property = gst_droidcamsrc_get_property;
@@ -947,6 +953,81 @@ gst_droidcamsrc_imgsrc_negotiate (GstDroidCamSrcPad * data)
   }
 
   g_free (pic);
+
+  if (!gst_droidcamsrc_apply_params (src)) {
+    goto out;
+  }
+
+  ret = TRUE;
+
+out:
+  if (peer) {
+    gst_caps_unref (peer);
+  }
+
+  if (our_caps) {
+    gst_caps_unref (our_caps);
+  }
+
+  return ret;
+}
+
+static gboolean
+gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
+{
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (data->pad));
+  gboolean ret = FALSE;
+  GstCaps *peer = NULL;
+  GstCaps *our_caps = NULL;
+  gchar *vid;
+  GstVideoInfo info;
+
+  GST_DEBUG_OBJECT (src, "vidsrc negotiate");
+
+  our_caps = gst_droidcamsrc_params_get_video_caps (src->dev->params);
+  GST_DEBUG_OBJECT (src, "our caps %" GST_PTR_FORMAT, our_caps);
+
+  if (!our_caps || gst_caps_is_empty (our_caps)) {
+    GST_ERROR_OBJECT (src, "no caps");
+    goto out;
+  }
+
+  peer = gst_pad_peer_query_caps (data->pad, our_caps);
+  GST_DEBUG_OBJECT (src, "peer caps %" GST_PTR_FORMAT, peer);
+
+  if (!peer || gst_caps_is_empty (peer)) {
+    GST_ERROR_OBJECT (src, "no common caps");
+    goto out;
+  }
+
+  gst_caps_unref (our_caps);
+  our_caps = peer;
+  peer = NULL;
+
+  our_caps = gst_caps_make_writable (our_caps);
+  our_caps = gst_caps_truncate (our_caps);
+
+  if (!gst_pad_set_caps (data->pad, our_caps)) {
+    GST_ERROR_OBJECT (src, "failed to set caps");
+    goto out;
+  }
+
+  GST_DEBUG_OBJECT (src, "pad %s using caps %" GST_PTR_FORMAT,
+      GST_PAD_NAME (data->pad), our_caps);
+
+  if (!gst_video_info_from_caps (&info, our_caps)) {
+    GST_ERROR_OBJECT (src, "failed to parse caps");
+    goto out;
+  }
+
+  vid = g_strdup_printf ("%ix%i", info.width, info.height);
+  if (!gst_droidcamsrc_params_set_string (src->dev->params, "video-size", vid)) {
+    g_free (vid);
+    GST_ERROR_OBJECT (src, "failed to set video-size");
+    goto out;
+  }
+
+  g_free (vid);
 
   if (!gst_droidcamsrc_apply_params (src)) {
     goto out;
