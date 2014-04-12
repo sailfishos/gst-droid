@@ -275,6 +275,9 @@ gst_droidenc_finalize (GObject * object)
 
   GST_DEBUG_OBJECT (enc, "finalize");
 
+  gst_mini_object_unref (GST_MINI_OBJECT (enc->codec));
+  enc->codec = NULL;
+
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
 
@@ -340,9 +343,6 @@ gst_droidenc_stop (GstVideoEncoder * encoder)
     gst_droid_codec_destroy_component (enc->comp);
     enc->comp = NULL;
   }
-
-  gst_mini_object_unref (GST_MINI_OBJECT (enc->codec));
-  enc->codec = NULL;
 
   return TRUE;
 }
