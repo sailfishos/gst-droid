@@ -573,8 +573,9 @@ gst_droidenc_change_state (GstElement * element, GstStateChange transition)
   GST_DEBUG_OBJECT (enc, "change state");
 
   if (transition == GST_STATE_CHANGE_PAUSED_TO_READY) {
-    GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
     gst_droidenc_stop_loop (encoder);
+
+    GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
     GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
   }
 
