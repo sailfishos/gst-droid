@@ -324,10 +324,6 @@ gst_droidenc_stop (GstVideoEncoder * encoder)
 
   gst_droidenc_stop_loop (encoder);
 
-  if (!enc->codec) {
-    return TRUE;
-  }
-
   if (enc->in_state) {
     gst_video_codec_state_unref (enc->in_state);
     enc->in_state = NULL;
@@ -343,6 +339,8 @@ gst_droidenc_stop (GstVideoEncoder * encoder)
     gst_droid_codec_destroy_component (enc->comp);
     enc->comp = NULL;
   }
+
+  GST_DEBUG_OBJECT (enc, "stopped");
 
   return TRUE;
 }
@@ -435,28 +433,6 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
     goto error;
   }
 
-  /* if we have been flushed then we need to start accepting data again */
-  if (!gst_droid_codec_is_running (enc->comp)) {
-    if (GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame)) {
-      GST_WARNING_OBJECT (enc, "dropping non sync frame");
-      gst_video_encoder_finish_frame (encoder, frame);
-      return GST_FLOW_OK;
-    }
-
-    if (!gst_droid_codec_flush (enc->comp, FALSE)) {
-      goto error;
-    }
-
-    gst_droid_codec_empty_full (enc->comp);
-
-    if (!gst_pad_start_task (GST_VIDEO_ENCODER_SRC_PAD (encoder),
-            (GstTaskFunction) gst_droidenc_loop, gst_object_ref (enc),
-            gst_object_unref)) {
-      GST_ERROR_OBJECT (enc, "failed to start src task");
-      goto error;
-    }
-  }
-
   if (gst_droidenc_do_handle_frame (encoder, frame)) {
     return GST_FLOW_OK;
   }
@@ -511,7 +487,9 @@ gst_droidenc_change_state (GstElement * element, GstStateChange transition)
   encoder = GST_VIDEO_ENCODER (element);
   enc = GST_DROIDENC (element);
 
-  GST_DEBUG_OBJECT (enc, "change state");
+  GST_DEBUG_OBJECT (enc, "change state from %s to %s",
+      gst_element_state_get_name (GST_STATE_TRANSITION_CURRENT (transition)),
+      gst_element_state_get_name (GST_STATE_TRANSITION_NEXT (transition)));
 
   if (transition == GST_STATE_CHANGE_PAUSED_TO_READY) {
     gst_droidenc_stop_loop (encoder);
