@@ -644,7 +644,7 @@ gst_droiddec_class_init (GstDroidDecClass * klass)
   gstvideodecoder_class = (GstVideoDecoderClass *) klass;
 
   gst_element_class_set_static_metadata (gstelement_class,
-      "Video sink", "Decoder/Video/Device",
+      "Video decoder", "Decoder/Video/Device",
       "Android HAL decoder", "Mohammed Sameer <msameer@foolab.org>");
 
   caps = gst_droid_codec_type_all_caps ();
