@@ -517,17 +517,12 @@ gst_droidcamsrc_loop (gpointer user_data)
     data->open_stream = FALSE;
   }
 
-  if (gst_pad_check_reconfigure (data->pad)) {
+  if (G_UNLIKELY (gst_pad_check_reconfigure (data->pad))) {
     gboolean res = FALSE;
 
     GST_DEBUG_OBJECT (src, "pad %s needs negotiation",
         GST_PAD_NAME (data->pad));
-    if (data->negotiate) {
-      res = data->negotiate (data);
-    } else {
-      // TODO:
-      res = TRUE;
-    }
+    res = data->negotiate (data);
 
     if (!res) {
       GST_ELEMENT_ERROR (src, STREAM, FORMAT, (NULL),
