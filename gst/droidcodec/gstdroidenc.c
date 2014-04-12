@@ -41,14 +41,14 @@ GST_STATIC_PAD_TEMPLATE (GST_VIDEO_ENCODER_SINK_NAME,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
         (GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA, "{ENCODED, YV12}")));
-#if 0
+
 static gboolean
 gst_droidenc_do_handle_frame (GstVideoEncoder * encoder,
     GstVideoCodecFrame * frame)
 {
-  GstDroidEnc *dec = GST_DROIDENC (encoder);
+  GstDroidEnc *enc = GST_DROIDENC (encoder);
 
-  GST_DEBUG_OBJECT (dec, "do handle frame");
+  GST_DEBUG_OBJECT (enc, "do handle frame");
 
   /* This can deadlock if omx does not provide an input buffer and we end up
    * waiting for a buffer which does not happen because omx needs us to provide
@@ -70,9 +70,9 @@ gst_droidenc_do_handle_frame (GstVideoEncoder * encoder,
 static void
 gst_droidenc_stop_loop (GstVideoEncoder * encoder)
 {
-  GstDroidEnc *dec = GST_DROIDENC (encoder);
+  GstDroidEnc *enc = GST_DROIDENC (encoder);
 
-  GST_DEBUG_OBJECT (dec, "stop loop");
+  GST_DEBUG_OBJECT (enc, "stop loop");
 
   gst_droid_codec_set_running (enc->comp, FALSE);
 
@@ -101,51 +101,38 @@ gst_droidenc_stop_loop (GstVideoEncoder * encoder)
   GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
 
   if (!gst_pad_stop_task (GST_VIDEO_ENCODER_SRC_PAD (encoder))) {
-    GST_WARNING_OBJECT (dec, "failed to stop src pad task");
+    GST_WARNING_OBJECT (enc, "failed to stop src pad task");
   }
 
-  GST_DEBUG_OBJECT (dec, "stopped loop");
+  GST_DEBUG_OBJECT (enc, "stopped loop");
 }
-#endif
 
 static GstVideoCodecState *
-gst_droidenc_configure_state (GstVideoEncoder * encoder, gsize width,
-    gsize height, int hal_fmt)
+gst_droidenc_configure_state (GstVideoEncoder * encoder,
+    GstVideoInfo * info, GstCaps * caps)
 {
-  GstVideoFormat fmt;
   GstVideoCodecState *out = NULL;
-  //  GstCapsFeatures *feature;
   GstDroidEnc *enc = GST_DROIDENC (encoder);
+  GST_DEBUG_OBJECT (enc, "configure state: width: %d, height: %d",
+      info->width, info->height);
 
-  GST_DEBUG_OBJECT (enc, "configure state: width: %d, height: %d, fmt: 0x%x",
-      width, height, hal_fmt);
+  GST_DEBUG_OBJECT (enc, "peer caps %" GST_PTR_FORMAT, caps);
 
-  fmt = gst_gralloc_hal_to_gst (hal_fmt);
-  if (fmt == GST_VIDEO_FORMAT_UNKNOWN) {
-    GST_WARNING_OBJECT (enc, "unknown hal format 0x%x. Using ENCODED instead",
-        hal_fmt);
-    fmt = GST_VIDEO_FORMAT_ENCODED;
-  }
-#if 0
+  /* we care about width, height and framerate */
+  gst_caps_set_simple (caps, "width", G_TYPE_INT, info->width,
+      "height", G_TYPE_INT, info->height,
+      "framerate", GST_TYPE_FRACTION, info->fps_n, info->fps_d, NULL);
+
+  caps = gst_caps_fixate (caps);
+
   out = gst_video_encoder_set_output_state (GST_VIDEO_ENCODER (enc),
-      fmt, width, height, enc->in_state);
+      caps, enc->in_state);
 
-  if (!out->caps) {
-    /* we will add our caps */
-    out->caps = gst_video_info_to_caps (&out->info);
-  }
-
-  feature = gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_HANDLE, NULL);
-  gst_caps_set_features (out->caps, 0, feature);
-
-  GST_DEBUG_OBJECT (dec, "output caps %" GST_PTR_FORMAT, out->caps);
-#endif
   return out;
 }
 
-#if 0
 static void
-gst_droidenc_loop (GstDroidEnc * dec)
+gst_droidenc_loop (GstDroidEnc * enc)
 {
   OMX_BUFFERHEADERTYPE *buff;
   GstBuffer *buffer;
@@ -157,18 +144,18 @@ gst_droidenc_loop (GstDroidEnc * dec)
     }
 
     if (!gst_droid_codec_return_output_buffers (enc->comp)) {
-      GST_WARNING_OBJECT (dec,
+      GST_WARNING_OBJECT (enc,
           "failed to return output buffers to the encoder");
     }
 
-    GST_DEBUG_OBJECT (dec, "trying to get a buffer");
+    GST_DEBUG_OBJECT (enc, "trying to get a buffer");
     g_mutex_lock (&enc->comp->full_lock);
     buff = g_queue_pop_head (enc->comp->full);
 
     if (!buff) {
       if (!gst_droid_codec_is_running (enc->comp)) {
         /* this is a signal that we should quit */
-        GST_DEBUG_OBJECT (dec, "got no buffer");
+        GST_DEBUG_OBJECT (enc, "got no buffer");
         g_mutex_unlock (&enc->comp->full_lock);
         continue;
       }
@@ -178,10 +165,10 @@ gst_droidenc_loop (GstDroidEnc * dec)
     }
 
     g_mutex_unlock (&enc->comp->full_lock);
-    GST_DEBUG_OBJECT (dec, "got buffer %p", buff);
+    GST_DEBUG_OBJECT (enc, "got buffer %p", buff);
 
     if (!buff) {
-      GST_DEBUG_OBJECT (dec, "got no buffer");
+      GST_DEBUG_OBJECT (enc, "got no buffer");
       /* This can only happen if we are not running
        * yet we will not exit because we should detect
        * that upon looping */
@@ -190,40 +177,39 @@ gst_droidenc_loop (GstDroidEnc * dec)
 
     buffer = gst_omx_buffer_get_buffer (enc->comp, buff);
     if (!buffer) {
-      GST_ERROR_OBJECT (dec, "can not get buffer associated with omx buffer %p",
+      GST_ERROR_OBJECT (enc, "can not get buffer associated with omx buffer %p",
           buff);
       continue;
     }
 
     /* Now we can proceed. */
-    frame = gst_video_encoder_get_oldest_frame (GST_VIDEO_ENCODER (dec));
+    frame = gst_video_encoder_get_oldest_frame (GST_VIDEO_ENCODER (enc));
     if (!frame) {
       gst_buffer_unref (buffer);
-      GST_ERROR_OBJECT (dec, "can not find a video frame");
+      GST_ERROR_OBJECT (enc, "can not find a video frame");
       continue;
     }
 
     frame->output_buffer = buffer;
 
-    GST_DEBUG_OBJECT (dec, "finishing frame %p", frame);
+    GST_DEBUG_OBJECT (enc, "finishing frame %p", frame);
 
     // TODO: PTS, DTS, duration, ...
-    gst_video_encoder_finish_frame (GST_VIDEO_ENCODER (dec), frame);
+    gst_video_encoder_finish_frame (GST_VIDEO_ENCODER (enc), frame);
     gst_video_codec_frame_unref (frame);
   }
 
   if (!gst_droid_codec_is_running (enc->comp)) {
-    GST_DEBUG_OBJECT (dec, "stopping task");
+    GST_DEBUG_OBJECT (enc, "stopping task");
 
     if (!gst_pad_pause_task (GST_VIDEO_ENCODER_SRC_PAD (GST_VIDEO_ENCODER
-                (dec)))) {
-      GST_WARNING_OBJECT (dec, "failed to pause src pad task");
+                (enc)))) {
+      GST_WARNING_OBJECT (enc, "failed to pause src pad task");
     }
 
     return;
   }
 }
-#endif
 
 static void
 gst_droidenc_finalize (GObject * object)
@@ -271,7 +257,6 @@ gst_droidenc_start (GstVideoEncoder * encoder)
   return TRUE;
 }
 
-#if 0
 static gboolean
 gst_droidenc_stop (GstVideoEncoder * encoder)
 {
@@ -306,44 +291,51 @@ gst_droidenc_stop (GstVideoEncoder * encoder)
 
   return TRUE;
 }
-#endif
 
 static gboolean
 gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
 {
   const gchar *type;
   GstDroidEnc *enc = GST_DROIDENC (encoder);
-  int hal_fmt;
+  GstCaps *caps = NULL;
 
   GST_DEBUG_OBJECT (enc, "set format %" GST_PTR_FORMAT, state->caps);
 
   if (enc->comp) {
+    GST_ERROR_OBJECT (enc, "cannot renegotiate");
     return FALSE;
   }
 
-  type = gst_droid_codec_type_from_caps (state->caps);
+  enc->in_state = gst_video_codec_state_ref (state);
+
+  caps = gst_pad_peer_query_caps (GST_VIDEO_ENCODER_SRC_PAD (encoder), NULL);
+
+  caps = gst_caps_truncate (caps);
+
+  /* try to get our codec */
+  type = gst_droid_codec_type_from_caps (caps, GST_DROID_CODEC_ENCODER);
+
   if (!type) {
+    GST_DEBUG_OBJECT (enc, "failed to get any encoder");
+    gst_caps_unref (caps);
     return FALSE;
   }
 
   enc->comp =
       gst_droid_codec_get_component (enc->codec, type, GST_ELEMENT (enc));
   if (!enc->comp) {
+    GST_ERROR_OBJECT (enc, "failed to get component");
+    gst_caps_unref (caps);
     return FALSE;
   }
-
-  enc->in_state = gst_video_codec_state_ref (state);
 
   /* configure codec */
   if (!gst_droid_codec_configure_component (enc->comp, &state->info)) {
+    gst_caps_unref (caps);
     return FALSE;
   }
 
-  hal_fmt = enc->comp->out_port->def.format.video.eColorFormat;
-
-  enc->out_state =
-      gst_droidenc_configure_state (encoder, state->info.width,
-      state->info.height, hal_fmt);
+  enc->out_state = gst_droidenc_configure_state (encoder, &state->info, caps);
 
   /* now start */
   if (!gst_droid_codec_start_component (enc->comp, enc->in_state->caps,
@@ -355,32 +347,22 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
     return FALSE;
   }
 
-  if (state->codec_data) {
-    GST_DEBUG_OBJECT (enc, "passing codec_data to encoder");
-
-    if (!gst_droid_codec_set_codec_data (enc->comp, state->codec_data)) {
-      return FALSE;
-    }
+  if (!gst_pad_start_task (GST_VIDEO_ENCODER_SRC_PAD (encoder),
+          (GstTaskFunction) gst_droidenc_loop, gst_object_ref (enc),
+          gst_object_unref)) {
+    GST_ERROR_OBJECT (enc, "failed to start src task");
+    return FALSE;
   }
-  // TODO:
-  /*
-     if (!gst_pad_start_task (GST_VIDEO_ENCODER_SRC_PAD (encoder),
-     (GstTaskFunction) gst_droidenc_loop, gst_object_ref (enc),
-     gst_object_unref)) {
-     GST_ERROR_OBJECT (enc, "failed to start src task");
-     return FALSE;
-     }
-   */
+
   return TRUE;
 }
 
-#if 0
 static GstFlowReturn
 gst_droidenc_finish (GstVideoEncoder * encoder)
 {
-  GstDroidEnc *dec = GST_DROIDENC (encoder);
+  GstDroidEnc *enc = GST_DROIDENC (encoder);
 
-  GST_DEBUG_OBJECT (dec, "finish");
+  GST_DEBUG_OBJECT (enc, "finish");
 
   gst_droidenc_stop_loop (encoder);
 
@@ -391,23 +373,25 @@ static GstFlowReturn
 gst_droidenc_handle_frame (GstVideoEncoder * encoder,
     GstVideoCodecFrame * frame)
 {
-  gsize width, height;
-  int hal_fmt;
-  GstStructure *config;
-  GstDroidEnc *dec = GST_DROIDENC (encoder);
+  //  gsize width, height;
+  //  int hal_fmt;
+  //  GstStructure *config;
+  GstDroidEnc *enc = GST_DROIDENC (encoder);
 
-  GST_DEBUG_OBJECT (dec, "handle frame");
+  GST_DEBUG_OBJECT (enc, "handle frame");
 
   if (gst_droid_codec_has_error (enc->comp)) {
-    GST_ERROR_OBJECT (dec, "not handling frame while omx is in error state");
+    GST_ERROR_OBJECT (enc, "not handling frame while omx is in error state");
     goto error;
   }
 
   /* if we have been flushed then we need to start accepting data again */
   if (!gst_droid_codec_is_running (enc->comp)) {
     if (GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame)) {
-      GST_WARNING_OBJECT (dec, "dropping non sync frame");
-      gst_video_encoder_drop_frame (encoder, frame);
+      GST_WARNING_OBJECT (enc, "dropping non sync frame");
+      // TODO:
+      gst_video_codec_frame_unref (frame);
+      //      gst_video_encoder_drop_frame (encoder, frame);
       return GST_FLOW_OK;
     }
 
@@ -418,9 +402,9 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
     gst_droid_codec_empty_full (enc->comp);
 
     if (!gst_pad_start_task (GST_VIDEO_ENCODER_SRC_PAD (encoder),
-            (GstTaskFunction) gst_droidenc_loop, gst_object_ref (dec),
+            (GstTaskFunction) gst_droidenc_loop, gst_object_ref (enc),
             gst_object_unref)) {
-      GST_ERROR_OBJECT (dec, "failed to start src task");
+      GST_ERROR_OBJECT (enc, "failed to start src task");
       goto error;
     }
   }
@@ -432,7 +416,7 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
   if (!gst_droid_codec_is_running (enc->comp)) {
     return GST_FLOW_FLUSHING;
   }
-
+#if 0
   if (gst_droid_codec_needs_reconfigure (enc->comp)) {
     gst_droidenc_stop_loop (encoder);
 
@@ -466,7 +450,7 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
       NULL);
 
   if (!gst_buffer_pool_set_config (enc->comp->out_port->buffers, config)) {
-    GST_ERROR_OBJECT (dec, "failed to set buffer pool configuration");
+    GST_ERROR_OBJECT (enc, "failed to set buffer pool configuration");
     goto error;
   }
 
@@ -475,7 +459,7 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
   }
 
   if (!gst_buffer_pool_set_active (enc->comp->out_port->buffers, TRUE)) {
-    GST_ERROR_OBJECT (dec, "failed to activate buffer pool");
+    GST_ERROR_OBJECT (enc, "failed to activate buffer pool");
     goto error;
   }
 
@@ -485,34 +469,37 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
   if (!gst_pad_start_task (GST_VIDEO_ENCODER_SRC_PAD (encoder),
           (GstTaskFunction) gst_droidenc_loop, gst_object_ref (dec),
           gst_object_unref)) {
-    GST_ERROR_OBJECT (dec, "failed to start src task");
+    GST_ERROR_OBJECT (enc, "failed to start src task");
     goto error;
   }
 
   if (gst_droidenc_do_handle_frame (encoder, frame)) {
     return GST_FLOW_OK;
   }
-
+#endif
 error:
   /* don't leak the frame */
-  gst_video_encoder_release_frame (encoder, frame);
+  // TODO: 
+  //  gst_video_encoder_release_frame (encoder, frame);
+  gst_video_codec_frame_unref (frame);
 
   return GST_FLOW_ERROR;
 }
 
+#if 0
 static gboolean
 gst_droidenc_decide_allocation (GstVideoEncoder * encoder, GstQuery * query)
 {
   gsize size;
   GstStructure *conf;
-  GstDroidEnc *dec = GST_DROIDENC (encoder);
+  GstDroidEnc *enc = GST_DROIDENC (encoder);
 
-  GST_DEBUG_OBJECT (dec, "decide allocation %" GST_PTR_FORMAT, query);
+  GST_DEBUG_OBJECT (enc, "decide allocation %" GST_PTR_FORMAT, query);
 
   conf = gst_buffer_pool_get_config (enc->comp->out_port->buffers);
 
   if (!gst_buffer_pool_config_get_params (conf, NULL, &size, NULL, NULL)) {
-    GST_ERROR_OBJECT (dec, "failed to get buffer pool configuration");
+    GST_ERROR_OBJECT (enc, "failed to get buffer pool configuration");
     gst_structure_free (conf);
     return FALSE;
   }
@@ -541,6 +528,7 @@ gst_droidenc_propose_allocation (GstVideoEncoder * encoder, GstQuery * query)
 
   return TRUE;
 }
+#endif
 
 static gboolean
 gst_droidenc_flush (GstVideoEncoder * encoder)
@@ -560,7 +548,6 @@ gst_droidenc_flush (GstVideoEncoder * encoder)
 
   return TRUE;
 }
-#endif
 
 static void
 gst_droidenc_init (GstDroidEnc * enc)
@@ -571,7 +558,6 @@ gst_droidenc_init (GstDroidEnc * enc)
   enc->out_state = NULL;
 }
 
-#if 0
 static GstStateChangeReturn
 gst_droidenc_change_state (GstElement * element, GstStateChange transition)
 {
@@ -595,6 +581,7 @@ gst_droidenc_change_state (GstElement * element, GstStateChange transition)
   return ret;
 }
 
+#if 0
 static gboolean
 gst_droidenc_negotiate (GstVideoEncoder * encoder)
 {
@@ -646,28 +633,27 @@ gst_droidenc_getcaps (GstVideoEncoder * encoder, GstCaps * filter)
 {
   GstDroidEnc *enc;
   GstCaps *caps;
-  GstCaps *intersection;
+  //  GstCaps *ret;
+
   enc = GST_DROIDENC (encoder);
 
   GST_DEBUG_OBJECT (enc, "getcaps with filter %" GST_PTR_FORMAT, filter);
 
+  // TODO: if we have caps then report them.
   caps = gst_pad_get_pad_template_caps (GST_VIDEO_ENCODER_SINK_PAD (encoder));
+  GST_DEBUG_OBJECT (enc, "our caps %" GST_PTR_FORMAT, caps);
 
-  if (filter) {
-    intersection = gst_caps_intersect (caps, filter);
-  } else {
-    intersection = gst_caps_make_writable (caps);
-  }
+#if 0
+  ret = gst_video_encoder_proxy_getcaps (encoder, caps, filter);
 
-  GST_DEBUG_OBJECT (enc, "intersection %" GST_PTR_FORMAT, intersection);
+  GST_DEBUG_OBJECT (enc, "returning %" GST_PTR_FORMAT, ret);
 
-  intersection = gst_caps_truncate (intersection);
+  gst_caps_unref (caps);
 
-  intersection = gst_caps_fixate (intersection);
-
-  GST_DEBUG_OBJECT (enc, "returning %" GST_PTR_FORMAT, intersection);
-
-  return intersection;
+  return ret;
+#endif
+  // TODO:
+  return caps;
 }
 
 static void
@@ -697,27 +683,27 @@ gst_droidenc_class_init (GstDroidEncClass * klass)
       gst_static_pad_template_get (&gst_droidenc_sink_template_factory));
 
   gobject_class->finalize = gst_droidenc_finalize;
-
-  //  gstelement_class->change_state =
-  //      GST_DEBUG_FUNCPTR (gst_droidenc_change_state);
-
+  gstelement_class->change_state =
+      GST_DEBUG_FUNCPTR (gst_droidenc_change_state);
   gstvideoencoder_class->open = GST_DEBUG_FUNCPTR (gst_droidenc_open);
   gstvideoencoder_class->close = GST_DEBUG_FUNCPTR (gst_droidenc_close);
   gstvideoencoder_class->start = GST_DEBUG_FUNCPTR (gst_droidenc_start);
-  //  gstvideoencoder_class->stop = GST_DEBUG_FUNCPTR (gst_droidenc_stop);
+  gstvideoencoder_class->stop = GST_DEBUG_FUNCPTR (gst_droidenc_stop);
   gstvideoencoder_class->set_format =
       GST_DEBUG_FUNCPTR (gst_droidenc_set_format);
   gstvideoencoder_class->getcaps = GST_DEBUG_FUNCPTR (gst_droidenc_getcaps);
-  /*
+  gstvideoencoder_class->finish = GST_DEBUG_FUNCPTR (gst_droidenc_finish);
+  gstvideoencoder_class->handle_frame =
+      GST_DEBUG_FUNCPTR (gst_droidenc_handle_frame);
 
-     gstvideoencoder_class->finish = GST_DEBUG_FUNCPTR (gst_droidenc_finish);
-     gstvideoencoder_class->handle_frame =
-     GST_DEBUG_FUNCPTR (gst_droidenc_handle_frame);
+  /*
      gstvideoencoder_class->decide_allocation =
      GST_DEBUG_FUNCPTR (gst_droidenc_decide_allocation);
      gstvideoencoder_class->propose_allocation =
      GST_DEBUG_FUNCPTR (gst_droidenc_propose_allocation);
-     gstvideoencoder_class->flush = GST_DEBUG_FUNCPTR (gst_droidenc_flush);
+   */
+  gstvideoencoder_class->flush = GST_DEBUG_FUNCPTR (gst_droidenc_flush);
+  /*
      gstvideoencoder_class->negotiate = GST_DEBUG_FUNCPTR (gst_droidenc_negotiate);
    */
 }
