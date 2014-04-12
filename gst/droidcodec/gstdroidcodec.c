@@ -32,6 +32,7 @@
 #include "gstdroidcodecallocatoromx.h"
 #include "gstdroidcodecallocatorgralloc.h"
 #include "gst/memory/gstgralloc.h"
+#include "gstdroidcodectype.h"
 #include "plugin.h"
 
 GST_DEFINE_MINI_OBJECT_TYPE (GstDroidCodec, gst_droid_codec);
@@ -255,7 +256,7 @@ gst_droid_codec_create_and_insert_handle_locked (GstDroidCodec * codec,
     goto error;
   }
 
-  is_decoder = strstr (name, "decoder") != NULL;
+  is_decoder = gst_droid_codec_type_get_type (type) == GST_DROID_CODEC_DECODER;
 
   role = g_key_file_get_string (file, "droidcodec", "role", &error);
   if (!role) {

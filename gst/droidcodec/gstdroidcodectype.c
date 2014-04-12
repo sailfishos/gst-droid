@@ -117,3 +117,19 @@ gst_droid_codec_type_all_caps (GstDroidCodecTypeType type)
 
   return caps;
 }
+
+GstDroidCodecTypeType
+gst_droid_codec_type_get_type (const gchar * type)
+{
+  int x = 0;
+  int len = sizeof (types) / sizeof (types[0]);
+
+  for (x = 0; x < len; x++) {
+    if (!strcmp (type, types[x].codec_type)) {
+      return types[x].type;
+    }
+  }
+
+  /* should not happen */
+  return -1;
+}
