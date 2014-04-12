@@ -425,28 +425,32 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
     GstVideoCodecFrame * frame)
 {
   GstDroidEnc *enc = GST_DROIDENC (encoder);
+  GstFlowReturn ret = GST_FLOW_ERROR;
 
   GST_DEBUG_OBJECT (enc, "handle frame");
 
   if (gst_droid_codec_has_error (enc->comp)) {
     GST_ERROR_OBJECT (enc, "not handling frame while omx is in error state");
-    goto error;
+    goto out;
   }
 
   if (gst_droidenc_do_handle_frame (encoder, frame)) {
-    return GST_FLOW_OK;
+    ret = GST_FLOW_OK;
+    goto out;
   }
 
   if (!gst_droid_codec_is_running (enc->comp)) {
-    gst_video_encoder_finish_frame (encoder, frame);
-    return GST_FLOW_FLUSHING;
+    ret = GST_FLOW_FLUSHING;
+    goto out;
   }
 
-error:
+out:
   /* don't leak the frame */
-  gst_video_encoder_finish_frame (encoder, frame);
+  if (ret != GST_FLOW_OK) {
+    gst_video_encoder_finish_frame (encoder, frame);
+  }
 
-  return GST_FLOW_ERROR;
+  return ret;
 }
 
 static gboolean
