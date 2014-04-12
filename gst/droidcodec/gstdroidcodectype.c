@@ -59,6 +59,10 @@ GstDroidCodecType types[] = {
       "video/x-h264, alignment=au, stream-format=byte-stream"},
   {GST_DROID_CODEC_DECODER, "video/x-h263", "h263decode", NULL, "video/x-h263"},
   {GST_DROID_CODEC_DECODER, "video/x-divx", "divxdecode", NULL, "video/x-divx"},
+  {GST_DROID_CODEC_ENCODER, "video/mpeg", "mpeg4videoencode", mpeg4v,
+      "video/mpeg, mpegversion=4"},
+  {GST_DROID_CODEC_ENCODER, "video/x-h264", "h264encode", h264,
+      "video/x-h264, alignment=au, stream-format=byte-stream"},
 };
 
 const gchar *
@@ -101,6 +105,8 @@ gst_droid_codec_type_all_caps (GstDroidCodecTypeType type)
 
     g_free (file);
   }
+
+  GST_INFO ("caps %" GST_PTR_FORMAT, caps);
 
   return caps;
 }

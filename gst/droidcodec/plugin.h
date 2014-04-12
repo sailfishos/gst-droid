@@ -23,6 +23,7 @@
 #define __PLUGIN_H__
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_dec_debug);
+GST_DEBUG_CATEGORY_EXTERN (gst_droid_enc_debug);
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_codec_debug);
 
 // TODO: hardcoded

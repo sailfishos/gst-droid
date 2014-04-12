@@ -26,6 +26,7 @@
 #include <gst/gst.h>
 #include "plugin.h"
 #include "gstdroiddec.h"
+#include "gstdroidenc.h"
 
 static gboolean
 plugin_init (GstPlugin * plugin)
@@ -33,11 +34,16 @@ plugin_init (GstPlugin * plugin)
   GST_DEBUG_CATEGORY_INIT (gst_droid_dec_debug, "droiddec",
       0, "Android HAL decoder");
 
+  GST_DEBUG_CATEGORY_INIT (gst_droid_enc_debug, "droidenc",
+      0, "Android HAL encoder");
+
   GST_DEBUG_CATEGORY_INIT (gst_droid_codec_debug, "droidcodec",
       0, "Android HAL codec");
 
   return gst_element_register (plugin, "droiddec", GST_RANK_PRIMARY + 1,
-      GST_TYPE_DROIDDEC);
+      GST_TYPE_DROIDDEC) &&
+      gst_element_register (plugin, "droidenc", GST_RANK_PRIMARY + 1,
+      GST_TYPE_DROIDENC);
 }
 
 GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
