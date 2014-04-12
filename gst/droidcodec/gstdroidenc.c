@@ -199,14 +199,20 @@ gst_droidenc_loop (GstDroidEnc * enc)
       gst_buffer_replace (&enc->out_state->codec_data, codec_data);
       gst_buffer_unref (buffer);
 
+      continue;
+    }
+
+    if (!enc->first_frame_sent) {
+      enc->first_frame_sent = TRUE;
+
       if (!gst_video_encoder_negotiate (GST_VIDEO_ENCODER (enc))) {
         GST_ELEMENT_ERROR (enc, STREAM, FORMAT, (NULL),
             ("failed to negotiate output format"));
 
+        gst_buffer_unref (buffer);
         continue;
       }
 
-      continue;
     }
 
     /* Now we can proceed. */
@@ -268,8 +274,6 @@ gst_droidenc_finalize (GObject * object)
   GstDroidEnc *enc = GST_DROIDENC (object);
 
   GST_DEBUG_OBJECT (enc, "finalize");
-
-  // TODO:
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
@@ -357,6 +361,8 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
     return FALSE;
   }
 
+  enc->first_frame_sent = FALSE;
+
   enc->in_state = gst_video_codec_state_ref (state);
 
   caps = gst_pad_peer_query_caps (GST_VIDEO_ENCODER_SRC_PAD (encoder), NULL);
@@ -420,9 +426,6 @@ static GstFlowReturn
 gst_droidenc_handle_frame (GstVideoEncoder * encoder,
     GstVideoCodecFrame * frame)
 {
-  //  gsize width, height;
-  //  int hal_fmt;
-  //  GstStructure *config;
   GstDroidEnc *enc = GST_DROIDENC (encoder);
 
   GST_DEBUG_OBJECT (enc, "handle frame");

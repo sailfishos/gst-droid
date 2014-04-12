@@ -49,6 +49,7 @@ struct _GstDroidEnc
   GstDroidComponent *comp;
   GstVideoCodecState *in_state;
   GstVideoCodecState *out_state;
+  gboolean first_frame_sent;
 };
 
 struct _GstDroidEncClass
