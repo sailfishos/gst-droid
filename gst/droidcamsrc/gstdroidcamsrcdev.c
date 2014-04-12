@@ -531,7 +531,10 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
   dev->dev->ops->stop_recording (dev->dev);
 
   g_mutex_lock (&dev->lock);
+
   while (dev->vid->queued_frames != 0) {
+    GST_INFO ("waiting for queued frames to reach 0 from %i",
+        dev->vid->queued_frames);
     g_mutex_unlock (&dev->lock);
     usleep (30000);             // TODO: bad
     g_mutex_lock (&dev->lock);
