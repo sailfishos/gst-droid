@@ -127,7 +127,9 @@ bool VideoPlayer::stop() {
     return false;
   }
 
-  m_renderer->reset();
+  if (m_renderer) {
+    m_renderer->reset();
+  }
 
   emit runningChanged();
 
