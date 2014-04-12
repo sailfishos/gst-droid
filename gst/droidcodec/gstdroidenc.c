@@ -182,6 +182,18 @@ gst_droidenc_loop (GstDroidEnc * enc)
       continue;
     }
 
+    /* is it codec config? */
+    if (buff->nFlags & OMX_BUFFERFLAG_CODECCONFIG) {
+      GstBuffer *codec_data =
+          gst_buffer_new_allocate (NULL, buff->nFilledLen, NULL);
+      GST_INFO_OBJECT (enc, "received codec_data");
+      gst_buffer_fill (codec_data, 0, buff->pBuffer + buff->nOffset,
+          buff->nFilledLen);
+      gst_buffer_replace (&enc->out_state->codec_data, codec_data);
+      gst_buffer_unref (buffer);
+      continue;
+    }
+
     /* Now we can proceed. */
     frame = gst_video_encoder_get_oldest_frame (GST_VIDEO_ENCODER (enc));
     if (!frame) {
