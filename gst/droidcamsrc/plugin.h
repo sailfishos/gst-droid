@@ -28,8 +28,6 @@ G_BEGIN_DECLS
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 
-#define GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA  "memory:DroidVideoMetaData"
-
 G_END_DECLS
 
 #endif /* __PLUGIN_H__ */

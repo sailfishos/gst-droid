@@ -27,6 +27,7 @@
 #include "gstdroidcamsrc.h"
 #include <gst/video/video.h>
 #include <gst/memory/gstgralloc.h>
+#include <gst/memory/gstwrappedmemory.h>
 
 #define gst_droidcamsrc_parent_class parent_class
 G_DEFINE_TYPE (GstDroidCamSrc, gst_droidcamsrc, GST_TYPE_ELEMENT);

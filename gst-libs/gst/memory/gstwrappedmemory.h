@@ -28,6 +28,7 @@
 G_BEGIN_DECLS
 
 #define GST_ALLOCATOR_WRAPPED_MEMORY                    "WrappedMemory"
+#define GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA   "memory:DroidVideoMetaData"
 
 GstAllocator * gst_wrapped_memory_allocator_new (void);
 
