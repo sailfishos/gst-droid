@@ -465,67 +465,7 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
     gst_video_encoder_finish_frame (encoder, frame);
     return GST_FLOW_FLUSHING;
   }
-#if 0
-  if (gst_droid_codec_needs_reconfigure (enc->comp)) {
-    gst_droidenc_stop_loop (encoder);
 
-    /* reconfigure */
-    if (!gst_droid_codec_reconfigure_output_port (enc->comp)) {
-      /* failed */
-      goto error;
-    }
-  }
-
-  gst_droid_codec_unset_needs_reconfigure (enc->comp);
-
-  /* update codec state and src caps */
-  if (enc->out_state) {
-    gst_video_codec_state_unref (enc->out_state);
-  }
-
-  width = enc->comp->out_port->def.format.video.nFrameWidth;
-  height = enc->comp->out_port->def.format.video.nFrameHeight;
-  hal_fmt = enc->comp->out_port->def.format.video.eColorFormat;
-  enc->out_state = gst_droidenc_configure_state (encoder,
-      width, height, hal_fmt);
-
-  /* now the buffer pool */
-  config = gst_buffer_pool_get_config (enc->comp->out_port->buffers);
-  gst_buffer_pool_config_set_params (config, enc->out_state->caps,
-      enc->comp->out_port->def.nBufferSize,
-      enc->comp->out_port->def.nBufferCountActual,
-      enc->comp->out_port->def.nBufferCountActual);
-  gst_buffer_pool_config_set_allocator (config, enc->comp->out_port->allocator,
-      NULL);
-
-  if (!gst_buffer_pool_set_config (enc->comp->out_port->buffers, config)) {
-    GST_ERROR_OBJECT (enc, "failed to set buffer pool configuration");
-    goto error;
-  }
-
-  if (!gst_video_encoder_negotiate (encoder)) {
-    goto error;
-  }
-
-  if (!gst_buffer_pool_set_active (enc->comp->out_port->buffers, TRUE)) {
-    GST_ERROR_OBJECT (enc, "failed to activate buffer pool");
-    goto error;
-  }
-
-  /* start the loop */
-  gst_droid_codec_set_running (enc->comp, TRUE);
-
-  if (!gst_pad_start_task (GST_VIDEO_ENCODER_SRC_PAD (encoder),
-          (GstTaskFunction) gst_droidenc_loop, gst_object_ref (dec),
-          gst_object_unref)) {
-    GST_ERROR_OBJECT (enc, "failed to start src task");
-    goto error;
-  }
-
-  if (gst_droidenc_do_handle_frame (encoder, frame)) {
-    return GST_FLOW_OK;
-  }
-#endif
 error:
   /* don't leak the frame */
   gst_video_encoder_finish_frame (encoder, frame);
