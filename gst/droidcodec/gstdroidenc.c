@@ -47,6 +47,7 @@ static gboolean
 gst_droidenc_do_handle_frame (GstVideoEncoder * encoder,
     GstVideoCodecFrame * frame)
 {
+  gboolean ret;
   GstDroidEnc *enc = GST_DROIDENC (encoder);
 
   GST_DEBUG_OBJECT (enc, "do handle frame");
@@ -59,13 +60,18 @@ gst_droidenc_do_handle_frame (GstVideoEncoder * encoder,
 
   GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
   if (!gst_droid_codec_consume_frame (enc->comp, frame)) {
-    GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
-    return FALSE;
+    ret = FALSE;
+    goto out;
   }
 
+  ret = TRUE;
+
+out:
   GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
 
-  return TRUE;
+  GST_DEBUG_OBJECT (enc, "do handle frame done %d", ret);
+
+  return ret;
 }
 
 static void
