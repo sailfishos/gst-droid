@@ -328,7 +328,9 @@ gst_droidenc_stop (GstVideoEncoder * encoder)
 
   GST_DEBUG_OBJECT (enc, "stop");
 
+  GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
   gst_droidenc_stop_loop (encoder);
+  GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
 
   if (enc->in_state) {
     gst_video_codec_state_unref (enc->in_state);
