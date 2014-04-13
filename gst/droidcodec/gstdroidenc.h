@@ -50,7 +50,6 @@ struct _GstDroidEnc
   GstVideoCodecState *in_state;
   GstVideoCodecState *out_state;
   gboolean first_frame_sent;
-  guint32 control_rate;
   guint32 target_bitrate;
 };
 

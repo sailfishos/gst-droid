@@ -46,38 +46,10 @@ GST_STATIC_PAD_TEMPLATE (GST_VIDEO_ENCODER_SINK_NAME,
 enum
 {
   PROP_0,
-  PROP_CONTROL_RATE,
   PROP_TARGET_BITRATE,
 };
 
-#define GST_DROID_ENC_CONTROL_RATE_DEFAULT   (0xffffffff)
 #define GST_DROID_ENC_TARGET_BITRATE_DEFAULT (0xffffffff)
-
-#define GST_TYPE_DROID_ENC_CONTROL_RATE (gst_droid_enc_control_rate_get_type ())
-
-static GType
-gst_droid_enc_control_rate_get_type (void)
-{
-
-  static GType qtype = 0;
-  if (qtype == 0) {
-    static const GEnumValue values[] = {
-      {OMX_Video_ControlRateDisable, "Disable", "disable"},
-      {OMX_Video_ControlRateVariable, "Variable", "variable"},
-      {OMX_Video_ControlRateConstant, "Constant", "constant"},
-      {OMX_Video_ControlRateVariableSkipFrames, "Variable Skip Frames",
-          "variable-skip-frames"},
-      {OMX_Video_ControlRateConstantSkipFrames, "Constant Skip Frames",
-          "constant-skip-frames"},
-      {0xffffffff, "Component Default", "default"},
-      {0, NULL, NULL}
-    };
-
-    qtype = g_enum_register_static ("GstDroidEncControlRate", values);
-  }
-
-  return qtype;
-}
 
 static gboolean
 gst_droidenc_do_handle_frame (GstVideoEncoder * encoder,
@@ -317,9 +289,6 @@ gst_droidenc_set_property (GObject * object, guint prop_id,
   GstDroidEnc *enc = GST_DROIDENC (object);
 
   switch (prop_id) {
-    case PROP_CONTROL_RATE:
-      enc->control_rate = g_value_get_enum (value);
-      break;
     case PROP_TARGET_BITRATE:
       enc->target_bitrate = g_value_get_uint (value);
       // TODO: apply it
@@ -337,9 +306,6 @@ gst_droidenc_get_property (GObject * object, guint prop_id, GValue * value,
   GstDroidEnc *enc = GST_DROIDENC (object);
 
   switch (prop_id) {
-    case PROP_CONTROL_RATE:
-      g_value_set_enum (value, enc->control_rate);
-      break;
     case PROP_TARGET_BITRATE:
       g_value_set_uint (value, enc->target_bitrate);
       break;
@@ -562,7 +528,6 @@ gst_droidenc_init (GstDroidEnc * enc)
   enc->comp = NULL;
   enc->in_state = NULL;
   enc->out_state = NULL;
-  enc->control_rate = GST_DROID_ENC_CONTROL_RATE_DEFAULT;
   enc->target_bitrate = GST_DROID_ENC_TARGET_BITRATE_DEFAULT;
 }
 
@@ -662,12 +627,6 @@ gst_droidenc_class_init (GstDroidEncClass * klass)
       GST_DEBUG_FUNCPTR (gst_droidenc_handle_frame);
   gstvideoencoder_class->flush = GST_DEBUG_FUNCPTR (gst_droidenc_flush);
 
-  g_object_class_install_property (gobject_class, PROP_CONTROL_RATE,
-      g_param_spec_enum ("control-rate", "Control Rate",
-          "Bitrate control method", GST_TYPE_DROID_ENC_CONTROL_RATE,
-          GST_DROID_ENC_CONTROL_RATE_DEFAULT,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS |
-          GST_PARAM_MUTABLE_READY));
   g_object_class_install_property (gobject_class, PROP_TARGET_BITRATE,
       g_param_spec_uint ("target-bitrate", "Target Bitrate",
           "Target bitrate (0xffffffff=component default)", 0, G_MAXUINT,
