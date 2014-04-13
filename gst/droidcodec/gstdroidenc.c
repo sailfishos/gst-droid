@@ -43,6 +43,42 @@ GST_STATIC_PAD_TEMPLATE (GST_VIDEO_ENCODER_SINK_NAME,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
         (GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA, "{ENCODED, YV12}")));
 
+enum
+{
+  PROP_0,
+  PROP_CONTROL_RATE,
+  PROP_TARGET_BITRATE,
+};
+
+#define GST_DROID_ENC_CONTROL_RATE_DEFAULT   (0xffffffff)
+#define GST_DROID_ENC_TARGET_BITRATE_DEFAULT (0xffffffff)
+
+#define GST_TYPE_DROID_ENC_CONTROL_RATE (gst_droid_enc_control_rate_get_type ())
+
+static GType
+gst_droid_enc_control_rate_get_type (void)
+{
+
+  static GType qtype = 0;
+  if (qtype == 0) {
+    static const GEnumValue values[] = {
+      {OMX_Video_ControlRateDisable, "Disable", "disable"},
+      {OMX_Video_ControlRateVariable, "Variable", "variable"},
+      {OMX_Video_ControlRateConstant, "Constant", "constant"},
+      {OMX_Video_ControlRateVariableSkipFrames, "Variable Skip Frames",
+          "variable-skip-frames"},
+      {OMX_Video_ControlRateConstantSkipFrames, "Constant Skip Frames",
+          "constant-skip-frames"},
+      {0xffffffff, "Component Default", "default"},
+      {0, NULL, NULL}
+    };
+
+    qtype = g_enum_register_static ("GstDroidEncControlRate", values);
+  }
+
+  return qtype;
+}
+
 static gboolean
 gst_droidenc_do_handle_frame (GstVideoEncoder * encoder,
     GstVideoCodecFrame * frame)
@@ -275,6 +311,45 @@ gst_droidenc_loop (GstDroidEnc * enc)
 }
 
 static void
+gst_droidenc_set_property (GObject * object, guint prop_id,
+    const GValue * value, GParamSpec * pspec)
+{
+  GstDroidEnc *enc = GST_DROIDENC (object);
+
+  switch (prop_id) {
+    case PROP_CONTROL_RATE:
+      enc->control_rate = g_value_get_enum (value);
+      break;
+    case PROP_TARGET_BITRATE:
+      enc->target_bitrate = g_value_get_uint (value);
+      // TODO: apply it
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+      break;
+  }
+}
+
+static void
+gst_droidenc_get_property (GObject * object, guint prop_id, GValue * value,
+    GParamSpec * pspec)
+{
+  GstDroidEnc *enc = GST_DROIDENC (object);
+
+  switch (prop_id) {
+    case PROP_CONTROL_RATE:
+      g_value_set_enum (value, enc->control_rate);
+      break;
+    case PROP_TARGET_BITRATE:
+      g_value_set_uint (value, enc->target_bitrate);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+      break;
+  }
+}
+
+static void
 gst_droidenc_finalize (GObject * object)
 {
   GstDroidEnc *enc = GST_DROIDENC (object);
@@ -487,6 +562,8 @@ gst_droidenc_init (GstDroidEnc * enc)
   enc->comp = NULL;
   enc->in_state = NULL;
   enc->out_state = NULL;
+  enc->control_rate = GST_DROID_ENC_CONTROL_RATE_DEFAULT;
+  enc->target_bitrate = GST_DROID_ENC_TARGET_BITRATE_DEFAULT;
 }
 
 static GstStateChangeReturn
@@ -569,6 +646,8 @@ gst_droidenc_class_init (GstDroidEncClass * klass)
       gst_static_pad_template_get (&gst_droidenc_sink_template_factory));
 
   gobject_class->finalize = gst_droidenc_finalize;
+  gobject_class->set_property = gst_droidenc_set_property;
+  gobject_class->get_property = gst_droidenc_get_property;
   gstelement_class->change_state =
       GST_DEBUG_FUNCPTR (gst_droidenc_change_state);
   gstvideoencoder_class->open = GST_DEBUG_FUNCPTR (gst_droidenc_open);
@@ -582,4 +661,17 @@ gst_droidenc_class_init (GstDroidEncClass * klass)
   gstvideoencoder_class->handle_frame =
       GST_DEBUG_FUNCPTR (gst_droidenc_handle_frame);
   gstvideoencoder_class->flush = GST_DEBUG_FUNCPTR (gst_droidenc_flush);
+
+  g_object_class_install_property (gobject_class, PROP_CONTROL_RATE,
+      g_param_spec_enum ("control-rate", "Control Rate",
+          "Bitrate control method", GST_TYPE_DROID_ENC_CONTROL_RATE,
+          GST_DROID_ENC_CONTROL_RATE_DEFAULT,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS |
+          GST_PARAM_MUTABLE_READY));
+  g_object_class_install_property (gobject_class, PROP_TARGET_BITRATE,
+      g_param_spec_uint ("target-bitrate", "Target Bitrate",
+          "Target bitrate (0xffffffff=component default)", 0, G_MAXUINT,
+          GST_DROID_ENC_TARGET_BITRATE_DEFAULT,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS |
+          GST_PARAM_MUTABLE_PLAYING));
 }
