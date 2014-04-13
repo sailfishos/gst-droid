@@ -291,7 +291,6 @@ gst_droidenc_set_property (GObject * object, guint prop_id,
   switch (prop_id) {
     case PROP_TARGET_BITRATE:
       enc->target_bitrate = g_value_get_uint (value);
-      // TODO: apply it
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -631,6 +630,5 @@ gst_droidenc_class_init (GstDroidEncClass * klass)
       g_param_spec_uint ("target-bitrate", "Target Bitrate",
           "Target bitrate (0xffffffff=component default)", 0, G_MAXUINT,
           GST_DROID_ENC_TARGET_BITRATE_DEFAULT,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS |
-          GST_PARAM_MUTABLE_PLAYING));
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 }
