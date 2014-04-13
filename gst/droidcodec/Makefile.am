@@ -18,7 +18,8 @@ libgstdroidcodec_la_SOURCES = \
 	gstdroidcodectype.c \
 	mappings.c \
 	gstdroidcodecallocatoromx.c \
-	gstdroidcodecallocatorgralloc.c
+	gstdroidcodecallocatorgralloc.c \
+	gstencoderparams.c
 
 noinst_HEADERS = \
 	plugin.h \
@@ -27,4 +28,5 @@ noinst_HEADERS = \
 	gstdroidcodec.h \
 	gstdroidcodectype.h \
 	gstdroidcodecallocatoromx.h \
-	gstdroidcodecallocatorgralloc.h
+	gstdroidcodecallocatorgralloc.h \
+	gstencoderparams.h

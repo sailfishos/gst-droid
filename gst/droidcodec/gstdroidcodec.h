@@ -30,6 +30,8 @@
 
 G_BEGIN_DECLS
 
+#define GST_DROID_ENC_TARGET_BITRATE_DEFAULT (0xffffffff)
+
 #define GST_TYPE_DROID_CODEC (gst_droid_codec_get_type())
 
 /* stolen from gst-omx */
@@ -116,6 +118,8 @@ void gst_droid_codec_set_running (GstDroidComponent * comp, gboolean running);
 
 void gst_droid_codec_empty_full (GstDroidComponent * comp);
 gboolean gst_droid_codec_flush (GstDroidComponent * comp, gboolean pause);
+gboolean gst_droid_codec_apply_encoding_params (GstDroidComponent * comp,
+    GstVideoInfo * info, GstCaps * caps, int bitrate);
 
 const gchar *gst_omx_error_to_string (OMX_ERRORTYPE err);
 const gchar *gst_omx_state_to_string (OMX_STATETYPE state);

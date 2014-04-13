@@ -34,6 +34,7 @@
 #include "gst/memory/gstgralloc.h"
 #include "gstdroidcodectype.h"
 #include "plugin.h"
+#include "gstencoderparams.h"
 
 GST_DEFINE_MINI_OBJECT_TYPE (GstDroidCodec, gst_droid_codec);
 
@@ -67,6 +68,12 @@ struct _GstDroidCodecHandle
       OMX_STRING name, OMX_PTR data, OMX_CALLBACKTYPE * callbacks);
     OMX_ERRORTYPE (*free_handle) (OMX_HANDLETYPE handle);
 };
+
+typedef struct _CodecProfileLevel
+{
+  OMX_U32 mProfile;
+  OMX_U32 mLevel;
+} CodecProfileLevel;
 
 static OMX_ERRORTYPE
 EventHandler (OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_EVENTTYPE eEvent,
@@ -1369,4 +1376,334 @@ gst_droid_codec_flush (GstDroidComponent * comp, gboolean pause)
   }
 
   return TRUE;
+}
+
+static gboolean
+gst_droid_codec_get_encoder_profile_level (GstDroidComponent * comp,
+    GstCaps * caps, const CodecProfileLevel defaultProfileLevel,
+    CodecProfileLevel user, CodecProfileLevel * profileLevel, int port)
+{
+  /* stolen from android OMXCodec.cpp */
+  OMX_VIDEO_PARAM_PROFILELEVELTYPE param;
+  OMX_ERRORTYPE err;
+
+  if (user.mProfile == -1) {
+    user.mProfile = defaultProfileLevel.mProfile;
+  }
+
+  if (user.mLevel == -1) {
+    user.mLevel = defaultProfileLevel.mLevel;
+  }
+
+  GST_DEBUG_OBJECT (comp->parent, "requested profile: 0x%lx, level: 0x%lx",
+      user.mProfile, user.mLevel);
+
+  GST_OMX_INIT_STRUCT (&param);
+
+  param.nPortIndex = port;
+
+  /* Are the target profile and level supported by the encoder? */
+  for (param.nProfileIndex = 0;; ++param.nProfileIndex) {
+    int supportedProfile, supportedLevel;
+
+    err =
+        gst_droid_codec_get_param (comp,
+        OMX_IndexParamVideoProfileLevelQuerySupported, &param);
+
+    if (err != OMX_ErrorNone) {
+      break;
+    }
+
+    supportedProfile = param.eProfile;
+    supportedLevel = param.eLevel;
+    GST_DEBUG_OBJECT (comp->parent, "supported profile: 0x%x, level 0x%x",
+        supportedProfile, supportedLevel);
+
+    if (user.mProfile == supportedProfile && user.mLevel <= supportedLevel) {
+      profileLevel->mProfile = user.mProfile;
+      profileLevel->mLevel = user.mLevel;
+      return TRUE;
+    }
+  }
+
+  GST_ERROR_OBJECT (comp->parent,
+      "profile (0x%lx) and level (0x%lx) are not supported", user.mProfile,
+      user.mLevel);
+
+  return FALSE;
+}
+
+static gboolean
+gst_droid_codec_apply_mpeg4video_encoding_params (GstDroidComponent * comp,
+    GstCaps * caps, int fps)
+{
+  /* stolen from android OMXCodec.cpp */
+
+  OMX_VIDEO_PARAM_MPEG4TYPE mpeg4type;
+  OMX_ERRORTYPE err;
+  CodecProfileLevel defaultProfileLevel, profileLevel, user;
+  GstStructure *s;
+
+  GST_DEBUG_OBJECT (comp->parent, "apply mpeg4 video encoding params");
+
+  GST_OMX_INIT_STRUCT (&mpeg4type);
+  mpeg4type.nPortIndex = comp->out_port->def.nPortIndex;
+  err = gst_droid_codec_get_param (comp, OMX_IndexParamVideoMpeg4, &mpeg4type);
+  if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) getting OMX_IndexParamVideoMpeg4",
+        gst_omx_error_to_string (err), err);
+    return FALSE;
+  }
+
+  mpeg4type.nSliceHeaderSpacing = 0;
+  mpeg4type.bSVH = OMX_FALSE;
+  mpeg4type.bGov = OMX_FALSE;
+  mpeg4type.nAllowedPictureTypes =
+      OMX_VIDEO_PictureTypeI | OMX_VIDEO_PictureTypeP;
+  mpeg4type.nPFrames = fps - 1;
+
+  if (mpeg4type.nPFrames == 0) {
+    mpeg4type.nAllowedPictureTypes = OMX_VIDEO_PictureTypeI;
+  }
+
+  mpeg4type.nBFrames = 0;
+  mpeg4type.nIDCVLCThreshold = 0;
+  mpeg4type.bACPred = OMX_TRUE;
+  mpeg4type.nMaxPacketSize = 256;
+  mpeg4type.nTimeIncRes = 1000;
+  mpeg4type.nHeaderExtension = 0;
+  mpeg4type.bReversibleVLC = OMX_FALSE;
+
+  defaultProfileLevel.mProfile = mpeg4type.eProfile;
+  defaultProfileLevel.mLevel = mpeg4type.eLevel;
+
+  s = gst_caps_get_structure (caps, 0);
+  user.mProfile =
+      gst_encoder_params_get_mpeg4_profile (gst_structure_get_string (s,
+          "profile"));
+  user.mLevel =
+      gst_encoder_params_get_mpeg4_level (gst_structure_get_string (s,
+          "level"));
+
+  if (!gst_droid_codec_get_encoder_profile_level (comp, caps,
+          defaultProfileLevel, user, &profileLevel,
+          comp->out_port->def.nPortIndex)) {
+    return FALSE;
+  }
+
+  mpeg4type.eProfile = profileLevel.mProfile;
+  mpeg4type.eLevel = profileLevel.mLevel;
+
+  err = gst_droid_codec_set_param (comp, OMX_IndexParamVideoMpeg4, &mpeg4type);
+  if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) setting OMX_IndexParamVideoMpeg4",
+        gst_omx_error_to_string (err), err);
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+static gboolean
+gst_droid_codec_apply_avc_encoding_params (GstDroidComponent * comp,
+    GstCaps * caps, int fps)
+{
+  /* stolen from android OMXCodec.cpp */
+
+  OMX_VIDEO_PARAM_AVCTYPE h264type;
+  OMX_ERRORTYPE err;
+  CodecProfileLevel defaultProfileLevel, profileLevel, user;
+  GstStructure *s;
+
+  GST_DEBUG_OBJECT (comp->parent, "apply avc encoding params");
+
+  GST_OMX_INIT_STRUCT (&h264type);
+
+  h264type.nPortIndex = comp->out_port->def.nPortIndex;
+
+  err = gst_droid_codec_get_param (comp, OMX_IndexParamVideoAvc, &h264type);
+  if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) getting OMX_IndexParamVideoAvc",
+        gst_omx_error_to_string (err), err);
+    return FALSE;
+  }
+
+  h264type.nAllowedPictureTypes =
+      OMX_VIDEO_PictureTypeI | OMX_VIDEO_PictureTypeP;
+
+  defaultProfileLevel.mProfile = h264type.eProfile;
+  defaultProfileLevel.mLevel = h264type.eLevel;
+
+  s = gst_caps_get_structure (caps, 0);
+  user.mProfile =
+      gst_encoder_params_get_avc_profile (gst_structure_get_string (s,
+          "profile"));
+  user.mLevel =
+      gst_encoder_params_get_avc_level (gst_structure_get_string (s, "level"));
+
+  if (!gst_droid_codec_get_encoder_profile_level (comp, caps,
+          defaultProfileLevel, user, &profileLevel,
+          comp->out_port->def.nPortIndex)) {
+    return FALSE;
+  }
+
+  h264type.eProfile = profileLevel.mProfile;
+  h264type.eLevel = profileLevel.mLevel;
+
+  if (h264type.eProfile != OMX_VIDEO_AVCProfileBaseline) {
+    GST_WARNING_OBJECT (comp->parent,
+        "Use baseline profile instead of 0x%x for AVC recording",
+        h264type.eProfile);
+
+    h264type.eProfile = OMX_VIDEO_AVCProfileBaseline;
+  }
+
+  if (h264type.eProfile == OMX_VIDEO_AVCProfileBaseline) {
+    h264type.nSliceHeaderSpacing = 0;
+    h264type.bUseHadamard = OMX_TRUE;
+    h264type.nRefFrames = 1;
+    h264type.nBFrames = 0;
+    h264type.nPFrames = fps - 1;
+
+    if (h264type.nPFrames == 0) {
+      h264type.nAllowedPictureTypes = OMX_VIDEO_PictureTypeI;
+    }
+
+    h264type.nRefIdx10ActiveMinus1 = 0;
+    h264type.nRefIdx11ActiveMinus1 = 0;
+    h264type.bEntropyCodingCABAC = OMX_FALSE;
+    h264type.bWeightedPPrediction = OMX_FALSE;
+    h264type.bconstIpred = OMX_FALSE;
+    h264type.bDirect8x8Inference = OMX_FALSE;
+    h264type.bDirectSpatialTemporal = OMX_FALSE;
+    h264type.nCabacInitIdc = 0;
+  }
+
+  if (h264type.nBFrames != 0) {
+    h264type.nAllowedPictureTypes |= OMX_VIDEO_PictureTypeB;
+  }
+
+  h264type.bEnableUEP = OMX_FALSE;
+  h264type.bEnableFMO = OMX_FALSE;
+  h264type.bEnableASO = OMX_FALSE;
+  h264type.bEnableRS = OMX_FALSE;
+  h264type.bFrameMBsOnly = OMX_TRUE;
+  h264type.bMBAFF = OMX_FALSE;
+  h264type.eLoopFilterMode = OMX_VIDEO_AVCLoopFilterEnable;
+
+  err = gst_droid_codec_set_param (comp, OMX_IndexParamVideoAvc, &h264type);
+  if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) setting OMX_IndexParamVideoAvc",
+        gst_omx_error_to_string (err), err);
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+static gboolean
+gst_droid_codec_apply_bitrate (GstDroidComponent * comp, int bitrate, int port)
+{
+  OMX_VIDEO_PARAM_BITRATETYPE bitrateType;
+  OMX_ERRORTYPE err;
+
+  GST_DEBUG_OBJECT (comp->parent, "apply bitrate %i", bitrate);
+
+  if (bitrate == GST_DROID_ENC_TARGET_BITRATE_DEFAULT) {
+    GST_INFO_OBJECT (comp->parent, "bitrate is the default");
+    return TRUE;
+  }
+
+  GST_OMX_INIT_STRUCT (&bitrateType);
+
+  bitrateType.nPortIndex = port;
+
+  err =
+      gst_droid_codec_get_param (comp, OMX_IndexParamVideoBitrate,
+      &bitrateType);
+  if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) getting OMX_IndexParamVideoBitrate",
+        gst_omx_error_to_string (err), err);
+    return FALSE;
+  }
+
+  bitrateType.eControlRate = OMX_Video_ControlRateVariable;
+  bitrateType.nTargetBitrate = bitrate;
+
+  err =
+      gst_droid_codec_set_param (comp, OMX_IndexParamVideoBitrate,
+      &bitrateType);
+  if (err != OMX_ErrorNone) {
+    GST_ERROR_OBJECT (comp->parent,
+        "got error %s (0x%08x) setting OMX_IndexParamVideoBitrate",
+        gst_omx_error_to_string (err), err);
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+gboolean
+gst_droid_codec_apply_encoding_params (GstDroidComponent * comp,
+    GstVideoInfo * info, GstCaps * caps, int bitrate)
+{
+  gboolean ret;
+  int fps;
+
+  GST_DEBUG_OBJECT (comp->parent, "apply encoding params");
+
+  fps = info->fps_n / info->fps_d;
+
+  if (!strcmp (comp->handle->type, GST_DROID_CODEC_TYPE_MPEG4VIDEO_ENC)) {
+    ret = gst_droid_codec_apply_mpeg4video_encoding_params (comp, caps, fps);
+  } else if (!strcmp (comp->handle->type, GST_DROID_CODEC_TYPE_AVC_ENC)) {
+    ret = gst_droid_codec_apply_avc_encoding_params (comp, caps, fps);
+  } else {
+    GST_ERROR_OBJECT ("unknown encoder type %s", comp->handle->type);
+    ret = FALSE;
+  }
+
+  if (ret) {
+    /* setup error correction (optional) */
+    OMX_VIDEO_PARAM_ERRORCORRECTIONTYPE errorCorrectionType;
+    OMX_ERRORTYPE err;
+
+    GST_OMX_INIT_STRUCT (&errorCorrectionType);
+    errorCorrectionType.nPortIndex = comp->out_port->def.nPortIndex;
+
+    err =
+        gst_droid_codec_get_param (comp, OMX_IndexParamVideoErrorCorrection,
+        &errorCorrectionType);
+    if (err != OMX_ErrorNone) {
+      GST_WARNING_OBJECT (comp->parent,
+          "got error %s (0x%08x) getting OMX_IndexParamVideoErrorCorrection",
+          gst_omx_error_to_string (err), err);
+    } else {
+      errorCorrectionType.bEnableHEC = OMX_FALSE;
+      errorCorrectionType.bEnableResync = OMX_TRUE;
+      errorCorrectionType.nResynchMarkerSpacing = 256;
+      errorCorrectionType.bEnableDataPartitioning = OMX_FALSE;
+      errorCorrectionType.bEnableRVLC = OMX_FALSE;
+
+      err = gst_droid_codec_set_param (comp, OMX_IndexParamVideoErrorCorrection,
+          &errorCorrectionType);
+      if (err != OMX_ErrorNone) {
+        GST_WARNING_OBJECT (comp->parent,
+            "got error %s (0x%08x) setting OMX_IndexParamVideoErrorCorrection",
+            gst_omx_error_to_string (err), err);
+      }
+    }
+  }
+
+  if (ret) {
+    return gst_droid_codec_apply_bitrate (comp, bitrate,
+        comp->out_port->def.nPortIndex);
+  }
+
+  return ret;
 }

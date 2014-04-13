@@ -49,8 +49,6 @@ enum
   PROP_TARGET_BITRATE,
 };
 
-#define GST_DROID_ENC_TARGET_BITRATE_DEFAULT (0xffffffff)
-
 static gboolean
 gst_droidenc_do_handle_frame (GstVideoEncoder * encoder,
     GstVideoCodecFrame * frame)
@@ -434,6 +432,12 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
 
   /* configure codec */
   if (!gst_droid_codec_configure_component (enc->comp, &state->info)) {
+    gst_caps_unref (caps);
+    return FALSE;
+  }
+
+  if (!gst_droid_codec_apply_encoding_params (enc->comp, &state->info, caps,
+          enc->target_bitrate)) {
     gst_caps_unref (caps);
     return FALSE;
   }
