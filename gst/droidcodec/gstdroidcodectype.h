@@ -26,6 +26,13 @@
 
 G_BEGIN_DECLS
 
+#define GST_DROID_CODEC_TYPE_MPEG4VIDEO_DEC         "mpeg4videodecode"
+#define GST_DROID_CODEC_TYPE_AVC_DEC                "h264decode"
+#define GST_DROID_CODEC_TYPE_H263_DEC               "h263decode"
+#define GST_DROID_CODEC_TYPE_DIVX_DEC               "divxdecode"
+#define GST_DROID_CODEC_TYPE_MPEG4VIDEO_ENC         "mpeg4videoencode"
+#define GST_DROID_CODEC_TYPE_AVC_ENC                "h264encode"
+
 typedef enum {
   GST_DROID_CODEC_DECODER,
   GST_DROID_CODEC_ENCODER,

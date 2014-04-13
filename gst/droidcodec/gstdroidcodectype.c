@@ -54,17 +54,21 @@ struct _GstDroidCodecType
 
 GstDroidCodecType types[] = {
   /* decoders */
-  {GST_DROID_CODEC_DECODER, "video/mpeg", "mpeg4videodecode", mpeg4v,
+  {GST_DROID_CODEC_DECODER, "video/mpeg", GST_DROID_CODEC_TYPE_MPEG4VIDEO_DEC,
+        mpeg4v,
       "video/mpeg, mpegversion=4"},
-  {GST_DROID_CODEC_DECODER, "video/x-h264", "h264decode", h264,
+  {GST_DROID_CODEC_DECODER, "video/x-h264", GST_DROID_CODEC_TYPE_AVC_DEC, h264,
       "video/x-h264, alignment=au, stream-format=byte-stream"},
-  {GST_DROID_CODEC_DECODER, "video/x-h263", "h263decode", NULL, "video/x-h263"},
-  {GST_DROID_CODEC_DECODER, "video/x-divx", "divxdecode", NULL, "video/x-divx"},
+  {GST_DROID_CODEC_DECODER, "video/x-h263", GST_DROID_CODEC_TYPE_H263_DEC, NULL,
+      "video/x-h263"},
+  {GST_DROID_CODEC_DECODER, "video/x-divx", GST_DROID_CODEC_TYPE_DIVX_DEC, NULL,
+      "video/x-divx"},
 
   /* encoders */
-  {GST_DROID_CODEC_ENCODER, "video/mpeg", "mpeg4videoencode", mpeg4v,
+  {GST_DROID_CODEC_ENCODER, "video/mpeg", GST_DROID_CODEC_TYPE_MPEG4VIDEO_ENC,
+        mpeg4v,
       "video/mpeg, mpegversion=4, systemstream=false"},
-  {GST_DROID_CODEC_ENCODER, "video/x-h264", "h264encode", h264,
+  {GST_DROID_CODEC_ENCODER, "video/x-h264", GST_DROID_CODEC_TYPE_AVC_ENC, h264,
       "video/x-h264, alignment=au, stream-format=byte-stream"},
 };
 
