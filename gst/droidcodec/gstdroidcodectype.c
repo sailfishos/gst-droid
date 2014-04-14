@@ -60,33 +60,42 @@ h264_enc (GstStructure * s)
   return TRUE;
 }
 
+void
+h264_compliment (GstCaps * caps)
+{
+  gst_caps_set_simple (caps, "alignment", G_TYPE_STRING, "au",
+      "stream-format", G_TYPE_STRING, "byte-stream", NULL);
+}
+
 struct _GstDroidCodecType
 {
   GstDroidCodecTypeType type;
   const gchar *media_type;
   const gchar *codec_type;
     gboolean (*verify) (GstStructure * s);
+  void (*compliment) (GstCaps * caps);
   const gchar *caps;
 };
 
 GstDroidCodecType types[] = {
   /* decoders */
   {GST_DROID_CODEC_DECODER, "video/mpeg", GST_DROID_CODEC_TYPE_MPEG4VIDEO_DEC,
-        mpeg4v,
+        mpeg4v, NULL,
       "video/mpeg, mpegversion=4"},
   {GST_DROID_CODEC_DECODER, "video/x-h264", GST_DROID_CODEC_TYPE_AVC_DEC, h264,
-      "video/x-h264, alignment=au, stream-format=byte-stream"},
+      NULL, "video/x-h264, alignment=au, stream-format=byte-stream"},
   {GST_DROID_CODEC_DECODER, "video/x-h263", GST_DROID_CODEC_TYPE_H263_DEC, NULL,
-      "video/x-h263"},
+      NULL, "video/x-h263"},
   {GST_DROID_CODEC_DECODER, "video/x-divx", GST_DROID_CODEC_TYPE_DIVX_DEC, NULL,
-      "video/x-divx"},
+      NULL, "video/x-divx"},
 
   /* encoders */
   {GST_DROID_CODEC_ENCODER, "video/mpeg", GST_DROID_CODEC_TYPE_MPEG4VIDEO_ENC,
         mpeg4v,
-      "video/mpeg, mpegversion=4, systemstream=false"},
+      NULL, "video/mpeg, mpegversion=4, systemstream=false"},
   {GST_DROID_CODEC_ENCODER, "video/x-h264", GST_DROID_CODEC_TYPE_AVC_ENC,
         h264_enc,
+        h264_compliment,
       "video/x-h264, alignment=au, stream-format=byte-stream"},
 };
 
@@ -167,4 +176,21 @@ gst_droid_codec_type_get_path (const gchar * type)
   g_free (file_name);
 
   return file;
+}
+
+void
+gst_droid_codec_type_compliment_caps (const gchar * type, GstCaps * caps)
+{
+  int x = 0;
+  int len = sizeof (types) / sizeof (types[0]);
+
+  for (x = 0; x < len; x++) {
+    if (!strcmp (type, types[x].codec_type)) {
+      if (types[x].compliment) {
+        types[x].compliment (caps);
+      }
+
+      return;
+    }
+  }
 }

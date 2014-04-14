@@ -127,7 +127,7 @@ gst_droidenc_stop_loop (GstVideoEncoder * encoder)
 
 static GstVideoCodecState *
 gst_droidenc_configure_state (GstVideoEncoder * encoder,
-    GstVideoInfo * info, GstCaps * caps)
+    GstVideoInfo * info, GstCaps * caps, const gchar * type)
 {
   GstVideoCodecState *out = NULL;
   GstDroidEnc *enc = GST_DROIDENC (encoder);
@@ -142,6 +142,8 @@ gst_droidenc_configure_state (GstVideoEncoder * encoder,
       "framerate", GST_TYPE_FRACTION, info->fps_n, info->fps_d, NULL);
 
   caps = gst_caps_fixate (caps);
+
+  gst_droid_codec_type_compliment_caps (type, caps);
 
   out = gst_video_encoder_set_output_state (GST_VIDEO_ENCODER (enc),
       caps, enc->in_state);
@@ -436,7 +438,8 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
     return FALSE;
   }
 
-  enc->out_state = gst_droidenc_configure_state (encoder, &state->info, caps);
+  enc->out_state =
+      gst_droidenc_configure_state (encoder, &state->info, caps, type);
 
   /* now start */
   if (!gst_droid_codec_start_component (enc->comp, enc->in_state->caps,
