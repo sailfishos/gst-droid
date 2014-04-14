@@ -31,6 +31,7 @@
 #include <gst/basecamerabinsrc/gstcamerabin-enum.h>
 #include <gst/basecamerabinsrc/gstbasecamerasrc.h>
 #endif /* GST_USE_UNSTABLE_API */
+#include <gst/meta/nemometa.h>
 
 G_BEGIN_DECLS
 
@@ -62,18 +63,11 @@ typedef enum {
   GST_DROID_CAM_SRC_DIRECTION_FRONT = CAMERA_FACING_FRONT,
 } GstDroidCamSrcCamDirection;
 
-typedef enum {
-  GST_DROID_CAM_SRC_ORIENTATION_0,
-  GST_DROID_CAM_SRC_ORIENTATION_90,
-  GST_DROID_CAM_SRC_ORIENTATION_180,
-  GST_DROID_CAM_SRC_ORIENTATION_270,
-} GstDroidCamSrcCamOrientation;
-
 struct _GstDroidCamSrcCamInfo
 {
   int num;
   GstDroidCamSrcCamDirection direction;
-  GstDroidCamSrcCamOrientation orientation;
+  NemoGstBufferOrientation orientation;
 };
 
 struct _GstDroidCamSrcPad

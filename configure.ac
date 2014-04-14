@@ -83,6 +83,17 @@ PKG_CHECK_MODULES(NGI, [
   ])
 ])
 
+PKG_CHECK_MODULES(NGM, [
+  nemo-gstreamer-meta-1.0
+], [
+  AC_SUBST(NGM_CFLAGS)
+  AC_SUBST(NGM_LIBS)
+], [
+  AC_MSG_ERROR([
+      nemo-gstreamer-meta not found
+  ])
+])
+
 PKG_CHECK_MODULES(DROID, [
   android-headers
 ], [

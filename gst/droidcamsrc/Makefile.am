@@ -1,9 +1,11 @@
 plugin_LTLIBRARIES = libgstdroidcamsrc.la
-libgstdroidcamsrc_la_CFLAGS = $(GST_CFLAGS) $(NGI_CFLAGS) $(EGL_CFLAGS) $(DROID_CFLAGS) \
-			       -I$(top_builddir)/gst-libs/ \
-                               -I$(top_builddir)/inc/hybris/
+libgstdroidcamsrc_la_CFLAGS = $(GST_CFLAGS) $(NGI_CFLAGS) $(EGL_CFLAGS) \
+                              $(DROID_CFLAGS) $(NGM_CFLAGS)\
+			      -I$(top_builddir)/gst-libs/ \
+                              -I$(top_builddir)/inc/hybris/
 
-libgstdroidcamsrc_la_LIBADD = $(GST_LIBS) $(NGI_LIBS) $(EGL_LIBS) $(DROID_LIBS) \
+libgstdroidcamsrc_la_LIBADD = $(GST_LIBS) $(NGI_LIBS) $(EGL_LIBS) \
+                              $(DROID_LIBS) $(NGM_LIBS) \
                               $(top_builddir)/gst-libs/gst/memory/libgstdroidmemory-@GST_API_VERSION@.la \
                               -lgstbasecamerabinsrc-1.0
 
