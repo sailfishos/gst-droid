@@ -75,28 +75,28 @@ struct _GstDroidCodecType
     gboolean (*verify) (GstStructure * s);
   void (*compliment) (GstCaps * caps);
   const gchar *caps;
+  gboolean in_stream_headers;
 };
 
 GstDroidCodecType types[] = {
   /* decoders */
   {GST_DROID_CODEC_DECODER, "video/mpeg", GST_DROID_CODEC_TYPE_MPEG4VIDEO_DEC,
         mpeg4v, NULL,
-      "video/mpeg, mpegversion=4"},
+      "video/mpeg, mpegversion=4", FALSE},
   {GST_DROID_CODEC_DECODER, "video/x-h264", GST_DROID_CODEC_TYPE_AVC_DEC, h264,
-      NULL, "video/x-h264, alignment=au, stream-format=byte-stream"},
+      NULL, "video/x-h264, alignment=au, stream-format=byte-stream", FALSE},
   {GST_DROID_CODEC_DECODER, "video/x-h263", GST_DROID_CODEC_TYPE_H263_DEC, NULL,
-      NULL, "video/x-h263"},
+      NULL, "video/x-h263", FALSE},
   {GST_DROID_CODEC_DECODER, "video/x-divx", GST_DROID_CODEC_TYPE_DIVX_DEC, NULL,
-      NULL, "video/x-divx"},
+      NULL, "video/x-divx", FALSE},
 
   /* encoders */
   {GST_DROID_CODEC_ENCODER, "video/mpeg", GST_DROID_CODEC_TYPE_MPEG4VIDEO_ENC,
         mpeg4v,
-      NULL, "video/mpeg, mpegversion=4, systemstream=false"},
+      NULL, "video/mpeg, mpegversion=4, systemstream=false", FALSE},
   {GST_DROID_CODEC_ENCODER, "video/x-h264", GST_DROID_CODEC_TYPE_AVC_ENC,
-        h264_enc,
-        h264_compliment,
-      "video/x-h264, alignment=au, stream-format=byte-stream"},
+        h264_enc, h264_compliment,
+      "video/x-h264, alignment=au, stream-format=byte-stream", TRUE},
 };
 
 const gchar *
@@ -193,4 +193,20 @@ gst_droid_codec_type_compliment_caps (const gchar * type, GstCaps * caps)
       return;
     }
   }
+}
+
+gboolean
+gst_droid_codec_type_in_stream_headers (const gchar * type, gboolean * result)
+{
+  int x = 0;
+  int len = sizeof (types) / sizeof (types[0]);
+
+  for (x = 0; x < len; x++) {
+    if (!strcmp (type, types[x].codec_type)) {
+      *result = types[x].in_stream_headers;
+      return TRUE;
+    }
+  }
+
+  return FALSE;
 }

@@ -43,6 +43,7 @@ GstCaps *gst_droid_codec_type_all_caps (GstDroidCodecTypeType type);
 GstDroidCodecTypeType gst_droid_codec_type_get_type (const gchar *type);
 gchar *gst_droid_codec_type_get_path (const gchar *type);
 void gst_droid_codec_type_compliment_caps (const gchar * type, GstCaps * caps);
+gboolean gst_droid_codec_type_in_stream_headers (const gchar * type, gboolean * result);
 
 G_END_DECLS
 
