@@ -98,6 +98,8 @@ OMX_ERRORTYPE gst_droid_codec_get_param (GstDroidComponent * comp,
 					 OMX_INDEXTYPE index, gpointer param);
 OMX_ERRORTYPE gst_droid_codec_set_param (GstDroidComponent * comp,
 					 OMX_INDEXTYPE index, gpointer param);
+OMX_ERRORTYPE gst_droid_codec_set_config (GstDroidComponent * comp,
+                                         OMX_INDEXTYPE index, gpointer config);
 gboolean gst_droid_codec_configure_component (GstDroidComponent *comp,
 					      const GstVideoInfo * info);
 gboolean gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink, GstCaps * src);

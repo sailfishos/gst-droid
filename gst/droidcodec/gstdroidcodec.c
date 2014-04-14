@@ -671,6 +671,15 @@ gst_droid_codec_set_param (GstDroidComponent * comp, OMX_INDEXTYPE index,
   return OMX_SetParameter (comp->omx, index, param);
 }
 
+OMX_ERRORTYPE
+gst_droid_codec_set_config (GstDroidComponent * comp,
+    OMX_INDEXTYPE index, gpointer config)
+{
+  GST_DEBUG_OBJECT (comp->parent, "setting config at index 0x%08x", index);
+
+  return OMX_SetConfig (comp->omx, index, config);
+}
+
 gboolean
 gst_droid_codec_configure_component (GstDroidComponent * comp,
     const GstVideoInfo * info)
