@@ -141,6 +141,12 @@ gst_droid_codec_type_get_type (const gchar * type)
 gchar *
 gst_droid_codec_type_get_path (const gchar * type)
 {
-  return g_build_path ("/", SYSCONFDIR, "gst-droid", "droidcodec.d", type,
-      ".conf", NULL);
+  gchar *file_name = g_strdup_printf ("%s.conf", type);
+  gchar *file =
+      g_build_path ("/", SYSCONFDIR, "gst-droid", "droidcodec.d", file_name,
+      NULL);
+
+  g_free (file_name);
+
+  return file;
 }
