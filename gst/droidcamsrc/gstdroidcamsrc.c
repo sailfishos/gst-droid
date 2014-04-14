@@ -1104,6 +1104,13 @@ gst_droidcamsrc_start_capture (GstDroidCamSrc * src)
 
   GST_DEBUG_OBJECT (src, "start capture");
 
+  if (!src->dev) {
+    GST_ELEMENT_WARNING (src, RESOURCE, FAILED, (NULL), (NULL));
+    GST_ERROR_OBJECT (src, "cannot capture while not running");
+    started = FALSE;
+    goto out;
+  }
+
   g_mutex_lock (&src->capture_lock);
 
   if (src->captures > 0) {
