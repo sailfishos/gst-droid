@@ -34,7 +34,7 @@ GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 
 #define ACQUIRE_BUFFER_TRIALS                  4
 #define MIN_UNDEQUEUED_BUFFER_COUNT            2
-#define ACAUIRE_BUFFER_TIMEOUT                 10000    /* us */
+#define ACQUIRE_BUFFER_TIMEOUT                 10000    /* us */
 
 // TODO: keep this in 1 place
 #define container_of(ptr, type, member) ({                      \
@@ -94,7 +94,7 @@ retry:
 
     /* we need to unlock here to allow buffers to be returned back */
     g_mutex_unlock (&win->lock);
-    usleep (ACAUIRE_BUFFER_TIMEOUT);
+    usleep (ACQUIRE_BUFFER_TIMEOUT);
     g_mutex_lock (&win->lock);
     if (win->needs_reconfigure) {
       /* out of here */
