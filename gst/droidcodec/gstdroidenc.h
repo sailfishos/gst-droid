@@ -51,6 +51,7 @@ struct _GstDroidEnc
   GstVideoCodecState *out_state;
   gboolean first_frame_sent;
   guint32 target_bitrate;
+  gboolean in_stream_headers;
 };
 
 struct _GstDroidEncClass

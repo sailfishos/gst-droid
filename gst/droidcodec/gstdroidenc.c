@@ -210,8 +210,15 @@ gst_droidenc_loop (GstDroidEnc * enc)
       GST_INFO_OBJECT (enc, "received codec_data");
       gst_buffer_fill (codec_data, 0, buff->pBuffer + buff->nOffset,
           buff->nFilledLen);
-      gst_buffer_replace (&enc->out_state->codec_data, codec_data);
-      gst_buffer_unref (buffer);
+      if (enc->in_stream_headers) {
+        GstVideoEncoder *encoder = GST_VIDEO_ENCODER (enc);
+        GList *headers = NULL;
+        headers = g_list_append (headers, codec_data);
+        gst_video_encoder_set_headers (encoder, headers);
+      } else {
+        gst_buffer_replace (&enc->out_state->codec_data, codec_data);
+        gst_buffer_unref (buffer);
+      }
 
       continue;
     }
@@ -414,6 +421,13 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
 
   if (!type) {
     GST_DEBUG_OBJECT (enc, "failed to get any encoder");
+    gst_caps_unref (caps);
+    return FALSE;
+  }
+
+  if (!gst_droid_codec_type_in_stream_headers (type, &enc->in_stream_headers)) {
+    GST_ERROR_OBJECT (enc,
+        "cannot determine header requirements for encoder %s", type);
     gst_caps_unref (caps);
     return FALSE;
   }
