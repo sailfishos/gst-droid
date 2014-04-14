@@ -33,6 +33,8 @@
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 #define GST_CAT_DEFAULT gst_droidcamsrc_debug
 
+#define VIDEO_RECORDING_STOP_TIMEOUT                 100000     /* us */
+
 struct _GstDroidCamSrcImageCaptureState
 {
   gboolean image_preview_sent;
@@ -528,21 +530,25 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
     return;
   }
 
-  dev->dev->ops->stop_recording (dev->dev);
-
   g_mutex_lock (&dev->lock);
 
   GST_INFO ("waiting for queued frames %i", dev->vid->queued_frames);
 
-  while (dev->vid->queued_frames != 0) {
+  if (dev->vid->queued_frames > 0) {
     GST_INFO ("waiting for queued frames to reach 0 from %i",
         dev->vid->queued_frames);
     g_mutex_unlock (&dev->lock);
-    usleep (30000);             // TODO: bad
+    usleep (VIDEO_RECORDING_STOP_TIMEOUT);
     g_mutex_lock (&dev->lock);
   }
 
+  if (dev->vid->queued_frames > 0) {
+    GST_WARNING ("video queue still has %i frames", dev->vid->queued_frames);
+  }
+
   g_mutex_unlock (&dev->lock);
+
+  dev->dev->ops->stop_recording (dev->dev);
 }
 
 static void
