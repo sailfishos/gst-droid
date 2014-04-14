@@ -1707,3 +1707,18 @@ gst_droid_codec_apply_encoding_params (GstDroidComponent * comp,
 
   return ret;
 }
+
+void
+gst_droid_codec_timestamp (GstBuffer * buffer, OMX_BUFFERHEADERTYPE * buff)
+{
+  GST_BUFFER_PTS (buffer) =
+      gst_util_uint64_scale (buff->nTimeStamp, GST_SECOND,
+      OMX_TICKS_PER_SECOND);
+
+  if (buff->nTickCount != 0) {
+    GST_BUFFER_DURATION (buffer) =
+        gst_util_uint64_scale (buff->nTickCount, GST_SECOND,
+        OMX_TICKS_PER_SECOND);
+  }
+
+}

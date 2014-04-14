@@ -253,15 +253,7 @@ gst_droidenc_loop (GstDroidEnc * enc)
 
     GST_DEBUG_OBJECT (enc, "finishing frame %p", frame);
 
-    GST_BUFFER_PTS (frame->output_buffer) =
-        gst_util_uint64_scale (buff->nTimeStamp, GST_SECOND,
-        OMX_TICKS_PER_SECOND);
-
-    if (buff->nTickCount != 0) {
-      GST_BUFFER_DURATION (frame->output_buffer) =
-          gst_util_uint64_scale (buff->nTickCount, GST_SECOND,
-          OMX_TICKS_PER_SECOND);
-    }
+    gst_droid_codec_timestamp (frame->output_buffer, buff);
 
     gst_video_encoder_finish_frame (GST_VIDEO_ENCODER (enc), frame);
     gst_video_codec_frame_unref (frame);

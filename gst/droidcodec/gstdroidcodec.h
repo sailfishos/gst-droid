@@ -121,6 +121,8 @@ gboolean gst_droid_codec_flush (GstDroidComponent * comp, gboolean pause);
 gboolean gst_droid_codec_apply_encoding_params (GstDroidComponent * comp,
     GstVideoInfo * info, GstCaps * caps, int bitrate);
 
+void gst_droid_codec_timestamp (GstBuffer * buffer, OMX_BUFFERHEADERTYPE * buff);
+
 const gchar *gst_omx_error_to_string (OMX_ERRORTYPE err);
 const gchar *gst_omx_state_to_string (OMX_STATETYPE state);
 const gchar *gst_omx_command_to_string (OMX_COMMANDTYPE cmd);
