@@ -497,6 +497,24 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
     goto out;
   }
 
+  if (GST_VIDEO_CODEC_FRAME_IS_FORCE_KEYFRAME (frame)) {
+    OMX_CONFIG_INTRAREFRESHVOPTYPE config;
+    OMX_ERRORTYPE err;
+
+    GST_OMX_INIT_STRUCT (&config);
+    config.nPortIndex = enc->comp->in_port->def.nPortIndex;
+    config.IntraRefreshVOP = OMX_TRUE;
+
+    GST_DEBUG_OBJECT (enc, "forcing a keyframe");
+
+    err = gst_droid_codec_set_config (enc->comp,
+        OMX_IndexConfigVideoIntraVOPRefresh, &config);
+    if (err != OMX_ErrorNone) {
+      GST_WARNING_OBJECT (enc, "got error %s (0x%08x) forcing a keyframe",
+          gst_omx_error_to_string (err), err);
+    }
+  }
+
   if (gst_droidenc_do_handle_frame (encoder, frame)) {
     ret = GST_FLOW_OK;
     goto out;
