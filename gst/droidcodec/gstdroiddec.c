@@ -594,10 +594,17 @@ gst_droiddec_negotiate (GstVideoDecoder * decoder)
   GstCaps *caps = NULL;
   gboolean ret = FALSE;
 
+  /* TODO: something is wrong here.
+   * If I don't imlement a _negotiate function then I never get an error from downstream
+   * elements.
+   * If I don't query the peer caps then I don't get an error but downstream does not
+   * like the caps.
+   */
   dec = GST_DROIDDEC (decoder);
   pad = GST_VIDEO_DECODER_SRC_PAD (decoder);
 
-  GST_DEBUG_OBJECT (dec, "negotiate");
+  GST_DEBUG_OBJECT (dec, "negotiate with caps %" GST_PTR_FORMAT,
+      dec->out_state->caps);
 
   if (!GST_VIDEO_DECODER_CLASS (parent_class)->negotiate (decoder)) {
     return FALSE;
@@ -609,6 +616,10 @@ gst_droiddec_negotiate (GstVideoDecoder * decoder)
   GST_DEBUG_OBJECT (dec, "intersection %" GST_PTR_FORMAT, caps);
 
   if (gst_caps_is_empty (caps)) {
+    goto error;
+  }
+
+  if (!gst_caps_is_equal (caps, dec->out_state->caps)) {
     goto error;
   }
 
