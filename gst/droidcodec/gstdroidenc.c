@@ -581,8 +581,12 @@ gst_droidenc_getcaps (GstVideoEncoder * encoder, GstCaps * filter)
 
   GST_DEBUG_OBJECT (enc, "getcaps with filter %" GST_PTR_FORMAT, filter);
 
-  // TODO: if we have caps then report them.
-  caps = gst_pad_get_pad_template_caps (GST_VIDEO_ENCODER_SINK_PAD (encoder));
+  if (enc->out_state && enc->out_state->caps) {
+    caps = gst_caps_copy (enc->out_state->caps);
+  } else {
+    caps = gst_pad_get_pad_template_caps (GST_VIDEO_ENCODER_SINK_PAD (encoder));
+  }
+
   GST_DEBUG_OBJECT (enc, "our caps %" GST_PTR_FORMAT, caps);
 
 #if 0
