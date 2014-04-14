@@ -43,6 +43,23 @@ h264 (GstStructure * s)
       && !strcmp (format, "byte-stream");
 }
 
+static gboolean
+h264_enc (GstStructure * s)
+{
+  const char *alignment = gst_structure_get_string (s, "alignment");
+  const char *format = gst_structure_get_string (s, "stream-format");
+
+  if (alignment && strcmp (alignment, "au")) {
+    return FALSE;
+  }
+
+  if (format && strcmp (format, "byte-stream")) {
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
 struct _GstDroidCodecType
 {
   GstDroidCodecTypeType type;
@@ -68,7 +85,8 @@ GstDroidCodecType types[] = {
   {GST_DROID_CODEC_ENCODER, "video/mpeg", GST_DROID_CODEC_TYPE_MPEG4VIDEO_ENC,
         mpeg4v,
       "video/mpeg, mpegversion=4, systemstream=false"},
-  {GST_DROID_CODEC_ENCODER, "video/x-h264", GST_DROID_CODEC_TYPE_AVC_ENC, h264,
+  {GST_DROID_CODEC_ENCODER, "video/x-h264", GST_DROID_CODEC_TYPE_AVC_ENC,
+        h264_enc,
       "video/x-h264, alignment=au, stream-format=byte-stream"},
 };
 

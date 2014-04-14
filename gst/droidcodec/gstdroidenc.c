@@ -403,6 +403,8 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
 
   caps = gst_pad_peer_query_caps (GST_VIDEO_ENCODER_SRC_PAD (encoder), NULL);
 
+  GST_DEBUG_OBJECT (enc, "peer caps %" GST_PTR_FORMAT, caps);
+
   caps = gst_caps_truncate (caps);
 
   /* try to get our codec */
