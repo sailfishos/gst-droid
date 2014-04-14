@@ -1,3 +1,4 @@
+AM_CPPFLAGS = -DSYSCONFDIR=\"$(sysconfdir)\"
 plugin_LTLIBRARIES = libgstdroidcodec.la
 libgstdroidcodec_la_CFLAGS = $(GST_CFLAGS) $(NGI_CFLAGS) $(EGL_CFLAGS) $(DROID_CFLAGS) \
 			       -I$(top_builddir)/gst-libs/ \

@@ -242,7 +242,7 @@ gst_droid_codec_create_and_insert_handle_locked (GstDroidCodec * codec,
   GST_DEBUG ("create and insert handle locked");
 
   file = g_key_file_new ();
-  path = g_strdup_printf ("%s/%s.conf", DROID_CODEC_CONFIG_DIR, type);
+  path = gst_droid_codec_type_get_path (type);
 
   /* read info from configuration */
   res = g_key_file_load_from_file (file, path, 0, &error);

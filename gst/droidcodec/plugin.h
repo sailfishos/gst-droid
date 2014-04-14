@@ -26,7 +26,4 @@ GST_DEBUG_CATEGORY_EXTERN (gst_droid_dec_debug);
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_enc_debug);
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_codec_debug);
 
-// TODO: hardcoded
-#define DROID_CODEC_CONFIG_DIR   "/etc/gst-droid/droidcodec.d"
-
 #endif /* __PLUGIN_H__ */

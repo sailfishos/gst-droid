@@ -107,8 +107,8 @@ gst_droid_codec_type_all_caps (GstDroidCodecTypeType type)
       continue;
     }
 
-    gchar *file = g_strdup_printf ("%s/%s.conf", DROID_CODEC_CONFIG_DIR,
-        types[x].codec_type);
+    gchar *file = gst_droid_codec_type_get_path (types[x].codec_type);
+
     if (g_file_test (file, G_FILE_TEST_IS_REGULAR | G_FILE_TEST_EXISTS)) {
       GstStructure *s = gst_structure_new_from_string (types[x].caps);
       caps = gst_caps_merge_structure (caps, s);
@@ -136,4 +136,11 @@ gst_droid_codec_type_get_type (const gchar * type)
 
   /* should not happen */
   return -1;
+}
+
+gchar *
+gst_droid_codec_type_get_path (const gchar * type)
+{
+  return g_build_path ("/", SYSCONFDIR, "gst-droid", "droidcodec.d", type,
+      ".conf", NULL);
 }
