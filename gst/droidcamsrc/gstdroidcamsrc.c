@@ -240,7 +240,10 @@ gst_droidcamsrc_fill_info (GstDroidCamSrc * src, GstDroidCamSrcCamInfo * target,
 
     if (info.facing == facing) {
       target->num = x;
-      target->direction = info.facing;
+      target->direction =
+          facing ==
+          CAMERA_FACING_FRONT ? NEMO_GST_META_DEVICE_DIRECTION_FRONT :
+          NEMO_GST_META_DEVICE_DIRECTION_BACK;
       target->orientation = info.orientation / 90;
 
       GST_INFO_OBJECT (src, "camera %d is facing %d with orientation %d",
@@ -301,10 +304,11 @@ static GstDroidCamSrcCamInfo *
 gst_droidcamsrc_find_camera_device (GstDroidCamSrc * src)
 {
   int x;
-  GstDroidCamSrcCamDirection direction =
+  NemoGstDeviceDirection direction =
       src->camera_device ==
       GST_DROIDCAMSRC_CAMERA_DEVICE_SECONDARY ?
-      GST_DROID_CAM_SRC_DIRECTION_FRONT : GST_DROID_CAM_SRC_DIRECTION_BACK;
+      NEMO_GST_META_DEVICE_DIRECTION_FRONT :
+      NEMO_GST_META_DEVICE_DIRECTION_BACK;
 
   for (x = 0; x < MAX_CAMERAS; x++) {
     if (src->info[x].direction == direction) {

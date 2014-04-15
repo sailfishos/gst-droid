@@ -58,15 +58,10 @@ typedef struct _GstDroidCamSrcPad GstDroidCamSrcPad;
 
 typedef gboolean (* GstDroidCamSrcNegotiateCallback)(GstDroidCamSrcPad * pad);
 
-typedef enum {
-  GST_DROID_CAM_SRC_DIRECTION_BACK = CAMERA_FACING_BACK,
-  GST_DROID_CAM_SRC_DIRECTION_FRONT = CAMERA_FACING_FRONT,
-} GstDroidCamSrcCamDirection;
-
 struct _GstDroidCamSrcCamInfo
 {
   int num;
-  GstDroidCamSrcCamDirection direction;
+  NemoGstDeviceDirection direction;
   NemoGstBufferOrientation orientation;
 };
 
