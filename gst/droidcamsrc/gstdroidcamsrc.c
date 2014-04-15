@@ -297,7 +297,7 @@ gst_droid_cam_src_get_hw (GstDroidCamSrc * src)
   return TRUE;
 }
 
-static gchar *
+static GstDroidCamSrcCamInfo *
 gst_droidcamsrc_find_camera_device (GstDroidCamSrc * src)
 {
   int x;
@@ -308,7 +308,7 @@ gst_droidcamsrc_find_camera_device (GstDroidCamSrc * src)
 
   for (x = 0; x < MAX_CAMERAS; x++) {
     if (src->info[x].direction == direction) {
-      return g_strdup_printf ("%d", src->info[x].num);
+      return &src->info[x];
     }
   }
 
@@ -342,18 +342,18 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
     {
       /* find the device */
       gboolean res;
+      GstDroidCamSrcCamInfo *info;
       src->camera_device = src->user_camera_device;
-      gchar *id = gst_droidcamsrc_find_camera_device (src);
+      info = gst_droidcamsrc_find_camera_device (src);
 
-      if (!id) {
+      if (!info) {
         ret = GST_STATE_CHANGE_FAILURE;
         break;
       }
 
-      GST_DEBUG_OBJECT (src, "using camera device %s", id);
+      GST_DEBUG_OBJECT (src, "using camera device %i", info->num);
 
-      res = gst_droidcamsrc_dev_open (src->dev, id);
-      g_free (id);
+      res = gst_droidcamsrc_dev_open (src->dev, info);
       if (!res) {
         ret = GST_STATE_CHANGE_FAILURE;
         break;

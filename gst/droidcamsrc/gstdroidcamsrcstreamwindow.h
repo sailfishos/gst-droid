@@ -30,6 +30,7 @@ G_BEGIN_DECLS
 typedef struct _GstDroidCamSrcStreamWindow GstDroidCamSrcStreamWindow;
 typedef struct _GstDroidCamSrcBufferPool GstDroidCamSrcBufferPool;
 typedef struct _GstDroidCamSrcPad GstDroidCamSrcPad;
+typedef struct _GstDroidCamSrcCamInfo GstDroidCamSrcCamInfo;
 
 struct _GstDroidCamSrcStreamWindow
 {
@@ -46,9 +47,11 @@ struct _GstDroidCamSrcStreamWindow
   GMutex lock;
   GstDroidCamSrcPad *pad;
   GstAllocator *allocator;
+  GstDroidCamSrcCamInfo *info;
 };
 
-GstDroidCamSrcStreamWindow * gst_droid_cam_src_stream_window_new (GstDroidCamSrcPad *pad);
+GstDroidCamSrcStreamWindow * gst_droid_cam_src_stream_window_new (GstDroidCamSrcPad *pad,
+								  GstDroidCamSrcCamInfo * info);
 void gst_droid_cam_src_stream_window_destroy (GstDroidCamSrcStreamWindow * win);
 void gst_droid_cam_src_stream_window_clear (GstDroidCamSrcStreamWindow * win);
 

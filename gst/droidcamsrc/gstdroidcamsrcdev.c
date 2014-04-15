@@ -218,6 +218,7 @@ gst_droidcamsrc_dev_new (camera_module_t * hw, GstDroidCamSrcPad * vfsrc,
 
   dev = g_slice_new0 (GstDroidCamSrcDev);
 
+  dev->info = NULL;
   dev->img = g_slice_new0 (GstDroidCamSrcImageCaptureState);
   dev->vid = g_slice_new0 (GstDroidCamSrcVideoCaptureState);
   g_mutex_init (&dev->vid->lock);
@@ -234,17 +235,24 @@ gst_droidcamsrc_dev_new (camera_module_t * hw, GstDroidCamSrcPad * vfsrc,
 }
 
 gboolean
-gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, const gchar * id)
+gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
 {
   int err;
+  gchar *id;
 
   GST_DEBUG ("dev open");
 
   g_mutex_lock (&dev->lock);
 
+  dev->info = info;
+  id = g_strdup_printf ("%d", dev->info->num);
+
   err =
       dev->hw->common.methods->open ((const struct hw_module_t *) dev->hw, id,
       (struct hw_device_t **) &dev->dev);
+
+  g_free (id);
+
   if (err < 0) {
     dev->dev = NULL;
 
@@ -287,6 +295,7 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
   GST_DEBUG ("dev destroy");
 
   dev->hw = NULL;
+  dev->info = NULL;
   gst_object_unref (dev->allocator);
   g_mutex_clear (&dev->lock);
   g_mutex_init (&dev->vid->lock);
@@ -306,7 +315,7 @@ gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
 
   g_mutex_lock (&dev->lock);
 
-  dev->win = gst_droid_cam_src_stream_window_new (dev->vfsrc);
+  dev->win = gst_droid_cam_src_stream_window_new (dev->vfsrc, dev->info);
 
   params = dev->dev->ops->get_parameters (dev->dev);
 

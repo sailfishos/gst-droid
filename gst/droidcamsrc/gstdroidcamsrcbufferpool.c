@@ -26,6 +26,7 @@
 #include "gstdroidcamsrcbufferpool.h"
 #include "gst/memory/gstgralloc.h"
 #include "gstdroidcamsrc.h"
+#include <gst/meta/nemometa.h>
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 #define GST_CAT_DEFAULT gst_droidcamsrc_debug
@@ -48,6 +49,7 @@ gst_droidcamsrc_buffer_pool_alloc_buffer (GstBufferPool * bpool,
   GstStructure *config;
   int width, height, format, usage;
   GstAllocator *allocator;
+  NemoGstBufferOrientationMeta *meta;
 
   GstDroidCamSrcBufferPool *pool = GST_DROIDCAMSRC_BUFFER_POOL (bpool);
 
@@ -81,13 +83,27 @@ gst_droidcamsrc_buffer_pool_alloc_buffer (GstBufferPool * bpool,
   *buffer = gst_buffer_new ();
   gst_buffer_append_memory (*buffer, mem);
 
+  /* now our meta */
+  meta =
+      gst_buffer_add_gst_buffer_orientation_meta (*buffer,
+      pool->info->orientation, pool->info->direction);
+
+  if (!meta) {
+    gst_buffer_unref (*buffer);
+    GST_ERROR_OBJECT (pool, "failed to add orientation meta");
+    return GST_FLOW_ERROR;
+  }
+
   return GST_FLOW_OK;
 }
 
 GstDroidCamSrcBufferPool *
-gst_droid_cam_src_buffer_pool_new ()
+gst_droid_cam_src_buffer_pool_new (GstDroidCamSrcCamInfo * info)
 {
-  return g_object_new (GST_TYPE_DROIDCAMSRC_BUFFER_POOL, NULL);
+  GstDroidCamSrcBufferPool *pool =
+      g_object_new (GST_TYPE_DROIDCAMSRC_BUFFER_POOL, NULL);
+  pool->info = info;
+  return pool;
 }
 
 static void

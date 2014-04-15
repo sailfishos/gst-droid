@@ -43,10 +43,12 @@ G_BEGIN_DECLS
 
 typedef struct _GstDroidCamSrcBufferPool GstDroidCamSrcBufferPool;
 typedef struct _GstDroidCamSrcBufferPoolClass GstDroidCamSrcBufferPoolClass;
+typedef struct _GstDroidCamSrcCamInfo GstDroidCamSrcCamInfo;
 
 struct _GstDroidCamSrcBufferPool
 {
   GstBufferPool parent;
+  GstDroidCamSrcCamInfo *info;
 };
 
 struct _GstDroidCamSrcBufferPoolClass
@@ -54,7 +56,7 @@ struct _GstDroidCamSrcBufferPoolClass
   GstBufferPoolClass parent_class;
 };
 
-GstDroidCamSrcBufferPool * gst_droid_cam_src_buffer_pool_new ();
+GstDroidCamSrcBufferPool * gst_droid_cam_src_buffer_pool_new (GstDroidCamSrcCamInfo * info);
 
 G_END_DECLS
 

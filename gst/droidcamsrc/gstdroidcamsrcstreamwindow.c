@@ -331,7 +331,8 @@ gst_droidcamsrc_stream_window_set_timestamp (struct preview_stream_ops *w,
 }
 
 GstDroidCamSrcStreamWindow *
-gst_droid_cam_src_stream_window_new (GstDroidCamSrcPad * pad)
+gst_droid_cam_src_stream_window_new (GstDroidCamSrcPad * pad,
+    GstDroidCamSrcCamInfo * info)
 {
   GstDroidCamSrcStreamWindow *win;
 
@@ -341,6 +342,7 @@ gst_droid_cam_src_stream_window_new (GstDroidCamSrcPad * pad)
   win->pad = pad;
   win->allocator = gst_gralloc_allocator_new ();
   win->pool = NULL;
+  win->info = info;
   win->map = g_hash_table_new (g_direct_hash, g_direct_equal);
   g_mutex_init (&win->lock);
 
@@ -403,7 +405,7 @@ static void
     gst_object_unref (win->pool);
   }
 
-  win->pool = gst_droid_cam_src_buffer_pool_new ();
+  win->pool = gst_droid_cam_src_buffer_pool_new (win->info);
 
   g_hash_table_remove_all (win->map);
 
