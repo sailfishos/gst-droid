@@ -1105,7 +1105,6 @@ gst_droidcamsrc_stop_video_recording_locked (GstDroidCamSrc * src)
 {
   GST_DEBUG_OBJECT (src, "stop video recording");
   gst_droidcamsrc_dev_stop_video_recording (src->dev);
-  // TODO: wait until a few frames have been recorded.
 }
 
 static void
@@ -1154,6 +1153,8 @@ out:
 static void
 gst_droidcamsrc_stop_capture (GstDroidCamSrc * src)
 {
+  gboolean notify = FALSE;
+
   GST_DEBUG_OBJECT (src, "stop capture");
 
   g_mutex_lock (&src->capture_lock);
@@ -1167,10 +1168,19 @@ gst_droidcamsrc_stop_capture (GstDroidCamSrc * src)
 
   if (src->mode != MODE_IMAGE) {
     gst_droidcamsrc_stop_video_recording_locked (src);
+    notify = TRUE;
   }
 
 out:
+  if (notify) {
+    --src->captures;
+  }
+
   g_mutex_unlock (&src->capture_lock);
+
+  if (notify) {
+    g_object_notify (G_OBJECT (src), "ready-for-capture");
+  }
 }
 
 void
