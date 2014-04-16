@@ -533,10 +533,9 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
   g_mutex_unlock (&dev->vidsrc->lock);
 
   /* now we are done. We just push eos */
+  GST_DEBUG ("Pushing EOS");
   if (!gst_pad_push_event (dev->vidsrc->pad, gst_event_new_eos ())) {
     GST_ERROR ("failed to push EOS event");
-    dev->dev->ops->stop_recording (dev->dev);
-    return;
   }
 
   g_mutex_lock (&dev->lock);
@@ -558,6 +557,8 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
   g_mutex_unlock (&dev->lock);
 
   dev->dev->ops->stop_recording (dev->dev);
+
+  GST_INFO ("dev stopped video recording");
 }
 
 static void
