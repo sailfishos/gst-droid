@@ -505,6 +505,8 @@ out:
 void
 gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
 {
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->vidsrc->pad));
+
   GST_DEBUG ("dev stop video recording");
 
   // TODO: review all those locks
@@ -558,6 +560,12 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
   g_mutex_unlock (&dev->lock);
 
   dev->dev->ops->stop_recording (dev->dev);
+
+  g_mutex_lock (&src->capture_lock);
+  --src->captures;
+  g_mutex_unlock (&src->capture_lock);
+
+  g_object_notify (G_OBJECT (src), "ready-for-capture");
 }
 
 static void
