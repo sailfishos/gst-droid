@@ -542,6 +542,11 @@ gst_droiddec_flush (GstVideoDecoder * decoder)
 
   GST_DEBUG_OBJECT (dec, "flush");
 
+  if (!dec->comp) {
+    GST_DEBUG_OBJECT (dec, "no component to flush");
+    return TRUE;
+  }
+
   gst_droiddec_stop_loop (decoder);
 
   /* now flush our component */

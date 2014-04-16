@@ -541,6 +541,11 @@ gst_droidenc_flush (GstVideoEncoder * encoder)
 
   GST_DEBUG_OBJECT (enc, "flush");
 
+  if (!enc->comp) {
+    GST_DEBUG_OBJECT (enc, "no component to flush");
+    return TRUE;
+  }
+
   gst_droidenc_stop_loop (encoder);
 
   /* now flush our component */
