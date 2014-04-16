@@ -111,6 +111,7 @@ gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
   g_cond_init (&pad->cond);
   pad->queue = g_queue_new ();
   pad->running = FALSE;
+  pad->send_flush_stop = FALSE;
   pad->negotiate = NULL;
   pad->capture_pad = capture_pad;
   pad->pushed_buffers = 0;
@@ -571,6 +572,16 @@ unlock_and_out:
   return;
 
 out:
+  if (G_UNLIKELY (data->send_flush_stop)) {
+    GST_DEBUG_OBJECT (src, "sending FLUSH_STOP");
+
+    if (!gst_pad_push_event (data->pad, gst_event_new_flush_stop (TRUE))) {
+      GST_ERROR_OBJECT (src, "failed to push FLUSH_STOP event");
+    }
+
+    data->send_flush_stop = FALSE;
+  }
+
   /* segment */
   if (G_UNLIKELY (data->open_segment)) {
     GstEvent *event;
@@ -1091,11 +1102,14 @@ gst_droidcamsrc_start_video_recording_locked (GstDroidCamSrc * src)
 {
   GST_DEBUG_OBJECT (src, "start video recording");
 
+  /* TODO: is is that safe to do this? the assumption is _loop () is sleeping */
+  src->vidsrc->open_segment = TRUE;
+  src->vidsrc->send_flush_stop = TRUE;
+
   if (!gst_droidcamsrc_dev_start_video_recording (src->dev)) {
     GST_ERROR_OBJECT (src, "failed to start image capture");
     return FALSE;
   }
-  // TODO:
 
   return TRUE;
 }
