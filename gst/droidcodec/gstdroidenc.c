@@ -256,6 +256,10 @@ gst_droidenc_loop (GstDroidEnc * enc)
         gst_video_encoder_allocate_output_buffer (GST_VIDEO_ENCODER (enc),
         buff->nFilledLen);
 
+    if (buff->nFlags & OMX_BUFFERFLAG_SYNCFRAME) {
+      GST_VIDEO_CODEC_FRAME_SET_SYNC_POINT (frame);
+    }
+
     gst_buffer_map (frame->output_buffer, &map, GST_MAP_WRITE);
     memcpy (map.data, buff->pBuffer + buff->nOffset, buff->nFilledLen);
     gst_buffer_unmap (frame->output_buffer, &map);
