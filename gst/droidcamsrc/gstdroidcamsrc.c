@@ -114,7 +114,7 @@ gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
   pad->negotiate = NULL;
   pad->capture_pad = capture_pad;
   pad->pushed_buffers = 0;
-
+  pad->adjust_segment = FALSE;
   gst_segment_init (&pad->segment, GST_FORMAT_TIME);
 
   gst_element_add_pad (GST_ELEMENT (src), pad->pad);
@@ -153,6 +153,7 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
 
   src->vidsrc = gst_droidcamsrc_create_pad (src,
       &vid_src_template_factory, GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME, TRUE);
+  src->vidsrc->adjust_segment = TRUE;
   src->vidsrc->negotiate = gst_droidcamsrc_vidsrc_negotiate;
 
   GST_OBJECT_FLAG_SET (src, GST_ELEMENT_FLAG_SOURCE);
@@ -576,7 +577,10 @@ out:
 
     GST_DEBUG_OBJECT (src, "Pushing SEGMENT");
 
-    // TODO: consider buffer timestamp as start?
+    if (data->adjust_segment) {
+      data->segment.start = GST_BUFFER_TIMESTAMP (buffer);
+    }
+
     event = gst_event_new_segment (&data->segment);
 
     if (!gst_pad_push_event (data->pad, event)) {
@@ -1210,6 +1214,7 @@ gst_droidcamsrc_timestamp (GstDroidCamSrc * src, GstBuffer * buffer)
 
   gst_object_unref (clock);
 
+  // TODO: duration
   GST_BUFFER_DTS (buffer) = ts;
   GST_BUFFER_PTS (buffer) = ts;
 }

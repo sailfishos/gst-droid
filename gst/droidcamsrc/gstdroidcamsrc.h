@@ -74,6 +74,7 @@ struct _GstDroidCamSrcPad
   gboolean running;
   gboolean open_stream;
   gboolean open_segment;
+  gboolean adjust_segment;
   gboolean capture_pad;
   unsigned pushed_buffers;
   GstSegment segment;
