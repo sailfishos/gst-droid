@@ -202,7 +202,28 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
       break;
 
     case PROP_MODE:
-      src->mode = g_value_get_enum (value);
+    {
+      GstCameraBinMode mode = g_value_get_enum (value);
+
+      GST_INFO_OBJECT (src, "setting capture mode to : %d", mode);
+
+      if (src->mode == mode) {
+        GST_INFO_OBJECT (src, "not resetting the same mode");
+        break;
+      }
+
+      g_mutex_lock (&src->capture_lock);
+      if (src->captures > 0) {
+        GST_WARNING_OBJECT (src, "cannot set capture mode while capturing");
+        g_mutex_unlock (&src->capture_lock);
+        break;
+      }
+
+      g_mutex_unlock (&src->capture_lock);
+
+      src->mode = mode;
+    }
+
       break;
 
     default:
