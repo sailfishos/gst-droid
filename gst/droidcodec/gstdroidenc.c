@@ -492,6 +492,11 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
 
   GST_DEBUG_OBJECT (enc, "handle frame");
 
+  if (!enc->comp) {
+    GST_ERROR_OBJECT (enc, "component not initialized");
+    goto out;
+  }
+
   if (gst_droid_codec_has_error (enc->comp)) {
     GST_ERROR_OBJECT (enc, "not handling frame while omx is in error state");
     goto out;
