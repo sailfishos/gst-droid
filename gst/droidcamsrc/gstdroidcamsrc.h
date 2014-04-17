@@ -32,7 +32,6 @@
 #endif /* GST_USE_UNSTABLE_API */
 #include <gst/basecamerabinsrc/gstcamerabin-enum.h>
 #include <gst/basecamerabinsrc/gstbasecamerasrc.h>
-#include <gst/interfaces/photography.h>
 
 G_BEGIN_DECLS
 
@@ -56,6 +55,7 @@ typedef struct _GstDroidCamSrc GstDroidCamSrc;
 typedef struct _GstDroidCamSrcClass GstDroidCamSrcClass;
 typedef struct _GstDroidCamSrcCamInfo GstDroidCamSrcCamInfo;
 typedef struct _GstDroidCamSrcPad GstDroidCamSrcPad;
+typedef struct _GstDroidCamSrcPhotography GstDroidCamSrcPhotography;
 
 typedef gboolean (* GstDroidCamSrcNegotiateCallback)(GstDroidCamSrcPad * pad);
 
@@ -102,7 +102,7 @@ struct _GstDroidCamSrc
   int captures;
   GMutex capture_lock;
 
-  GstPhotographySettings photo;
+  GstDroidCamSrcPhotography * photo;
 };
 
 struct _GstDroidCamSrcClass

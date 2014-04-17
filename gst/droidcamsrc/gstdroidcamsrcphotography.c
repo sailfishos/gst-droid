@@ -30,15 +30,20 @@
 #endif /* GST_USE_UNSTABLE_API */
 #include <gst/interfaces/photography.h>
 
+struct _GstDroidCamSrcPhotography
+{
+  GstPhotographySettings settings;
+};
+
 void
-gst_droidcamsrc_photography_init (gpointer g_iface, gpointer iface_data)
+gst_droidcamsrc_photography_register (gpointer g_iface, gpointer iface_data)
 {
   // TODO:
 
 }
 
 void
-gst_droidcamsrc_photography_override (GObjectClass * klass)
+gst_droidcamsrc_photography_add_overrides (GObjectClass * klass)
 {
   g_object_class_override_property (klass, PROP_WB_MODE,
       GST_PHOTOGRAPHY_PROP_WB_MODE);
@@ -150,25 +155,35 @@ gst_droidcamsrc_photography_set_property (GstDroidCamSrc * src, guint prop_id,
 }
 
 void
-gst_droidcamsrc_photography_reset (GstDroidCamSrc * src)
+gst_droidcamsrc_photography_init (GstDroidCamSrc * src)
 {
-  src->photo.wb_mode = GST_PHOTOGRAPHY_WB_MODE_AUTO;
-  src->photo.tone_mode = GST_PHOTOGRAPHY_COLOR_TONE_MODE_NORMAL;
-  src->photo.scene_mode = GST_PHOTOGRAPHY_SCENE_MODE_AUTO;
-  src->photo.flash_mode = GST_PHOTOGRAPHY_FLASH_MODE_AUTO;
-  src->photo.exposure_time = 0;
-  src->photo.aperture = 0;
-  src->photo.ev_compensation = 0.0;
-  src->photo.iso_speed = 0;
-  src->photo.zoom = 1.0;
-  src->photo.flicker_mode = GST_PHOTOGRAPHY_FLICKER_REDUCTION_OFF;
-  src->photo.focus_mode = GST_PHOTOGRAPHY_FOCUS_MODE_CONTINUOUS_NORMAL;
-  src->photo.noise_reduction = 0;       /* TODO: what to use here? */
-  src->photo.exposure_mode = GST_PHOTOGRAPHY_EXPOSURE_MODE_AUTO;        /* TODO: not a property? */
-  src->photo.color_temperature = 0;     /* TODO: what to use here? */
-  memset (&src->photo.white_point, 0x0, sizeof (src->photo.white_point));       /* TODO: what to use here? */
-  src->photo.analog_gain = 0.0; /* TODO: what to use here? */
-  src->photo.lens_focus = 0.0;  /* TODO: what to use here? */
-  src->photo.min_exposure_time = 0;     /* TODO: what to use here? */
-  src->photo.max_exposure_time = 0;     /* TODO: what to use here? */
+  src->photo = g_slice_new0 (GstDroidCamSrcPhotography);
+
+  src->photo->settings.wb_mode = GST_PHOTOGRAPHY_WB_MODE_AUTO;
+  src->photo->settings.tone_mode = GST_PHOTOGRAPHY_COLOR_TONE_MODE_NORMAL;
+  src->photo->settings.scene_mode = GST_PHOTOGRAPHY_SCENE_MODE_AUTO;
+  src->photo->settings.flash_mode = GST_PHOTOGRAPHY_FLASH_MODE_AUTO;
+  src->photo->settings.exposure_time = 0;
+  src->photo->settings.aperture = 0;
+  src->photo->settings.ev_compensation = 0.0;
+  src->photo->settings.iso_speed = 0;
+  src->photo->settings.zoom = 1.0;
+  src->photo->settings.flicker_mode = GST_PHOTOGRAPHY_FLICKER_REDUCTION_OFF;
+  src->photo->settings.focus_mode =
+      GST_PHOTOGRAPHY_FOCUS_MODE_CONTINUOUS_NORMAL;
+  src->photo->settings.noise_reduction = 0;     /* TODO: what to use here? */
+  src->photo->settings.exposure_mode = GST_PHOTOGRAPHY_EXPOSURE_MODE_AUTO;      /* TODO: not a property? */
+  src->photo->settings.color_temperature = 0;   /* TODO: what to use here? */
+  memset (&src->photo->settings.white_point, 0x0, sizeof (src->photo->settings.white_point));   /* TODO: what to use here? */
+  src->photo->settings.analog_gain = 0.0;       /* TODO: what to use here? */
+  src->photo->settings.lens_focus = 0.0;        /* TODO: what to use here? */
+  src->photo->settings.min_exposure_time = 0;   /* TODO: what to use here? */
+  src->photo->settings.max_exposure_time = 0;   /* TODO: what to use here? */
+}
+
+void
+gst_droidcamsrc_photography_destroy (GstDroidCamSrc * src)
+{
+  g_slice_free (GstDroidCamSrcPhotography, src->photo);
+  src->photo = NULL;
 }

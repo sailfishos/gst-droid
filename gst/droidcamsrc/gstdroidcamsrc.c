@@ -29,11 +29,15 @@
 #include <gst/memory/gstgralloc.h>
 #include <gst/memory/gstwrappedmemory.h>
 #include "gstdroidcamsrcphotography.h"
+#ifndef GST_USE_UNSTABLE_API
+#define GST_USE_UNSTABLE_API
+#endif /* GST_USE_UNSTABLE_API */
+#include <gst/interfaces/photography.h>
 
 #define gst_droidcamsrc_parent_class parent_class
 G_DEFINE_TYPE_WITH_CODE (GstDroidCamSrc, gst_droidcamsrc, GST_TYPE_ELEMENT,
     G_IMPLEMENT_INTERFACE (GST_TYPE_PHOTOGRAPHY,
-        gst_droidcamsrc_photography_init));
+        gst_droidcamsrc_photography_register));
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 #define GST_CAT_DEFAULT gst_droidcamsrc_debug
@@ -139,7 +143,7 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   src->captures = 0;
   g_mutex_init (&src->capture_lock);
 
-  gst_droidcamsrc_photography_reset (src);
+  gst_droidcamsrc_photography_init (src);
 
   src->vfsrc = gst_droidcamsrc_create_pad (src,
       &vf_src_template_factory, GST_BASE_CAMERA_SRC_VIEWFINDER_PAD_NAME, FALSE);
@@ -250,7 +254,8 @@ gst_droidcamsrc_finalize (GObject * object)
   gst_droidcamsrc_destroy_pad (src->vidsrc);
 
   g_mutex_clear (&src->capture_lock);
-  // TODO:
+
+  gst_droidcamsrc_photography_destroy (src);
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
@@ -498,7 +503,7 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
           "Element is ready for another capture",
           TRUE, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
-  gst_droidcamsrc_photography_override (gobject_class);
+  gst_droidcamsrc_photography_add_overrides (gobject_class);
 
   /* Signals */
   droidcamsrc_signals[START_CAPTURE_SIGNAL] =
@@ -514,7 +519,6 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
       G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
       G_CALLBACK (gst_droidcamsrc_stop_capture),
       NULL, NULL, g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0);
-
 }
 
 static void
