@@ -28,10 +28,6 @@
 #include <gst/video/video.h>
 #include <gst/memory/gstgralloc.h>
 #include <gst/memory/gstwrappedmemory.h>
-#ifndef GST_USE_UNSTABLE_API
-#define GST_USE_UNSTABLE_API
-#endif /* GST_USE_UNSTABLE_API */
-#include <gst/interfaces/photography.h>
 #include "gstdroidcamsrcphotography.h"
 
 #define gst_droidcamsrc_parent_class parent_class
@@ -142,6 +138,8 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   src->mode = DEFAULT_MODE;
   src->captures = 0;
   g_mutex_init (&src->capture_lock);
+
+  gst_droidcamsrc_photography_reset (src);
 
   src->vfsrc = gst_droidcamsrc_create_pad (src,
       &vf_src_template_factory, GST_BASE_CAMERA_SRC_VIEWFINDER_PAD_NAME, FALSE);

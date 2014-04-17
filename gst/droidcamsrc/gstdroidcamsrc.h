@@ -26,12 +26,13 @@
 #include "gstdroidcamsrcdev.h"
 #include "gstdroidcamsrcenums.h"
 #include <hardware/camera.h>
+#include <gst/meta/nemometa.h>
 #ifndef GST_USE_UNSTABLE_API
 #define GST_USE_UNSTABLE_API
+#endif /* GST_USE_UNSTABLE_API */
 #include <gst/basecamerabinsrc/gstcamerabin-enum.h>
 #include <gst/basecamerabinsrc/gstbasecamerasrc.h>
-#endif /* GST_USE_UNSTABLE_API */
-#include <gst/meta/nemometa.h>
+#include <gst/interfaces/photography.h>
 
 G_BEGIN_DECLS
 
@@ -100,6 +101,8 @@ struct _GstDroidCamSrc
 
   int captures;
   GMutex capture_lock;
+
+  GstPhotographySettings photo;
 };
 
 struct _GstDroidCamSrcClass

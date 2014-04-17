@@ -24,6 +24,7 @@
 #endif
 
 #include "gstdroidcamsrcphotography.h"
+#include "gstdroidcamsrc.h"
 #ifndef GST_USE_UNSTABLE_API
 #define GST_USE_UNSTABLE_API
 #endif /* GST_USE_UNSTABLE_API */
@@ -146,4 +147,28 @@ gst_droidcamsrc_photography_set_property (GstDroidCamSrc * src, guint prop_id,
   }
 
   return FALSE;
+}
+
+void
+gst_droidcamsrc_photography_reset (GstDroidCamSrc * src)
+{
+  src->photo.wb_mode = GST_PHOTOGRAPHY_WB_MODE_AUTO;
+  src->photo.tone_mode = GST_PHOTOGRAPHY_COLOR_TONE_MODE_NORMAL;
+  src->photo.scene_mode = GST_PHOTOGRAPHY_SCENE_MODE_AUTO;
+  src->photo.flash_mode = GST_PHOTOGRAPHY_FLASH_MODE_AUTO;
+  src->photo.exposure_time = 0;
+  src->photo.aperture = 0;
+  src->photo.ev_compensation = 0.0;
+  src->photo.iso_speed = 0;
+  src->photo.zoom = 1.0;
+  src->photo.flicker_mode = GST_PHOTOGRAPHY_FLICKER_REDUCTION_OFF;
+  src->photo.focus_mode = GST_PHOTOGRAPHY_FOCUS_MODE_CONTINUOUS_NORMAL;
+  src->photo.noise_reduction = 0;       /* TODO: what to use here? */
+  src->photo.exposure_mode = GST_PHOTOGRAPHY_EXPOSURE_MODE_AUTO;        /* TODO: not a property? */
+  src->photo.color_temperature = 0;     /* TODO: what to use here? */
+  memset (&src->photo.white_point, 0x0, sizeof (src->photo.white_point));       /* TODO: what to use here? */
+  src->photo.analog_gain = 0.0; /* TODO: what to use here? */
+  src->photo.lens_focus = 0.0;  /* TODO: what to use here? */
+  src->photo.min_exposure_time = 0;     /* TODO: what to use here? */
+  src->photo.max_exposure_time = 0;     /* TODO: what to use here? */
 }
