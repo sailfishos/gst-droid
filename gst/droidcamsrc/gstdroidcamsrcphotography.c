@@ -30,41 +30,72 @@
 #endif /* GST_USE_UNSTABLE_API */
 #include <gst/interfaces/photography.h>
 
+enum EntryType
+{
+  TYPE_UINT,
+  TYPE_ENUM,
+  TYPE_FLOAT,
+  TYPE_UNK,
+};
+
 struct Entry
 {
   int prop;
   const gchar *photo_prop;
+  enum EntryType type;
 };
 
 struct Entry Entries[] = {
-  {PROP_WB_MODE, GST_PHOTOGRAPHY_PROP_WB_MODE},
-  {PROP_COLOR_TONE, GST_PHOTOGRAPHY_PROP_COLOR_TONE},
-  {PROP_SCENE_MODE, GST_PHOTOGRAPHY_PROP_SCENE_MODE},
-  {PROP_FLASH_MODE, GST_PHOTOGRAPHY_PROP_FLASH_MODE},
-  {PROP_FLICKER_MODE, GST_PHOTOGRAPHY_PROP_FLICKER_MODE},
-  {PROP_FOCUS_MODE, GST_PHOTOGRAPHY_PROP_FOCUS_MODE},
-  {PROP_CAPABILITIES, GST_PHOTOGRAPHY_PROP_CAPABILITIES},
-  {PROP_EV_COMP, GST_PHOTOGRAPHY_PROP_EV_COMP},
-  {PROP_ISO_SPEED, GST_PHOTOGRAPHY_PROP_ISO_SPEED},
-  {PROP_APERTURE, GST_PHOTOGRAPHY_PROP_APERTURE},
-  {PROP_EXPOSURE_TIME, GST_PHOTOGRAPHY_PROP_EXPOSURE_TIME},
+  /* enums */
+  {PROP_WB_MODE, GST_PHOTOGRAPHY_PROP_WB_MODE, TYPE_ENUM},
+  {PROP_COLOR_TONE, GST_PHOTOGRAPHY_PROP_COLOR_TONE, TYPE_ENUM},
+  {PROP_SCENE_MODE, GST_PHOTOGRAPHY_PROP_SCENE_MODE, TYPE_ENUM},
+  {PROP_FLASH_MODE, GST_PHOTOGRAPHY_PROP_FLASH_MODE, TYPE_ENUM},
+  {PROP_FLICKER_MODE, GST_PHOTOGRAPHY_PROP_FLICKER_MODE, TYPE_ENUM},
+  {PROP_FOCUS_MODE, GST_PHOTOGRAPHY_PROP_FOCUS_MODE, TYPE_ENUM},
+  {PROP_EXPOSURE_MODE, GST_PHOTOGRAPHY_PROP_EXPOSURE_MODE, TYPE_ENUM},
+  {PROP_NOISE_REDUCTION, GST_PHOTOGRAPHY_PROP_NOISE_REDUCTION, TYPE_ENUM},
+
+  /* floats */
+  {PROP_ZOOM, GST_PHOTOGRAPHY_PROP_ZOOM, TYPE_FLOAT},
+  {PROP_EV_COMP, GST_PHOTOGRAPHY_PROP_EV_COMP, TYPE_FLOAT},
+  {PROP_ANALOG_GAIN, GST_PHOTOGRAPHY_PROP_ANALOG_GAIN, TYPE_FLOAT},
+  {PROP_LENS_FOCUS, GST_PHOTOGRAPHY_PROP_LENS_FOCUS, TYPE_FLOAT},
+
+  /* unsigned ints */
+  {PROP_APERTURE, GST_PHOTOGRAPHY_PROP_APERTURE, TYPE_UINT},
+  {PROP_ISO_SPEED, GST_PHOTOGRAPHY_PROP_ISO_SPEED, TYPE_UINT},
+  {PROP_COLOR_TEMPERATURE, GST_PHOTOGRAPHY_PROP_COLOR_TEMPERATURE, TYPE_UINT},
+  {PROP_MIN_EXPOSURE_TIME, GST_PHOTOGRAPHY_PROP_MIN_EXPOSURE_TIME, TYPE_UINT},
+  {PROP_MAX_EXPOSURE_TIME, GST_PHOTOGRAPHY_PROP_MAX_EXPOSURE_TIME, TYPE_UINT},
+
+  /* unsigned int32 */
+  {PROP_EXPOSURE_TIME, GST_PHOTOGRAPHY_PROP_EXPOSURE_TIME, TYPE_UINT},
+
+  /* unknown */
+  {PROP_CAPABILITIES, GST_PHOTOGRAPHY_PROP_CAPABILITIES, TYPE_UNK},
   {PROP_IMAGE_CAPTURE_SUPPORTED_CAPS,
-      GST_PHOTOGRAPHY_PROP_IMAGE_CAPTURE_SUPPORTED_CAPS},
+      GST_PHOTOGRAPHY_PROP_IMAGE_CAPTURE_SUPPORTED_CAPS, TYPE_UNK},
   {PROP_IMAGE_PREVIEW_SUPPORTED_CAPS,
-      GST_PHOTOGRAPHY_PROP_IMAGE_PREVIEW_SUPPORTED_CAPS},
-  {PROP_ZOOM, GST_PHOTOGRAPHY_PROP_ZOOM},
-  {PROP_COLOR_TEMPERATURE, GST_PHOTOGRAPHY_PROP_COLOR_TEMPERATURE},
-  {PROP_WHITE_POINT, GST_PHOTOGRAPHY_PROP_WHITE_POINT},
-  {PROP_ANALOG_GAIN, GST_PHOTOGRAPHY_PROP_ANALOG_GAIN},
-  {PROP_LENS_FOCUS, GST_PHOTOGRAPHY_PROP_LENS_FOCUS},
-  {PROP_MIN_EXPOSURE_TIME, GST_PHOTOGRAPHY_PROP_MIN_EXPOSURE_TIME},
-  {PROP_MAX_EXPOSURE_TIME, GST_PHOTOGRAPHY_PROP_MAX_EXPOSURE_TIME},
-  {PROP_NOISE_REDUCTION, GST_PHOTOGRAPHY_PROP_NOISE_REDUCTION},
+      GST_PHOTOGRAPHY_PROP_IMAGE_PREVIEW_SUPPORTED_CAPS, TYPE_UNK},
+  {PROP_WHITE_POINT, GST_PHOTOGRAPHY_PROP_WHITE_POINT, TYPE_UNK},
+};
+
+struct PhotoEntry
+{
+  enum EntryType type;
+
+  union
+  {
+    int ival;
+    uint uval;
+    float fval;
+  };
 };
 
 struct _GstDroidCamSrcPhotography
 {
-  GstPhotographySettings settings;
+  struct PhotoEntry entries[PROP_PHOTO_MAX - 1];
 };
 
 void
@@ -90,8 +121,6 @@ gboolean
 gst_droidcamsrc_photography_get_property (GstDroidCamSrc * src, guint prop_id,
     GValue * value, GParamSpec * pspec)
 {
-  // TODO:
-
   switch (prop_id) {
     case PROP_WB_MODE:
     case PROP_COLOR_TONE:
@@ -99,22 +128,33 @@ gst_droidcamsrc_photography_get_property (GstDroidCamSrc * src, guint prop_id,
     case PROP_FLASH_MODE:
     case PROP_FLICKER_MODE:
     case PROP_FOCUS_MODE:
-    case PROP_CAPABILITIES:
-    case PROP_EV_COMP:
-    case PROP_ISO_SPEED:
-    case PROP_APERTURE:
-    case PROP_EXPOSURE_TIME:
-    case PROP_IMAGE_CAPTURE_SUPPORTED_CAPS:
-    case PROP_IMAGE_PREVIEW_SUPPORTED_CAPS:
-    case PROP_ZOOM:
-    case PROP_COLOR_TEMPERATURE:
-    case PROP_WHITE_POINT:
-    case PROP_ANALOG_GAIN:
-    case PROP_LENS_FOCUS:
-    case PROP_MIN_EXPOSURE_TIME:
-    case PROP_MAX_EXPOSURE_TIME:
     case PROP_NOISE_REDUCTION:
     case PROP_EXPOSURE_MODE:
+      g_value_set_enum (value, src->photo->entries[prop_id - 1].ival);
+      return TRUE;
+
+    case PROP_ZOOM:
+    case PROP_EV_COMP:
+    case PROP_ANALOG_GAIN:
+    case PROP_LENS_FOCUS:
+      g_value_set_float (value, src->photo->entries[prop_id - 1].fval);
+      return TRUE;
+
+    case PROP_APERTURE:
+    case PROP_ISO_SPEED:
+    case PROP_COLOR_TEMPERATURE:
+    case PROP_MIN_EXPOSURE_TIME:
+    case PROP_MAX_EXPOSURE_TIME:
+    case PROP_EXPOSURE_TIME:
+      g_value_set_uint (value, src->photo->entries[prop_id - 1].uval);
+      return TRUE;
+
+    case PROP_CAPABILITIES:
+    case PROP_IMAGE_CAPTURE_SUPPORTED_CAPS:
+    case PROP_IMAGE_PREVIEW_SUPPORTED_CAPS:
+    case PROP_WHITE_POINT:
+      // TODO:
+
       return TRUE;
   }
 
@@ -156,28 +196,50 @@ gst_droidcamsrc_photography_set_property (GstDroidCamSrc * src, guint prop_id,
 void
 gst_droidcamsrc_photography_init (GstDroidCamSrc * src)
 {
+  int x;
+  int len = G_N_ELEMENTS (Entries);
+
   src->photo = g_slice_new0 (GstDroidCamSrcPhotography);
 
-  src->photo->settings.wb_mode = GST_PHOTOGRAPHY_WB_MODE_AUTO;
-  src->photo->settings.tone_mode = GST_PHOTOGRAPHY_COLOR_TONE_MODE_NORMAL;
-  src->photo->settings.scene_mode = GST_PHOTOGRAPHY_SCENE_MODE_AUTO;
-  src->photo->settings.flash_mode = GST_PHOTOGRAPHY_FLASH_MODE_AUTO;
-  src->photo->settings.exposure_time = 0;
-  src->photo->settings.aperture = 0;
-  src->photo->settings.ev_compensation = 0.0;
-  src->photo->settings.iso_speed = 0;
-  src->photo->settings.zoom = 1.0;
-  src->photo->settings.flicker_mode = GST_PHOTOGRAPHY_FLICKER_REDUCTION_OFF;
-  src->photo->settings.focus_mode =
+  for (x = 0; x < len; x++) {
+    int prop_id = Entries[x].prop - 1;
+    src->photo->entries[prop_id].type = Entries[x].type;
+  }
+
+  src->photo->entries[PROP_WB_MODE - 1].ival = GST_PHOTOGRAPHY_WB_MODE_AUTO;
+  src->photo->entries[PROP_COLOR_TONE - 1].ival =
+      GST_PHOTOGRAPHY_COLOR_TONE_MODE_NORMAL;
+  src->photo->entries[PROP_SCENE_MODE - 1].ival =
+      GST_PHOTOGRAPHY_SCENE_MODE_AUTO;
+  src->photo->entries[PROP_FLASH_MODE - 1].ival =
+      GST_PHOTOGRAPHY_FLASH_MODE_AUTO;
+  src->photo->entries[PROP_FLICKER_MODE - 1].ival =
+      GST_PHOTOGRAPHY_FLICKER_REDUCTION_OFF;
+  src->photo->entries[PROP_FOCUS_MODE - 1].ival =
       GST_PHOTOGRAPHY_FOCUS_MODE_CONTINUOUS_NORMAL;
-  src->photo->settings.noise_reduction = 0;     /* TODO: what to use here? */
-  src->photo->settings.exposure_mode = GST_PHOTOGRAPHY_EXPOSURE_MODE_AUTO;      /* TODO: not a property? */
-  src->photo->settings.color_temperature = 0;   /* TODO: what to use here? */
-  memset (&src->photo->settings.white_point, 0x0, sizeof (src->photo->settings.white_point));   /* TODO: what to use here? */
-  src->photo->settings.analog_gain = 0.0;       /* TODO: what to use here? */
-  src->photo->settings.lens_focus = 0.0;        /* TODO: what to use here? */
-  src->photo->settings.min_exposure_time = 0;   /* TODO: what to use here? */
-  src->photo->settings.max_exposure_time = 0;   /* TODO: what to use here? */
+  src->photo->entries[PROP_NOISE_REDUCTION - 1].ival = 0;       /* TODO: is that correct? */
+  src->photo->entries[PROP_EXPOSURE_MODE - 1].ival =
+      GST_PHOTOGRAPHY_EXPOSURE_MODE_AUTO;
+
+  src->photo->entries[PROP_ZOOM - 1].fval = 1.0;
+  src->photo->entries[PROP_EV_COMP - 1].fval = 0.0;
+  src->photo->entries[PROP_ANALOG_GAIN - 1].fval = 0.0; /* TODO: is that correct? */
+  src->photo->entries[PROP_LENS_FOCUS - 1].fval = 0.0;  /* TODO: is that correct? */
+
+  src->photo->entries[PROP_APERTURE - 1].uval = 0;
+  src->photo->entries[PROP_ISO_SPEED - 1].uval = 0;
+  src->photo->entries[PROP_COLOR_TEMPERATURE - 1].uval = 0;     /* TODO: is that correct? */
+  src->photo->entries[PROP_MIN_EXPOSURE_TIME - 1].uval = 0;     /* TODO: is that correct? */
+  src->photo->entries[PROP_MAX_EXPOSURE_TIME - 1].uval = 0;     /* TODO: is that correct? */
+  src->photo->entries[PROP_EXPOSURE_TIME - 1].uval = 0; /* TODO: is that correct? */
+
+  /* TODO: we handle those manually */
+  /*
+   * src->photo->entries[PROP_CAPABILITIES - 1];
+   * src->photo->entries[PROP_IMAGE_CAPTURE_SUPPORTED_CAPS - 1];
+   * src->photo->entries[PROP_IMAGE_PREVIEW_SUPPORTED_CAPS - 1];
+   * src->photo->entries[PROP_WHITE_POINT - 1];
+   */
 }
 
 void
