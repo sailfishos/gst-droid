@@ -72,6 +72,8 @@ gboolean gst_droidcamsrc_dev_capture_image (GstDroidCamSrcDev * dev);
 gboolean gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev);
 void gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev);
 
+void gst_droidcamsrc_dev_update_params (GstDroidCamSrcDev * dev);
+
 G_END_DECLS
 
 #endif /* __GST_DROID_CAM_SRC_DEV_H__ */

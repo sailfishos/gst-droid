@@ -51,6 +51,7 @@ struct _GstDroidCamSrcVideoCaptureState
 
 static void gst_droidcamsrc_dev_release_recording_frame (void *data,
     GstDroidCamSrcDev * dev);
+void gst_droidcamsrc_dev_update_params_locked (GstDroidCamSrcDev * dev);
 
 static camera_memory_t *
 gst_droidcamsrc_dev_request_memory (int fd, size_t buf_size,
@@ -308,8 +309,8 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
 gboolean
 gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
 {
-  gchar *params;
   int err;
+  gchar *params;
 
   GST_DEBUG ("dev init");
 
@@ -317,19 +318,11 @@ gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
 
   dev->win = gst_droid_cam_src_stream_window_new (dev->vfsrc, dev->info);
 
-  params = dev->dev->ops->get_parameters (dev->dev);
+  gst_droidcamsrc_dev_update_params_locked (dev);
 
-  dev->params = gst_droidcamsrc_params_new (params);
-
+  params = gst_droidcamsrc_params_to_string (dev->params);
   dev->dev->ops->set_parameters (dev->dev, params);
-
-  if (dev->dev->ops->put_parameters) {
-    dev->dev->ops->put_parameters (dev->dev, params);
-  } else {
-    free (params);
-  }
-
-  params = NULL;
+  g_free (params);
 
   dev->dev->ops->set_callbacks (dev->dev, gst_droidcamsrc_dev_notify_callback,
       gst_droidcamsrc_dev_data_callback,
@@ -570,5 +563,33 @@ gst_droidcamsrc_dev_release_recording_frame (void *data,
   g_mutex_lock (&dev->lock);
   --dev->vid->queued_frames;
   dev->dev->ops->release_recording_frame (dev->dev, data);
+  g_mutex_unlock (&dev->lock);
+}
+
+void
+gst_droidcamsrc_dev_update_params_locked (GstDroidCamSrcDev * dev)
+{
+  gchar *params;
+
+  params = dev->dev->ops->get_parameters (dev->dev);
+
+  if (dev->params) {
+    gst_droidcamsrc_params_reload (dev->params, params);
+  } else {
+    dev->params = gst_droidcamsrc_params_new (params);
+  }
+
+  if (dev->dev->ops->put_parameters) {
+    dev->dev->ops->put_parameters (dev->dev, params);
+  } else {
+    free (params);
+  }
+}
+
+void
+gst_droidcamsrc_dev_update_params (GstDroidCamSrcDev * dev)
+{
+  g_mutex_lock (&dev->lock);
+  gst_droidcamsrc_dev_update_params_locked (dev);
   g_mutex_unlock (&dev->lock);
 }
