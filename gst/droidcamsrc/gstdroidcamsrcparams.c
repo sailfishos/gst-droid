@@ -117,6 +117,7 @@ gst_droidcamsrc_params_get_string_locked (GstDroidCamSrcParams * params,
   return list->data;
 }
 #endif
+
 static int
 gst_droidcamsrc_params_get_int_locked (GstDroidCamSrcParams * params,
     const char *key)
@@ -127,6 +128,18 @@ gst_droidcamsrc_params_get_int_locked (GstDroidCamSrcParams * params,
   }
 
   return atoi (list->data);
+}
+
+int
+gst_droidcamsrc_params_get_int (GstDroidCamSrcParams * params, const char *key)
+{
+  int value;
+
+  g_mutex_lock (&params->lock);
+  value = gst_droidcamsrc_params_get_int_locked (params, key);
+  g_mutex_unlock (&params->lock);
+
+  return value;
 }
 
 static gboolean
