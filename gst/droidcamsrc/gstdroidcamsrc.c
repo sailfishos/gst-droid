@@ -1109,6 +1109,7 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
   }
 
   /* now update max-zoom that we have a preview size */
+  gst_droidcamsrc_dev_update_params (src->dev);
   gst_droidcamsrc_update_max_zoom (src);
 
   ret = TRUE;
