@@ -130,13 +130,10 @@ gst_droidcamsrc_photography_set_property (GstDroidCamSrc * src, guint prop_id,
     case PROP_FLASH_MODE:
     case PROP_FLICKER_MODE:
     case PROP_FOCUS_MODE:
-    case PROP_CAPABILITIES:
     case PROP_EV_COMP:
     case PROP_ISO_SPEED:
     case PROP_APERTURE:
     case PROP_EXPOSURE_TIME:
-    case PROP_IMAGE_CAPTURE_SUPPORTED_CAPS:
-    case PROP_IMAGE_PREVIEW_SUPPORTED_CAPS:
     case PROP_ZOOM:
     case PROP_COLOR_TEMPERATURE:
     case PROP_WHITE_POINT:
