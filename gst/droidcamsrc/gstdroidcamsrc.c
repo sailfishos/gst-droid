@@ -90,6 +90,7 @@ static guint droidcamsrc_signals[LAST_SIGNAL];
 #define DEFAULT_CAMERA_DEVICE GST_DROIDCAMSRC_CAMERA_DEVICE_PRIMARY
 #define DEFAULT_MODE          MODE_IMAGE
 #define DEFAULT_MAX_ZOOM      10.0f
+#define DEFAULT_VIDEO_TORCH   FALSE
 
 static GstDroidCamSrcPad *
 gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
@@ -193,6 +194,8 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
       g_value_set_float (value, src->max_zoom);
       break;
 
+    case PROP_VIDEO_TORCH:
+      // TODO:
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -242,6 +245,9 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
     }
 
       break;
+
+    case PROP_VIDEO_TORCH:
+      // TODO:
 
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -519,6 +525,10 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
           "Android zoom factor", 1.0f, G_MAXFLOAT,
           DEFAULT_MAX_ZOOM, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_VIDEO_TORCH,
+      g_param_spec_boolean ("video-torch", "Video torch",
+          "Sets torch light on or off for video recording", DEFAULT_VIDEO_TORCH,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   gst_droidcamsrc_photography_add_overrides (gobject_class);
 
   /* Signals */
