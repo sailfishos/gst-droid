@@ -266,3 +266,40 @@ gst_droidcamsrc_photography_destroy (GstDroidCamSrc * src)
   g_slice_free (GstDroidCamSrcPhotography, src->photo);
   src->photo = NULL;
 }
+
+GHashTable *
+gst_droidcamsrc_photography_load (GKeyFile * file, const gchar * property)
+{
+  gchar **keys;
+  GError *err;
+  int x;
+  gsize len = 0;
+  GHashTable *table =
+      g_hash_table_new_full (g_direct_hash, g_direct_equal, NULL, g_free);
+
+  keys = g_key_file_get_keys (file, property, &len, &err);
+
+  if (err) {
+    GST_WARNING ("failed to load %s: %s", property, err->message);
+    g_error_free (err);
+    err = NULL;
+  }
+
+  for (x = 0; x < len; x++) {
+    gchar *value = g_key_file_get_value (file, property, keys[x], &err);
+
+    if (err) {
+      GST_WARNING ("failed to load %s (%s): %s", property, keys[x],
+          err->message);
+      g_error_free (err);
+      err = NULL;
+    }
+
+    if (value) {
+      int key = atoi (keys[x]);
+      g_hash_table_insert (table, GINT_TO_POINTER (key), value);
+    }
+  }
+
+  return table;
+}
