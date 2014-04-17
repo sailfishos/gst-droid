@@ -114,6 +114,7 @@ gst_droidcamsrc_photography_get_property (GstDroidCamSrc * src, guint prop_id,
     case PROP_MIN_EXPOSURE_TIME:
     case PROP_MAX_EXPOSURE_TIME:
     case PROP_NOISE_REDUCTION:
+    case PROP_EXPOSURE_MODE:
       return TRUE;
   }
 
@@ -145,6 +146,7 @@ gst_droidcamsrc_photography_set_property (GstDroidCamSrc * src, guint prop_id,
     case PROP_MIN_EXPOSURE_TIME:
     case PROP_MAX_EXPOSURE_TIME:
     case PROP_NOISE_REDUCTION:
+    case PROP_EXPOSURE_MODE:
       return TRUE;
   }
 
