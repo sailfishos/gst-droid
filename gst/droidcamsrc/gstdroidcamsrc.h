@@ -103,6 +103,7 @@ struct _GstDroidCamSrc
   GMutex capture_lock;
 
   GstDroidCamSrcPhotography * photo;
+  gfloat max_zoom;
 };
 
 struct _GstDroidCamSrcClass

@@ -74,6 +74,7 @@ static gboolean gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data);
 static void gst_droidcamsrc_start_capture (GstDroidCamSrc * src);
 static void gst_droidcamsrc_stop_capture (GstDroidCamSrc * src);
 static gboolean gst_droidcamsrc_apply_params (GstDroidCamSrc * src);
+static void gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src);
 
 enum
 {
@@ -88,6 +89,7 @@ static guint droidcamsrc_signals[LAST_SIGNAL];
 
 #define DEFAULT_CAMERA_DEVICE GST_DROIDCAMSRC_CAMERA_DEVICE_PRIMARY
 #define DEFAULT_MODE          MODE_IMAGE
+#define DEFAULT_MAX_ZOOM      10.0f
 
 static GstDroidCamSrcPad *
 gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
@@ -142,6 +144,7 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   src->mode = DEFAULT_MODE;
   src->captures = 0;
   g_mutex_init (&src->capture_lock);
+  src->max_zoom = DEFAULT_MAX_ZOOM;
 
   gst_droidcamsrc_photography_init (src);
 
@@ -184,6 +187,10 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
       g_mutex_lock (&src->capture_lock);
       g_value_set_boolean (value, src->captures == 0);
       g_mutex_unlock (&src->capture_lock);
+      break;
+
+    case PROP_MAX_ZOOM:
+      g_value_set_float (value, src->max_zoom);
       break;
 
     default:
@@ -230,6 +237,8 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
       g_mutex_unlock (&src->capture_lock);
 
       src->mode = mode;
+
+      /* TODO: apply mode settings */
     }
 
       break;
@@ -502,6 +511,13 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
       g_param_spec_boolean ("ready-for-capture", "Ready for capture",
           "Element is ready for another capture",
           TRUE, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_MAX_ZOOM,
+      g_param_spec_float ("max-zoom",
+          "Maximum zoom level (note: may change "
+          "depending on resolution/implementation)",
+          "Android zoom factor", 1.0f, G_MAXFLOAT,
+          DEFAULT_MAX_ZOOM, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   gst_droidcamsrc_photography_add_overrides (gobject_class);
 
@@ -1082,6 +1098,9 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
     goto out;
   }
 
+  /* now update max-zoom that we have a preview size */
+  gst_droidcamsrc_update_max_zoom (src);
+
   ret = TRUE;
 
 out:
@@ -1272,4 +1291,56 @@ gst_droidcamsrc_timestamp (GstDroidCamSrc * src, GstBuffer * buffer)
   // TODO: duration
   GST_BUFFER_DTS (buffer) = ts;
   GST_BUFFER_PTS (buffer) = ts;
+}
+
+static void
+gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src)
+{
+  int max_zoom;
+  GParamSpec *pspec;
+  GParamSpecFloat *pspec_f;
+
+  GST_DEBUG_OBJECT (src, "update max zoom");
+
+  if (!src->dev) {
+    GST_DEBUG_OBJECT (src, "camera not yet initialized");
+    return;
+  }
+  // TODO: there is no lock for accesing the dev so dev can go
+  // away by the time we attempt to lock it
+  g_mutex_lock (&src->dev->lock);
+
+  if (!src->dev->params) {
+    GST_DEBUG_OBJECT (src, "camera not yet opened");
+    goto out;
+  }
+
+  max_zoom = gst_droidcamsrc_params_get_int (src->dev->params, "max-zoom");
+  if (max_zoom == -1) {
+    GST_WARNING_OBJECT (src, "camera hardware does not know about max-zoom");
+    goto out;
+  }
+
+  GST_DEBUG_OBJECT (src, "max zoom reported from HAL is %d", max_zoom);
+
+  src->max_zoom = max_zoom;
+
+  GST_INFO_OBJECT (src, "max zoom set to %f", src->max_zoom);
+
+  /* now update zoom pspec */
+  pspec = g_object_class_find_property (G_OBJECT_GET_CLASS (src), "zoom");
+
+  if (pspec && (G_PARAM_SPEC_VALUE_TYPE (pspec) == G_TYPE_FLOAT)) {
+    pspec_f = G_PARAM_SPEC_FLOAT (pspec);
+    pspec_f->maximum = src->max_zoom;
+  } else {
+    GST_WARNING_OBJECT (src, "updating maximum zoom failed");
+  }
+
+  /* TODO: if current zoom more than max-zoom then adjust it */
+
+  g_object_notify (G_OBJECT (src), "max-zoom");
+
+out:
+  g_mutex_unlock (&src->dev->lock);
 }
