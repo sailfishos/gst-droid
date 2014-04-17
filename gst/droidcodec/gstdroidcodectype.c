@@ -103,7 +103,7 @@ const gchar *
 gst_droid_codec_type_from_caps (GstCaps * caps, GstDroidCodecTypeType type)
 {
   int x = 0;
-  int len = sizeof (types) / sizeof (types[0]);
+  int len = G_N_ELEMENTS (types);
   GstStructure *s = gst_caps_get_structure (caps, 0);
   const gchar *name = gst_structure_get_name (s);
 
@@ -127,7 +127,7 @@ gst_droid_codec_type_all_caps (GstDroidCodecTypeType type)
 {
   GstCaps *caps = gst_caps_new_empty ();
   int x = 0;
-  int len = sizeof (types) / sizeof (types[0]);
+  int len = G_N_ELEMENTS (types);
 
   for (x = 0; x < len; x++) {
     if (types[x].type != type) {
@@ -153,7 +153,7 @@ GstDroidCodecTypeType
 gst_droid_codec_type_get_type (const gchar * type)
 {
   int x = 0;
-  int len = sizeof (types) / sizeof (types[0]);
+  int len = G_N_ELEMENTS (types);
 
   for (x = 0; x < len; x++) {
     if (!strcmp (type, types[x].codec_type)) {
@@ -182,7 +182,7 @@ void
 gst_droid_codec_type_compliment_caps (const gchar * type, GstCaps * caps)
 {
   int x = 0;
-  int len = sizeof (types) / sizeof (types[0]);
+  int len = G_N_ELEMENTS (types);
 
   for (x = 0; x < len; x++) {
     if (!strcmp (type, types[x].codec_type)) {
@@ -199,7 +199,7 @@ gboolean
 gst_droid_codec_type_in_stream_headers (const gchar * type, gboolean * result)
 {
   int x = 0;
-  int len = sizeof (types) / sizeof (types[0]);
+  int len = G_N_ELEMENTS (types);
 
   for (x = 0; x < len; x++) {
     if (!strcmp (type, types[x].codec_type)) {

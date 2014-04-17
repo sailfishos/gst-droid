@@ -78,7 +78,7 @@ void
 gst_droidcamsrc_photography_add_overrides (GObjectClass * klass)
 {
   int x;
-  int len = sizeof (Entries) / sizeof (Entries[0]);
+  int len = G_N_ELEMENTS (Entries);
 
   for (x = 0; x < len; x++) {
     g_object_class_override_property (klass, Entries[x].prop,
