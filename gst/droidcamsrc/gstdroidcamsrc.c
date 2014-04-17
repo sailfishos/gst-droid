@@ -28,9 +28,16 @@
 #include <gst/video/video.h>
 #include <gst/memory/gstgralloc.h>
 #include <gst/memory/gstwrappedmemory.h>
+#ifndef GST_USE_UNSTABLE_API
+#define GST_USE_UNSTABLE_API
+#endif /* GST_USE_UNSTABLE_API */
+#include <gst/interfaces/photography.h>
+#include "gstdroidcamsrcphotography.h"
 
 #define gst_droidcamsrc_parent_class parent_class
-G_DEFINE_TYPE (GstDroidCamSrc, gst_droidcamsrc, GST_TYPE_ELEMENT);
+G_DEFINE_TYPE_WITH_CODE (GstDroidCamSrc, gst_droidcamsrc, GST_TYPE_ELEMENT,
+    G_IMPLEMENT_INTERFACE (GST_TYPE_PHOTOGRAPHY,
+        gst_droidcamsrc_photography_init));
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 #define GST_CAT_DEFAULT gst_droidcamsrc_debug
@@ -67,14 +74,6 @@ static gboolean gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data);
 static void gst_droidcamsrc_start_capture (GstDroidCamSrc * src);
 static void gst_droidcamsrc_stop_capture (GstDroidCamSrc * src);
 static gboolean gst_droidcamsrc_apply_params (GstDroidCamSrc * src);
-
-enum
-{
-  PROP_0,
-  PROP_CAMERA_DEVICE,
-  PROP_MODE,
-  PROP_READY_FOR_CAPTURE,
-};
 
 enum
 {
@@ -166,6 +165,10 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
 {
   GstDroidCamSrc *src = GST_DROIDCAMSRC (object);
 
+  if (gst_droidcamsrc_photography_get_property (src, prop_id, value, pspec)) {
+    return;
+  }
+
   switch (prop_id) {
     case PROP_CAMERA_DEVICE:
       g_value_set_enum (value, src->camera_device);
@@ -187,12 +190,15 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
   }
 }
 
-
 static void
 gst_droidcamsrc_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec)
 {
   GstDroidCamSrc *src = GST_DROIDCAMSRC (object);
+
+  if (gst_droidcamsrc_photography_set_property (src, prop_id, value, pspec)) {
+    return;
+  }
 
   switch (prop_id) {
     case PROP_CAMERA_DEVICE:
@@ -493,6 +499,8 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
       g_param_spec_boolean ("ready-for-capture", "Ready for capture",
           "Element is ready for another capture",
           TRUE, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  gst_droidcamsrc_photography_override (gobject_class);
 
   /* Signals */
   droidcamsrc_signals[START_CAPTURE_SIGNAL] =

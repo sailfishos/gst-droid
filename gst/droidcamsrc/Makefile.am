@@ -7,7 +7,8 @@ libgstdroidcamsrc_la_CFLAGS = $(GST_CFLAGS) $(NGI_CFLAGS) $(EGL_CFLAGS) \
 libgstdroidcamsrc_la_LIBADD = $(GST_LIBS) $(NGI_LIBS) $(EGL_LIBS) \
                               $(DROID_LIBS) $(NGM_LIBS) \
                               $(top_builddir)/gst-libs/gst/memory/libgstdroidmemory-@GST_API_VERSION@.la \
-                              -lgstbasecamerabinsrc-1.0
+                              -lgstbasecamerabinsrc-1.0 \
+                              -lgstphotography-1.0
 
 libgstdroidcamsrc_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 libgstdroidcamsrc_la_LIBTOOLFLAGS = --tag=disable-static
@@ -20,7 +21,8 @@ libgstdroidcamsrc_la_SOURCES = \
 	gstdroidcamsrcbufferpool.c \
 	gstdroidcamsrcstreamwindow.c \
 	gstdroidcamsrcparams.c \
-	gstdroidcamsrcenums.c
+	gstdroidcamsrcenums.c \
+	gstdroidcamsrcphotography.c
 
 noinst_HEADERS = \
 	plugin.h \
@@ -30,4 +32,5 @@ noinst_HEADERS = \
 	gstdroidcamsrcbufferpool.h \
 	gstdroidcamsrcstreamwindow.h \
 	gstdroidcamsrcparams.h \
-	gstdroidcamsrcenums.h
+	gstdroidcamsrcenums.h \
+	gstdroidcamsrcphotography.h
