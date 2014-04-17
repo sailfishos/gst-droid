@@ -30,8 +30,12 @@ typedef struct _GstDroidCamSrc GstDroidCamSrc;
 
 typedef enum
 {
-  /* mandated by glib */
   PROP_0,
+  PROP_CAMERA_DEVICE,
+  PROP_MODE,
+  PROP_READY_FOR_CAPTURE,
+  PROP_MAX_ZOOM,
+  PROP_VIDEO_TORCH,
 
   /* photography interface */
   PROP_WB_MODE,
@@ -56,16 +60,6 @@ typedef enum
   PROP_MAX_EXPOSURE_TIME,
   PROP_NOISE_REDUCTION,
   PROP_EXPOSURE_MODE,
-
-  /* this should be the last photography "property" */
-  PROP_PHOTO_MAX,
-
-  /* other properties */
-  PROP_CAMERA_DEVICE,
-  PROP_MODE,
-  PROP_READY_FOR_CAPTURE,
-  PROP_MAX_ZOOM,
-  PROP_VIDEO_TORCH,
 } GstDroidCamSrcProperties;
 
 void gst_droidcamsrc_photography_register (gpointer g_iface,  gpointer iface_data);
