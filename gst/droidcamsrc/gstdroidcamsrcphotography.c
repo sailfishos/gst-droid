@@ -95,30 +95,84 @@ gboolean
 gst_droidcamsrc_photography_get_property (GstDroidCamSrc * src, guint prop_id,
     GValue * value, GParamSpec * pspec)
 {
-  // TODO:
   switch (prop_id) {
     case PROP_WB_MODE:
+      g_value_set_enum (value, src->photo->settings.wb_mode);
+      break;
+
     case PROP_COLOR_TONE:
+      g_value_set_enum (value, src->photo->settings.tone_mode);
+      break;
+
     case PROP_SCENE_MODE:
+      g_value_set_enum (value, src->photo->settings.scene_mode);
+      break;
+
     case PROP_FLASH_MODE:
+      g_value_set_enum (value, src->photo->settings.flash_mode);
+      break;
+
     case PROP_FLICKER_MODE:
+      g_value_set_enum (value, src->photo->settings.flicker_mode);
+      break;
+
     case PROP_FOCUS_MODE:
+      g_value_set_enum (value, src->photo->settings.focus_mode);
+      break;
+
     case PROP_NOISE_REDUCTION:
+      g_value_set_enum (value, src->photo->settings.noise_reduction);
+      break;
+
     case PROP_EXPOSURE_MODE:
+      g_value_set_enum (value, src->photo->settings.exposure_mode);
+      break;
+
     case PROP_ZOOM:
+      g_value_set_float (value, src->photo->settings.zoom);
+      break;
+
     case PROP_EV_COMP:
+      g_value_set_float (value, src->photo->settings.ev_compensation);
+      break;
+
     case PROP_ANALOG_GAIN:
+      g_value_set_float (value, src->photo->settings.analog_gain);
+      break;
+
     case PROP_LENS_FOCUS:
+      g_value_set_float (value, src->photo->settings.lens_focus);
+      break;
+
     case PROP_APERTURE:
+      g_value_set_uint (value, src->photo->settings.aperture);
+      break;
+
     case PROP_ISO_SPEED:
+      g_value_set_uint (value, src->photo->settings.iso_speed);
+      break;
+
     case PROP_COLOR_TEMPERATURE:
+      g_value_set_uint (value, src->photo->settings.color_temperature);
+      break;
+
     case PROP_MIN_EXPOSURE_TIME:
+      g_value_set_uint (value, src->photo->settings.min_exposure_time);
+      break;
+
     case PROP_MAX_EXPOSURE_TIME:
+      g_value_set_uint (value, src->photo->settings.max_exposure_time);
+      break;
+
     case PROP_EXPOSURE_TIME:
+      g_value_set_uint (value, src->photo->settings.exposure_time);
+      break;
+
     case PROP_CAPABILITIES:
     case PROP_IMAGE_CAPTURE_SUPPORTED_CAPS:
     case PROP_IMAGE_PREVIEW_SUPPORTED_CAPS:
     case PROP_WHITE_POINT:
+      // TODO:
       return TRUE;
   }
 
