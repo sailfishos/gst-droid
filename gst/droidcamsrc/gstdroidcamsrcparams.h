@@ -37,6 +37,7 @@ struct _GstDroidCamSrcParams
 
 GstDroidCamSrcParams * gst_droidcamsrc_params_new (const gchar * params);
 void gst_droidcamsrc_params_destroy (GstDroidCamSrcParams *params);
+void gst_droidcamsrc_params_reload (GstDroidCamSrcParams *params, const gchar * str);
 
 gchar *gst_droidcamsrc_params_to_string (GstDroidCamSrcParams *params);
 gboolean gst_droidcamsrc_params_is_dirty (GstDroidCamSrcParams *params);

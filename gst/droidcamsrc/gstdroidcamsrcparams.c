@@ -141,29 +141,42 @@ gst_droidcamsrc_params_parse_dimension (char *d, int *w, int *h)
   return *w != -1 && *h != -1;
 }
 
-GstDroidCamSrcParams *
-gst_droidcamsrc_params_new (const gchar * params)
+void
+gst_droidcamsrc_params_reload_locked (GstDroidCamSrcParams * params,
+    const gchar * str)
 {
-  GstDroidCamSrcParams *param = g_slice_new0 (GstDroidCamSrcParams);
-  gchar **parts = g_strsplit (params, ";", -1);
+  gchar **parts = g_strsplit (str, ";", -1);
   gchar **part = parts;
 
-  GST_DEBUG ("params new");
+  GST_INFO ("params reload");
 
-  param->params = g_hash_table_new_full (g_str_hash, g_str_equal,
+  if (params->params) {
+    g_hash_table_unref (params->params);
+  }
+
+  params->params = g_hash_table_new_full (g_str_hash, g_str_equal,
       (GDestroyNotify) g_free,
       (GDestroyNotify) gst_droidcamsrc_params_destroy_list);
 
   while (*part) {
-    gst_droidcamsrc_params_parse (param, *part);
+    gst_droidcamsrc_params_parse (params, *part);
     ++part;
   }
 
   g_strfreev (parts);
 
+  params->is_dirty = FALSE;
+}
+
+GstDroidCamSrcParams *
+gst_droidcamsrc_params_new (const gchar * params)
+{
+  GstDroidCamSrcParams *param = g_slice_new0 (GstDroidCamSrcParams);
   g_mutex_init (&param->lock);
 
-  param->is_dirty = FALSE;
+  GST_INFO ("params new");
+
+  gst_droidcamsrc_params_reload_locked (param, params);
 
   return param;
 }
@@ -176,6 +189,16 @@ gst_droidcamsrc_params_destroy (GstDroidCamSrcParams * params)
   g_mutex_clear (&params->lock);
   g_hash_table_unref (params->params);
   g_slice_free (GstDroidCamSrcParams, params);
+}
+
+void
+gst_droidcamsrc_params_reload (GstDroidCamSrcParams * params, const gchar * str)
+{
+  g_mutex_lock (&params->lock);
+
+  gst_droidcamsrc_params_reload_locked (params, str);
+
+  g_mutex_unlock (&params->lock);
 }
 
 gchar *
