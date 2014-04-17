@@ -30,6 +30,38 @@
 #endif /* GST_USE_UNSTABLE_API */
 #include <gst/interfaces/photography.h>
 
+struct Entry
+{
+  int prop;
+  const gchar *photo_prop;
+};
+
+struct Entry Entries[] = {
+  {PROP_WB_MODE, GST_PHOTOGRAPHY_PROP_WB_MODE},
+  {PROP_COLOR_TONE, GST_PHOTOGRAPHY_PROP_COLOR_TONE},
+  {PROP_SCENE_MODE, GST_PHOTOGRAPHY_PROP_SCENE_MODE},
+  {PROP_FLASH_MODE, GST_PHOTOGRAPHY_PROP_FLASH_MODE},
+  {PROP_FLICKER_MODE, GST_PHOTOGRAPHY_PROP_FLICKER_MODE},
+  {PROP_FOCUS_MODE, GST_PHOTOGRAPHY_PROP_FOCUS_MODE},
+  {PROP_CAPABILITIES, GST_PHOTOGRAPHY_PROP_CAPABILITIES},
+  {PROP_EV_COMP, GST_PHOTOGRAPHY_PROP_EV_COMP},
+  {PROP_ISO_SPEED, GST_PHOTOGRAPHY_PROP_ISO_SPEED},
+  {PROP_APERTURE, GST_PHOTOGRAPHY_PROP_APERTURE},
+  {PROP_EXPOSURE_TIME, GST_PHOTOGRAPHY_PROP_EXPOSURE_TIME},
+  {PROP_IMAGE_CAPTURE_SUPPORTED_CAPS,
+      GST_PHOTOGRAPHY_PROP_IMAGE_CAPTURE_SUPPORTED_CAPS},
+  {PROP_IMAGE_PREVIEW_SUPPORTED_CAPS,
+      GST_PHOTOGRAPHY_PROP_IMAGE_PREVIEW_SUPPORTED_CAPS},
+  {PROP_ZOOM, GST_PHOTOGRAPHY_PROP_ZOOM},
+  {PROP_COLOR_TEMPERATURE, GST_PHOTOGRAPHY_PROP_COLOR_TEMPERATURE},
+  {PROP_WHITE_POINT, GST_PHOTOGRAPHY_PROP_WHITE_POINT},
+  {PROP_ANALOG_GAIN, GST_PHOTOGRAPHY_PROP_ANALOG_GAIN},
+  {PROP_LENS_FOCUS, GST_PHOTOGRAPHY_PROP_LENS_FOCUS},
+  {PROP_MIN_EXPOSURE_TIME, GST_PHOTOGRAPHY_PROP_MIN_EXPOSURE_TIME},
+  {PROP_MAX_EXPOSURE_TIME, GST_PHOTOGRAPHY_PROP_MAX_EXPOSURE_TIME},
+  {PROP_NOISE_REDUCTION, GST_PHOTOGRAPHY_PROP_NOISE_REDUCTION},
+};
+
 struct _GstDroidCamSrcPhotography
 {
   GstPhotographySettings settings;
@@ -45,48 +77,13 @@ gst_droidcamsrc_photography_register (gpointer g_iface, gpointer iface_data)
 void
 gst_droidcamsrc_photography_add_overrides (GObjectClass * klass)
 {
-  g_object_class_override_property (klass, PROP_WB_MODE,
-      GST_PHOTOGRAPHY_PROP_WB_MODE);
-  g_object_class_override_property (klass, PROP_COLOR_TONE,
-      GST_PHOTOGRAPHY_PROP_COLOR_TONE);
-  g_object_class_override_property (klass, PROP_SCENE_MODE,
-      GST_PHOTOGRAPHY_PROP_SCENE_MODE);
-  g_object_class_override_property (klass, PROP_FLASH_MODE,
-      GST_PHOTOGRAPHY_PROP_FLASH_MODE);
-  g_object_class_override_property (klass, PROP_FLICKER_MODE,
-      GST_PHOTOGRAPHY_PROP_FLICKER_MODE);
-  g_object_class_override_property (klass, PROP_FOCUS_MODE,
-      GST_PHOTOGRAPHY_PROP_FOCUS_MODE);
-  g_object_class_override_property (klass, PROP_CAPABILITIES,
-      GST_PHOTOGRAPHY_PROP_CAPABILITIES);
-  g_object_class_override_property (klass, PROP_EV_COMP,
-      GST_PHOTOGRAPHY_PROP_EV_COMP);
-  g_object_class_override_property (klass, PROP_ISO_SPEED,
-      GST_PHOTOGRAPHY_PROP_ISO_SPEED);
-  g_object_class_override_property (klass, PROP_APERTURE,
-      GST_PHOTOGRAPHY_PROP_APERTURE);
-  g_object_class_override_property (klass, PROP_EXPOSURE_TIME,
-      GST_PHOTOGRAPHY_PROP_EXPOSURE_TIME);
-  g_object_class_override_property (klass, PROP_IMAGE_CAPTURE_SUPPORTED_CAPS,
-      GST_PHOTOGRAPHY_PROP_IMAGE_CAPTURE_SUPPORTED_CAPS);
-  g_object_class_override_property (klass, PROP_IMAGE_PREVIEW_SUPPORTED_CAPS,
-      GST_PHOTOGRAPHY_PROP_IMAGE_PREVIEW_SUPPORTED_CAPS);
-  g_object_class_override_property (klass, PROP_ZOOM,
-      GST_PHOTOGRAPHY_PROP_ZOOM);
-  g_object_class_override_property (klass, PROP_COLOR_TEMPERATURE,
-      GST_PHOTOGRAPHY_PROP_COLOR_TEMPERATURE);
-  g_object_class_override_property (klass, PROP_WHITE_POINT,
-      GST_PHOTOGRAPHY_PROP_WHITE_POINT);
-  g_object_class_override_property (klass, PROP_ANALOG_GAIN,
-      GST_PHOTOGRAPHY_PROP_ANALOG_GAIN);
-  g_object_class_override_property (klass, PROP_LENS_FOCUS,
-      GST_PHOTOGRAPHY_PROP_LENS_FOCUS);
-  g_object_class_override_property (klass, PROP_MIN_EXPOSURE_TIME,
-      GST_PHOTOGRAPHY_PROP_MIN_EXPOSURE_TIME);
-  g_object_class_override_property (klass, PROP_MAX_EXPOSURE_TIME,
-      GST_PHOTOGRAPHY_PROP_MAX_EXPOSURE_TIME);
-  g_object_class_override_property (klass, PROP_NOISE_REDUCTION,
-      GST_PHOTOGRAPHY_PROP_NOISE_REDUCTION);
+  int x;
+  int len = sizeof (Entries) / sizeof (Entries[0]);
+
+  for (x = 0; x < len; x++) {
+    g_object_class_override_property (klass, Entries[x].prop,
+        Entries[x].photo_prop);
+  }
 }
 
 gboolean
