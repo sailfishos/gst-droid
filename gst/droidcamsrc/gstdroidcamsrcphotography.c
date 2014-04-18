@@ -70,14 +70,20 @@ struct Entry Entries[] = {
 struct _GstDroidCamSrcPhotography
 {
   GstPhotographySettings settings;
-  GHashTable *flash;
-  GHashTable *color_tone;
-  GHashTable *focus;
-  GHashTable *scene;
-  GHashTable *wb;
+  GList *flash;
+  GList *color_tone;
+  GList *focus;
+  GList *scene;
+  GList *wb;
 };
 
-static GHashTable *gst_droidcamsrc_photography_load (GKeyFile * file,
+struct DataEntry
+{
+  int key;
+  gchar *value;
+};
+
+static GList *gst_droidcamsrc_photography_load (GKeyFile * file,
     const gchar * property);
 
 #define PHOTO_IFACE_FUNC(name, tset, tget)					\
@@ -92,17 +98,36 @@ static GHashTable *gst_droidcamsrc_photography_load (GKeyFile * file,
     return gst_droidcamsrc_set_##name (GST_DROIDCAMSRC (photo), val);	\
   }
 
-#define APPLY_SETTING(table, val, droid)		\
-  { \
-    const gchar *value = g_hash_table_lookup (table, GINT_TO_POINTER (val));       \
-    if (value) { \
+#define APPLY_SETTING(table, val, droid)				\
+  {									\
+    int x;								\
+    int len = g_list_length (table);					\
+    gchar *value = NULL;						\
+    for (x = 0; x < len; x++) {						\
+      struct DataEntry *entry = (struct DataEntry *) g_list_nth_data (table, x); \
+      if (val == entry->key) {						\
+	value = entry->value;						\
+	break;								\
+      }									\
+    }									\
+    if (value) {							\
       GST_INFO_OBJECT (src, "setting %s to %s", droid, value);		\
       gst_droidcamsrc_params_set_string (src->dev->params, droid, value); \
-    } \
+    }									\
   }
 
+
 #define SET_ENUM(table,val,droid,memb)					\
-  const gchar *value = g_hash_table_lookup (table, GINT_TO_POINTER (val)); \
+  int x;								\
+  int len = g_list_length (table);					\
+  const gchar *value = NULL;						\
+  for (x = 0; x < len; x++) {						\
+    struct DataEntry *entry = (struct DataEntry *) g_list_nth_data (table, x); \
+    if (val == entry->key) {						\
+      value = entry->value;						\
+      break;								\
+    }									\
+  }									\
   if (!value) {								\
     return FALSE;							\
   }									\
@@ -576,23 +601,41 @@ gst_droidcamsrc_photography_init (GstDroidCamSrc * src)
   g_key_file_unref (file);
 }
 
+static void
+free_data_entry (gpointer * data)
+{
+  struct DataEntry *entry = (struct DataEntry *) data;
+  g_free (entry->value);
+  g_slice_free (struct DataEntry, entry);
+}
+
 void
 gst_droidcamsrc_photography_destroy (GstDroidCamSrc * src)
 {
-  g_hash_table_unref (src->photo->flash);
-  src->photo->flash = NULL;
+  if (src->photo->flash) {
+    g_list_free_full (src->photo->flash, (GDestroyNotify) free_data_entry);
+    src->photo->flash = NULL;
+  }
 
-  g_hash_table_unref (src->photo->color_tone);
-  src->photo->color_tone = NULL;
+  if (src->photo->color_tone) {
+    g_list_free_full (src->photo->color_tone, (GDestroyNotify) free_data_entry);
+    src->photo->color_tone = NULL;
+  }
 
-  g_hash_table_unref (src->photo->focus);
-  src->photo->focus = NULL;
+  if (src->photo->focus) {
+    g_list_free_full (src->photo->focus, (GDestroyNotify) free_data_entry);
+    src->photo->focus = NULL;
+  }
 
-  g_hash_table_unref (src->photo->scene);
-  src->photo->scene = NULL;
+  if (src->photo->scene) {
+    g_list_free_full (src->photo->scene, (GDestroyNotify) free_data_entry);
+    src->photo->scene = NULL;
+  }
 
-  g_hash_table_unref (src->photo->wb);
-  src->photo->wb = NULL;
+  if (src->photo->wb) {
+    g_list_free_full (src->photo->wb, (GDestroyNotify) free_data_entry);
+    src->photo->wb = NULL;
+  }
 
   g_slice_free (GstDroidCamSrcPhotography, src->photo);
   src->photo = NULL;
@@ -623,15 +666,14 @@ gst_droidcamsrc_photography_apply (GstDroidCamSrc * src,
   }
 }
 
-static GHashTable *
+static GList *
 gst_droidcamsrc_photography_load (GKeyFile * file, const gchar * property)
 {
   gchar **keys;
   int x;
   GError *err = NULL;
   gsize len = 0;
-  GHashTable *table =
-      g_hash_table_new_full (g_direct_hash, g_direct_equal, NULL, g_free);
+  GList *list = NULL;
 
   keys = g_key_file_get_keys (file, property, &len, &err);
 
@@ -653,11 +695,14 @@ gst_droidcamsrc_photography_load (GKeyFile * file, const gchar * property)
 
     if (value) {
       int key = atoi (keys[x]);
-      g_hash_table_insert (table, GINT_TO_POINTER (key), value);
+      struct DataEntry *entry = g_slice_new (struct DataEntry);
+      entry->key = key;
+      entry->value = value;
+      list = g_list_append (list, entry);
     }
   }
 
-  return table;
+  return list;
 }
 
 static gboolean
