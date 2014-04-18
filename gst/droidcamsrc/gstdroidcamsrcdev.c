@@ -602,3 +602,47 @@ gst_droidcamsrc_dev_update_params (GstDroidCamSrcDev * dev)
   gst_droidcamsrc_dev_update_params_locked (dev);
   g_mutex_unlock (&dev->lock);
 }
+
+gboolean
+gst_droidcamsrc_dev_start_autofocus (GstDroidCamSrcDev * dev)
+{
+  int err;
+  gboolean ret = FALSE;
+
+  g_mutex_lock (&dev->lock);
+
+  if (dev->dev) {
+    GST_WARNING ("cannot autofocus because camera is not running");
+    goto out;
+
+    err = dev->dev->ops->auto_focus (dev->dev);
+    if (err != 0) {
+      GST_WARNING ("error 0x%x starting autofocus", err);
+      goto out;
+    }
+
+    ret = TRUE;
+  }
+
+out:
+  g_mutex_unlock (&dev->lock);
+
+  return ret;
+}
+
+void
+gst_droidcamsrc_dev_stop_autofocus (GstDroidCamSrcDev * dev)
+{
+  int err;
+
+  g_mutex_lock (&dev->lock);
+
+  if (dev->dev) {
+    err = dev->dev->ops->cancel_auto_focus (dev->dev);
+    if (err != 0) {
+      GST_WARNING ("error 0x%x stopping autofocus", err);
+    }
+  }
+
+  g_mutex_unlock (&dev->lock);
+}

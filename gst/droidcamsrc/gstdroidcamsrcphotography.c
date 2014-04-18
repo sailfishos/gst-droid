@@ -950,8 +950,20 @@ gst_droidcamsrc_prepare_for_capture (GstDroidCamSrc *
 static void
 gst_droidcamsrc_set_autofocus (GstDroidCamSrc * src, gboolean on)
 {
-  // TODO:
+  GST_DEBUG_OBJECT (src, "set autofocus %d", on);
 
+  if (!src->dev) {
+    GST_WARNING_OBJECT (src, "camera is not running");
+    return;
+  }
+
+  if (on) {
+    if (!gst_droidcamsrc_dev_start_autofocus (src->dev)) {
+      GST_WARNING_OBJECT (src, "failed to start autofocus");
+    }
+  } else {
+    gst_droidcamsrc_dev_stop_autofocus (src->dev);
+  }
 }
 
 static gboolean
