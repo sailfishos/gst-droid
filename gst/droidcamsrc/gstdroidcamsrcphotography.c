@@ -943,8 +943,7 @@ gst_droidcamsrc_prepare_for_capture (GstDroidCamSrc *
     src, GstPhotographyCapturePrepared func, GstCaps * capture_caps,
     gpointer user_data)
 {
-  // TODO:
-  return FALSE;
+  return TRUE;
 }
 
 static void
