@@ -627,8 +627,8 @@ static GHashTable *
 gst_droidcamsrc_photography_load (GKeyFile * file, const gchar * property)
 {
   gchar **keys;
-  GError *err;
   int x;
+  GError *err = NULL;
   gsize len = 0;
   GHashTable *table =
       g_hash_table_new_full (g_direct_hash, g_direct_equal, NULL, g_free);
