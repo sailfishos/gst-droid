@@ -72,11 +72,115 @@ struct _GstDroidCamSrcPhotography
   GstPhotographySettings settings;
 };
 
+static GHashTable *gst_droidcamsrc_photography_load (GKeyFile * file,
+    const gchar * property);
+
+static gboolean
+gst_droidcamsrc_photography_get_ev_compensation (GstPhotography *
+    photo, gfloat * ev_comp);
+static gboolean gst_droidcamsrc_photography_get_iso_speed (GstPhotography *
+    photo, guint * iso_speed);
+static gboolean gst_droidcamsrc_photography_get_aperture (GstPhotography *
+    photo, guint * aperture);
+static gboolean gst_droidcamsrc_photography_get_exposure (GstPhotography *
+    photo, guint32 * exposure);
+static gboolean
+gst_droidcamsrc_photography_get_white_balance_mode (GstPhotography *
+    photo, GstPhotographyWhiteBalanceMode * wb_mode);
+static gboolean
+gst_droidcamsrc_photography_get_color_tone_mode (GstPhotography *
+    photo, GstPhotographyColorToneMode * tone_mode);
+static gboolean gst_droidcamsrc_photography_get_scene_mode (GstPhotography
+    * photo, GstPhotographySceneMode * scene_mode);
+static gboolean gst_droidcamsrc_photography_get_flash_mode (GstPhotography
+    * photo, GstPhotographyFlashMode * flash_mode);
+static gboolean gst_droidcamsrc_photography_get_zoom (GstPhotography *
+    photo, gfloat * zoom);
+static gboolean
+gst_droidcamsrc_photography_get_flicker_mode (GstPhotography * photo,
+    GstPhotographyFlickerReductionMode * flicker_mode);
+static gboolean gst_droidcamsrc_photography_get_focus_mode (GstPhotography
+    * photo, GstPhotographyFocusMode * focus_mode);
+static gboolean
+gst_droidcamsrc_photography_set_ev_compensation (GstPhotography *
+    photo, gfloat ev_comp);
+static gboolean gst_droidcamsrc_photography_set_iso_speed (GstPhotography *
+    photo, guint iso_speed);
+static gboolean gst_droidcamsrc_photography_set_aperture (GstPhotography *
+    photo, guint aperture);
+static gboolean gst_droidcamsrc_photography_set_exposure (GstPhotography *
+    photo, guint32 exposure);
+static gboolean
+gst_droidcamsrc_photography_set_white_balance_mode (GstPhotography *
+    photo, GstPhotographyWhiteBalanceMode wb_mode);
+static gboolean
+gst_droidcamsrc_photography_set_color_tone_mode (GstPhotography *
+    photo, GstPhotographyColorToneMode tone_mode);
+static gboolean gst_droidcamsrc_photography_set_scene_mode (GstPhotography
+    * photo, GstPhotographySceneMode scene_mode);
+static gboolean gst_droidcamsrc_photography_set_flash_mode (GstPhotography
+    * photo, GstPhotographyFlashMode flash_mode);
+static gboolean gst_droidcamsrc_photography_set_zoom (GstPhotography *
+    photo, gfloat zoom);
+static gboolean
+gst_droidcamsrc_photography_set_flicker_mode (GstPhotography * photo,
+    GstPhotographyFlickerReductionMode flicker_mode);
+static gboolean gst_droidcamsrc_photography_set_focus_mode (GstPhotography
+    * photo, GstPhotographyFocusMode focus_mode);
+static GstPhotographyCaps
+gst_droidcamsrc_photography_get_capabilities (GstPhotography * photo);
+static gboolean
+gst_droidcamsrc_photography_prepare_for_capture (GstPhotography *
+    photo, GstPhotographyCapturePrepared func, GstCaps * capture_caps,
+    gpointer user_data);
+static void gst_droidcamsrc_photography_set_autofocus (GstPhotography *
+    photo, gboolean on);
+static gboolean gst_droidcamsrc_photography_set_config (GstPhotography *
+    photo, GstPhotographySettings * config);
+static gboolean gst_droidcamsrc_photography_get_config (GstPhotography *
+    photo, GstPhotographySettings * config);
+static gboolean
+gst_droidcamsrc_photography_get_noise_reduction (GstPhotography *
+    photo, GstPhotographyNoiseReduction * noise_reduction);
+static gboolean
+gst_droidcamsrc_photography_set_noise_reduction (GstPhotography *
+    photo, GstPhotographyNoiseReduction noise_reduction);
+
 void
 gst_droidcamsrc_photography_register (gpointer g_iface, gpointer iface_data)
 {
-  // TODO:
-
+  GstPhotographyInterface *iface = (GstPhotographyInterface *) g_iface;
+  iface->get_ev_compensation = gst_droidcamsrc_photography_get_ev_compensation;
+  iface->get_iso_speed = gst_droidcamsrc_photography_get_iso_speed;
+  iface->get_aperture = gst_droidcamsrc_photography_get_aperture;
+  iface->get_exposure = gst_droidcamsrc_photography_get_exposure;
+  iface->get_white_balance_mode =
+      gst_droidcamsrc_photography_get_white_balance_mode;
+  iface->get_color_tone_mode = gst_droidcamsrc_photography_get_color_tone_mode;
+  iface->get_scene_mode = gst_droidcamsrc_photography_get_scene_mode;
+  iface->get_flash_mode = gst_droidcamsrc_photography_get_flash_mode;
+  iface->get_zoom = gst_droidcamsrc_photography_get_zoom;
+  iface->get_flicker_mode = gst_droidcamsrc_photography_get_flicker_mode;
+  iface->get_focus_mode = gst_droidcamsrc_photography_get_focus_mode;
+  iface->set_ev_compensation = gst_droidcamsrc_photography_set_ev_compensation;
+  iface->set_iso_speed = gst_droidcamsrc_photography_set_iso_speed;
+  iface->set_aperture = gst_droidcamsrc_photography_set_aperture;
+  iface->set_exposure = gst_droidcamsrc_photography_set_exposure;
+  iface->set_white_balance_mode =
+      gst_droidcamsrc_photography_set_white_balance_mode;
+  iface->set_color_tone_mode = gst_droidcamsrc_photography_set_color_tone_mode;
+  iface->set_scene_mode = gst_droidcamsrc_photography_set_scene_mode;
+  iface->set_flash_mode = gst_droidcamsrc_photography_set_flash_mode;
+  iface->set_zoom = gst_droidcamsrc_photography_set_zoom;
+  iface->set_flicker_mode = gst_droidcamsrc_photography_set_flicker_mode;
+  iface->set_focus_mode = gst_droidcamsrc_photography_set_focus_mode;
+  iface->get_capabilities = gst_droidcamsrc_photography_get_capabilities;
+  iface->prepare_for_capture = gst_droidcamsrc_photography_prepare_for_capture;
+  iface->set_autofocus = gst_droidcamsrc_photography_set_autofocus;
+  iface->set_config = gst_droidcamsrc_photography_set_config;
+  iface->get_config = gst_droidcamsrc_photography_get_config;
+  iface->get_noise_reduction = gst_droidcamsrc_photography_get_noise_reduction;
+  iface->set_noise_reduction = gst_droidcamsrc_photography_set_noise_reduction;
 }
 
 void
@@ -302,4 +406,233 @@ gst_droidcamsrc_photography_load (GKeyFile * file, const gchar * property)
   }
 
   return table;
+}
+
+static gboolean
+gst_droidcamsrc_photography_get_ev_compensation (GstPhotography *
+    photo, gfloat * ev_comp)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_get_iso_speed (GstPhotography *
+    photo, guint * iso_speed)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_get_aperture (GstPhotography *
+    photo, guint * aperture)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_get_exposure (GstPhotography *
+    photo, guint32 * exposure)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_get_white_balance_mode (GstPhotography *
+    photo, GstPhotographyWhiteBalanceMode * wb_mode)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_get_color_tone_mode (GstPhotography *
+    photo, GstPhotographyColorToneMode * tone_mode)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_get_scene_mode (GstPhotography
+    * photo, GstPhotographySceneMode * scene_mode)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_get_flash_mode (GstPhotography
+    * photo, GstPhotographyFlashMode * flash_mode)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_get_zoom (GstPhotography * photo, gfloat * zoom)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_get_flicker_mode (GstPhotography * photo,
+    GstPhotographyFlickerReductionMode * flicker_mode)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_get_focus_mode (GstPhotography
+    * photo, GstPhotographyFocusMode * focus_mode)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_set_ev_compensation (GstPhotography *
+    photo, gfloat ev_comp)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_set_iso_speed (GstPhotography *
+    photo, guint iso_speed)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_set_aperture (GstPhotography *
+    photo, guint aperture)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_set_exposure (GstPhotography *
+    photo, guint32 exposure)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_set_white_balance_mode (GstPhotography *
+    photo, GstPhotographyWhiteBalanceMode wb_mode)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_set_color_tone_mode (GstPhotography *
+    photo, GstPhotographyColorToneMode tone_mode)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_set_scene_mode (GstPhotography
+    * photo, GstPhotographySceneMode scene_mode)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_set_flash_mode (GstPhotography
+    * photo, GstPhotographyFlashMode flash_mode)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_set_zoom (GstPhotography * photo, gfloat zoom)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_set_flicker_mode (GstPhotography * photo,
+    GstPhotographyFlickerReductionMode flicker_mode)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_set_focus_mode (GstPhotography
+    * photo, GstPhotographyFocusMode focus_mode)
+{
+  // TODO:
+  return FALSE;
+}
+
+static GstPhotographyCaps
+gst_droidcamsrc_photography_get_capabilities (GstPhotography * photo)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_prepare_for_capture (GstPhotography *
+    photo, GstPhotographyCapturePrepared func, GstCaps * capture_caps,
+    gpointer user_data)
+{
+  // TODO:
+  return FALSE;
+}
+
+static void
+gst_droidcamsrc_photography_set_autofocus (GstPhotography * photo, gboolean on)
+{
+  // TODO:
+
+}
+
+static gboolean
+gst_droidcamsrc_photography_set_config (GstPhotography *
+    photo, GstPhotographySettings * config)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_get_config (GstPhotography *
+    photo, GstPhotographySettings * config)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_get_noise_reduction (GstPhotography *
+    photo, GstPhotographyNoiseReduction * noise_reduction)
+{
+  // TODO:
+  return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_photography_set_noise_reduction (GstPhotography *
+    photo, GstPhotographyNoiseReduction noise_reduction)
+{
+  // TODO:
+  return FALSE;
 }
