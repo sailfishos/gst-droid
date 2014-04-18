@@ -607,9 +607,14 @@ gst_droidcamsrc_photography_apply (GstDroidCamSrc * src,
   GST_OBJECT_LOCK (src);
   APPLY_SETTING (src->photo->flash, src->photo->settings.flash_mode,
       "flash-mode");
-  APPLY_SETTING (src->photo->focus, src->photo->settings.focus_mode,
-      "focus-mode");
+
+  /*
+     // TODO: this needs special handling
+     APPLY_SETTING (src->photo->focus, src->photo->settings.focus_mode,
+     "focus-mode");
+   */
   APPLY_SETTING (src->photo->wb, src->photo->settings.wb_mode, "whitebalance");
+
 
   GST_OBJECT_UNLOCK (src);
 
