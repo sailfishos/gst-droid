@@ -75,6 +75,7 @@ struct _GstDroidCamSrcPhotography
   GList *focus;
   GList *scene;
   GList *wb;
+  GList *iso;
 };
 
 struct DataEntry
@@ -543,6 +544,23 @@ gst_droidcamsrc_photography_set_property (GstDroidCamSrc * src, guint prop_id,
   return FALSE;
 }
 
+static gint
+sort_desc (gconstpointer a, gconstpointer b)
+{
+  struct DataEntry *_a = (struct DataEntry *) a;
+  struct DataEntry *_b = (struct DataEntry *) b;
+
+  if (_a->key == _b->key) {
+    return 0;
+  }
+
+  if (_b->key > _a->key) {
+    return 1;
+  }
+
+  return -1;
+}
+
 void
 gst_droidcamsrc_photography_init (GstDroidCamSrc * src)
 {
@@ -595,6 +613,8 @@ gst_droidcamsrc_photography_init (GstDroidCamSrc * src)
   src->photo->scene = gst_droidcamsrc_photography_load (file, "scene-mode");
   src->photo->wb =
       gst_droidcamsrc_photography_load (file, "white-balance-mode");
+  src->photo->iso = gst_droidcamsrc_photography_load (file, "iso-speed");
+  src->photo->iso = g_list_sort (src->photo->iso, sort_desc);
 
   /* free our stuff */
   g_free (file_path);
@@ -635,6 +655,11 @@ gst_droidcamsrc_photography_destroy (GstDroidCamSrc * src)
   if (src->photo->wb) {
     g_list_free_full (src->photo->wb, (GDestroyNotify) free_data_entry);
     src->photo->wb = NULL;
+  }
+
+  if (src->photo->iso) {
+    g_list_free_full (src->photo->iso, (GDestroyNotify) free_data_entry);
+    src->photo->iso = NULL;
   }
 
   g_slice_free (GstDroidCamSrcPhotography, src->photo);
@@ -906,8 +931,28 @@ gst_droidcamsrc_set_ev_compensation (GstDroidCamSrc * src, gfloat ev_comp)
 static gboolean
 gst_droidcamsrc_set_iso_speed (GstDroidCamSrc * src, guint iso_speed)
 {
-  // TODO:
-  return FALSE;
+  int x;
+  int len = g_list_length (src->photo->iso);
+  gchar *value = NULL;
+
+  for (x = 0; x < len; x++) {
+    struct DataEntry *entry =
+        (struct DataEntry *) g_list_nth_data (src->photo->iso, x);
+    if (iso_speed >= entry->key) {
+      value = entry->value;
+      break;
+    }
+  }
+
+  if (!value) {
+    return FALSE;
+  }
+
+  GST_OBJECT_LOCK (src);
+  src->photo->settings.iso_speed = iso_speed;
+  GST_OBJECT_UNLOCK (src);
+
+  return gst_droidcamsrc_set_and_apply (src, "iso", value);
 }
 
 static gboolean
