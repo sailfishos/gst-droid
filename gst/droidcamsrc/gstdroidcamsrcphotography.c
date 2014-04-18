@@ -540,84 +540,192 @@ gst_droidcamsrc_photography_load (GKeyFile * file, const gchar * property)
 static gboolean
 gst_droidcamsrc_get_ev_compensation (GstDroidCamSrc * src, gfloat * ev_comp)
 {
-  // TODO:
-  return FALSE;
+  GST_OBJECT_LOCK (src);
+  *ev_comp = src->photo->settings.ev_compensation;
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
 }
 
 static gboolean
-gst_droidcamsrc_get_iso_speed (GstDroidCamSrc * photo, guint * iso_speed)
+gst_droidcamsrc_get_iso_speed (GstDroidCamSrc * src, guint * iso_speed)
 {
-  // TODO:
-  return FALSE;
+  GST_OBJECT_LOCK (src);
+  *iso_speed = src->photo->settings.iso_speed;
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
 }
 
 static gboolean
 gst_droidcamsrc_get_aperture (GstDroidCamSrc * src, guint * aperture)
 {
-  // TODO:
-  return FALSE;
+  GST_OBJECT_LOCK (src);
+  *aperture = src->photo->settings.aperture;
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
 }
 
 static gboolean
 gst_droidcamsrc_get_exposure (GstDroidCamSrc * src, guint32 * exposure)
 {
-  // TODO:
-  return FALSE;
+  GST_OBJECT_LOCK (src);
+  *exposure = src->photo->settings.exposure_time;
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
 }
 
 static gboolean
 gst_droidcamsrc_get_white_balance_mode (GstDroidCamSrc *
     src, GstPhotographyWhiteBalanceMode * wb_mode)
 {
-  // TODO:
-  return FALSE;
+  GST_OBJECT_LOCK (src);
+  *wb_mode = src->photo->settings.wb_mode;
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
 }
 
 static gboolean
 gst_droidcamsrc_get_color_tone_mode (GstDroidCamSrc *
     src, GstPhotographyColorToneMode * tone_mode)
 {
-  // TODO:
-  return FALSE;
+  GST_OBJECT_LOCK (src);
+  *tone_mode = src->photo->settings.tone_mode;
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
 }
 
 static gboolean
 gst_droidcamsrc_get_scene_mode (GstDroidCamSrc
     * src, GstPhotographySceneMode * scene_mode)
 {
-  // TODO:
-  return FALSE;
+  GST_OBJECT_LOCK (src);
+  *scene_mode = src->photo->settings.scene_mode;
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
 }
 
 static gboolean
 gst_droidcamsrc_get_flash_mode (GstDroidCamSrc
     * src, GstPhotographyFlashMode * flash_mode)
 {
-  // TODO:
-  return FALSE;
+  GST_OBJECT_LOCK (src);
+  *flash_mode = src->photo->settings.flash_mode;
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
 }
 
 static gboolean
 gst_droidcamsrc_get_zoom (GstDroidCamSrc * src, gfloat * zoom)
 {
-  // TODO:
-  return FALSE;
+  GST_OBJECT_LOCK (src);
+  *zoom = src->photo->settings.zoom;
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
 }
 
 static gboolean
-gst_droidcamsrc_get_flicker_mode (GstDroidCamSrc * photo,
+gst_droidcamsrc_get_flicker_mode (GstDroidCamSrc * src,
     GstPhotographyFlickerReductionMode * flicker_mode)
 {
-  // TODO:
-  return FALSE;
+  GST_OBJECT_LOCK (src);
+  *flicker_mode = src->photo->settings.flicker_mode;
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
 }
 
 static gboolean
 gst_droidcamsrc_get_focus_mode (GstDroidCamSrc
     * src, GstPhotographyFocusMode * focus_mode)
 {
-  // TODO:
-  return FALSE;
+  GST_OBJECT_LOCK (src);
+  *focus_mode = src->photo->settings.focus_mode;
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
+}
+
+static gboolean
+gst_droidcamsrc_get_noise_reduction (GstDroidCamSrc *
+    src, GstPhotographyNoiseReduction * noise_reduction)
+{
+  GST_OBJECT_LOCK (src);
+  *noise_reduction = src->photo->settings.noise_reduction;
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
+}
+
+static gboolean
+gst_droidcamsrc_get_exposure_mode (GstDroidCamSrc *
+    src, GstPhotographyExposureMode * exposure_mode)
+{
+  GST_OBJECT_LOCK (src);
+  *exposure_mode = src->photo->settings.exposure_mode;
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
+}
+
+static gboolean
+gst_droidcamsrc_get_analog_gain (GstDroidCamSrc * src, gfloat * analog_gain)
+{
+  GST_OBJECT_LOCK (src);
+  *analog_gain = src->photo->settings.analog_gain;
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
+}
+
+static gboolean
+gst_droidcamsrc_get_lens_focus (GstDroidCamSrc * src, gfloat * lens_focus)
+{
+  GST_OBJECT_LOCK (src);
+  *lens_focus = src->photo->settings.lens_focus;
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
+}
+
+static gboolean
+gst_droidcamsrc_get_color_temperature (GstDroidCamSrc * src,
+    guint * color_temperature)
+{
+  GST_OBJECT_LOCK (src);
+  *color_temperature = src->photo->settings.color_temperature;
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
+}
+
+static gboolean
+gst_droidcamsrc_get_min_exposure_time (GstDroidCamSrc * src,
+    guint * min_exposure_time)
+{
+  GST_OBJECT_LOCK (src);
+  *min_exposure_time = src->photo->settings.min_exposure_time;
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
+}
+
+static gboolean
+gst_droidcamsrc_get_max_exposure_time (GstDroidCamSrc * src,
+    guint * max_exposure_time)
+{
+  GST_OBJECT_LOCK (src);
+  *max_exposure_time = src->photo->settings.max_exposure_time;
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
 }
 
 static gboolean
@@ -743,24 +851,8 @@ gst_droidcamsrc_get_config (GstDroidCamSrc *
 }
 
 static gboolean
-gst_droidcamsrc_get_noise_reduction (GstDroidCamSrc *
-    src, GstPhotographyNoiseReduction * noise_reduction)
-{
-  // TODO:
-  return FALSE;
-}
-
-static gboolean
 gst_droidcamsrc_set_noise_reduction (GstDroidCamSrc *
     src, GstPhotographyNoiseReduction noise_reduction)
-{
-  // TODO:
-  return FALSE;
-}
-
-static gboolean
-gst_droidcamsrc_get_exposure_mode (GstDroidCamSrc *
-    src, GstPhotographyExposureMode * exposure_mode)
 {
   // TODO:
   return FALSE;
@@ -775,13 +867,6 @@ gst_droidcamsrc_set_exposure_mode (GstDroidCamSrc *
 }
 
 static gboolean
-gst_droidcamsrc_get_analog_gain (GstDroidCamSrc * src, gfloat * analog_gain)
-{
-  // TODO:
-  return FALSE;
-}
-
-static gboolean
 gst_droidcamsrc_set_analog_gain (GstDroidCamSrc * src, gfloat analog_gain)
 {
   // TODO:
@@ -789,22 +874,7 @@ gst_droidcamsrc_set_analog_gain (GstDroidCamSrc * src, gfloat analog_gain)
 }
 
 static gboolean
-gst_droidcamsrc_get_lens_focus (GstDroidCamSrc * src, gfloat * lens_focus)
-{
-  // TODO:
-  return FALSE;
-}
-
-static gboolean
 gst_droidcamsrc_set_lens_focus (GstDroidCamSrc * src, gfloat lens_focus)
-{
-  // TODO:
-  return FALSE;
-}
-
-static gboolean
-gst_droidcamsrc_get_color_temperature (GstDroidCamSrc * src,
-    guint * color_temperature)
 {
   // TODO:
   return FALSE;
@@ -819,24 +889,8 @@ gst_droidcamsrc_set_color_temperature (GstDroidCamSrc * src,
 }
 
 static gboolean
-gst_droidcamsrc_get_min_exposure_time (GstDroidCamSrc * src,
-    guint * min_exposure_time)
-{
-  // TODO:
-  return FALSE;
-}
-
-static gboolean
 gst_droidcamsrc_set_min_exposure_time (GstDroidCamSrc * src,
     guint min_exposure_time)
-{
-  // TODO:
-  return FALSE;
-}
-
-static gboolean
-gst_droidcamsrc_get_max_exposure_time (GstDroidCamSrc * src,
-    guint * max_exposure_time)
 {
   // TODO:
   return FALSE;
