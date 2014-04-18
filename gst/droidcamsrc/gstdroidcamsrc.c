@@ -1313,6 +1313,7 @@ gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src)
   int max_zoom;
   GParamSpec *pspec;
   GParamSpecFloat *pspec_f;
+  gfloat current_zoom = 0.0f;
 
   GST_DEBUG_OBJECT (src, "update max zoom");
 
@@ -1337,23 +1338,33 @@ gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src)
 
   GST_DEBUG_OBJECT (src, "max zoom reported from HAL is %d", max_zoom);
 
-  src->max_zoom = max_zoom;
+  GST_OBJECT_LOCK (src);
+  /* add 1 because android zoom starts from 0 while we start from 1 */
+  src->max_zoom = max_zoom + 1;
+  GST_OBJECT_UNLOCK (src);
 
-  GST_INFO_OBJECT (src, "max zoom set to %f", src->max_zoom);
+  g_object_notify (G_OBJECT (src), "max-zoom");
 
   /* now update zoom pspec */
   pspec = g_object_class_find_property (G_OBJECT_GET_CLASS (src), "zoom");
 
   if (pspec && (G_PARAM_SPEC_VALUE_TYPE (pspec) == G_TYPE_FLOAT)) {
     pspec_f = G_PARAM_SPEC_FLOAT (pspec);
+    GST_OBJECT_LOCK (src);
     pspec_f->maximum = src->max_zoom;
+    GST_OBJECT_UNLOCK (src);
+    GST_INFO_OBJECT (src, "max zoom set to %f", pspec_f->maximum);
+
+    /* if current zoom more than max-zoom then adjust it */
+    g_object_get (src, "zoom", &current_zoom, NULL);
+    if (pspec_f->maximum < current_zoom) {
+      GST_DEBUG_OBJECT (src, "current zoom level is too high: %f",
+          current_zoom);
+      g_object_set (src, "zoom", pspec_f->maximum, NULL);
+    }
   } else {
     GST_WARNING_OBJECT (src, "updating maximum zoom failed");
   }
-
-  /* TODO: if current zoom more than max-zoom then adjust it */
-
-  g_object_notify (G_OBJECT (src), "max-zoom");
 
 out:
   g_mutex_unlock (&src->dev->lock);
