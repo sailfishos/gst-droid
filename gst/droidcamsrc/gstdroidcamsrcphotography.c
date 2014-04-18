@@ -100,6 +100,17 @@ static GHashTable *gst_droidcamsrc_photography_load (GKeyFile * file,
       gst_droidcamsrc_params_set_string (src->dev->params, droid, value); \
     } \
   }
+
+#define SET_ENUM(table,val,droid,memb)					\
+  const gchar *value = g_hash_table_lookup (table, GINT_TO_POINTER (val)); \
+  if (!value) {								\
+    return FALSE;							\
+  }									\
+  GST_OBJECT_LOCK (src);						\
+  src->photo->settings.memb = val;					\
+  GST_OBJECT_UNLOCK (src);						\
+  return gst_droidcamsrc_set_and_apply (src, droid, value);
+
 PHOTO_IFACE_FUNC (ev_compensation, float, float *);
 PHOTO_IFACE_FUNC (iso_speed, guint, guint *);
 PHOTO_IFACE_FUNC (aperture, guint, guint *);
@@ -426,12 +437,17 @@ gboolean
 gst_droidcamsrc_photography_set_property (GstDroidCamSrc * src, guint prop_id,
     const GValue * value, GParamSpec * pspec)
 {
-  // TODO:
-
   switch (prop_id) {
     case PROP_WB_MODE:
+      gst_droidcamsrc_set_white_balance_mode (src, g_value_get_enum (value));
+      return TRUE;
+
     case PROP_COLOR_TONE:
+      gst_droidcamsrc_set_color_tone_mode (src, g_value_get_enum (value));
+      return TRUE;
+
     case PROP_SCENE_MODE:
+      gst_droidcamsrc_set_scene_mode (src, g_value_get_enum (value));
       return TRUE;
 
     case PROP_FLASH_MODE:
@@ -439,20 +455,63 @@ gst_droidcamsrc_photography_set_property (GstDroidCamSrc * src, guint prop_id,
       return TRUE;
 
     case PROP_FLICKER_MODE:
+      gst_droidcamsrc_set_flicker_mode (src, g_value_get_enum (value));
+      return TRUE;
+
     case PROP_FOCUS_MODE:
-    case PROP_EV_COMP:
-    case PROP_ISO_SPEED:
-    case PROP_APERTURE:
-    case PROP_EXPOSURE_TIME:
-    case PROP_ZOOM:
-    case PROP_COLOR_TEMPERATURE:
-    case PROP_WHITE_POINT:
-    case PROP_ANALOG_GAIN:
-    case PROP_LENS_FOCUS:
-    case PROP_MIN_EXPOSURE_TIME:
-    case PROP_MAX_EXPOSURE_TIME:
+      gst_droidcamsrc_set_focus_mode (src, g_value_get_enum (value));
+      return TRUE;
+
     case PROP_NOISE_REDUCTION:
+      gst_droidcamsrc_set_noise_reduction (src, g_value_get_enum (value));
+      return TRUE;
+
     case PROP_EXPOSURE_MODE:
+      gst_droidcamsrc_set_exposure_mode (src, g_value_get_enum (value));
+      return TRUE;
+
+    case PROP_ZOOM:
+      gst_droidcamsrc_set_zoom (src, g_value_get_float (value));
+      return TRUE;
+
+    case PROP_EV_COMP:
+      gst_droidcamsrc_set_ev_compensation (src, g_value_get_float (value));
+      return TRUE;
+
+    case PROP_ANALOG_GAIN:
+      gst_droidcamsrc_set_analog_gain (src, g_value_get_float (value));
+      return TRUE;
+
+    case PROP_LENS_FOCUS:
+      gst_droidcamsrc_set_lens_focus (src, g_value_get_float (value));
+      return TRUE;
+
+    case PROP_APERTURE:
+      gst_droidcamsrc_set_aperture (src, g_value_get_uint (value));
+      return TRUE;
+
+    case PROP_ISO_SPEED:
+      gst_droidcamsrc_set_iso_speed (src, g_value_get_uint (value));
+      return TRUE;
+
+    case PROP_COLOR_TEMPERATURE:
+      gst_droidcamsrc_set_color_temperature (src, g_value_get_uint (value));
+      return TRUE;
+
+    case PROP_MIN_EXPOSURE_TIME:
+      gst_droidcamsrc_set_min_exposure_time (src, g_value_get_uint (value));
+      return TRUE;
+
+    case PROP_MAX_EXPOSURE_TIME:
+      gst_droidcamsrc_set_max_exposure_time (src, g_value_get_uint (value));
+      return TRUE;
+
+    case PROP_EXPOSURE_TIME:
+      gst_droidcamsrc_set_exposure (src, g_value_get_uint (value));
+      return TRUE;
+
+    case PROP_WHITE_POINT:
+      // TODO:
       return TRUE;
   }
 
@@ -548,6 +607,9 @@ gst_droidcamsrc_photography_apply (GstDroidCamSrc * src,
   GST_OBJECT_LOCK (src);
   APPLY_SETTING (src->photo->flash, src->photo->settings.flash_mode,
       "flash-mode");
+  APPLY_SETTING (src->photo->focus, src->photo->settings.focus_mode,
+      "focus-mode");
+  APPLY_SETTING (src->photo->wb, src->photo->settings.wb_mode, "whitebalance");
 
   GST_OBJECT_UNLOCK (src);
 
@@ -816,8 +878,7 @@ static gboolean
 gst_droidcamsrc_set_white_balance_mode (GstDroidCamSrc *
     src, GstPhotographyWhiteBalanceMode wb_mode)
 {
-  // TODO:
-  return FALSE;
+  SET_ENUM (src->photo->wb, wb_mode, "whitebalance", wb_mode);
 }
 
 static gboolean
@@ -840,17 +901,7 @@ static gboolean
 gst_droidcamsrc_set_flash_mode (GstDroidCamSrc
     * src, GstPhotographyFlashMode flash_mode)
 {
-  const gchar *value;
-  value = g_hash_table_lookup (src->photo->flash, GINT_TO_POINTER (flash_mode));
-  if (!value) {
-    return FALSE;
-  }
-
-  GST_OBJECT_LOCK (src);
-  src->photo->settings.flash_mode = flash_mode;
-  GST_OBJECT_UNLOCK (src);
-
-  return gst_droidcamsrc_set_and_apply (src, "flash-mode", value);
+  SET_ENUM (src->photo->flash, flash_mode, "flash-mode", flash_mode);
 }
 
 static gboolean
@@ -872,8 +923,7 @@ static gboolean
 gst_droidcamsrc_set_focus_mode (GstDroidCamSrc
     * src, GstPhotographyFocusMode focus_mode)
 {
-  // TODO:
-  return FALSE;
+  SET_ENUM (src->photo->focus, focus_mode, "focus-mode", focus_mode);
 }
 
 static GstPhotographyCaps
