@@ -368,6 +368,7 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev)
 {
   int err;
   gboolean ret = FALSE;
+  gchar *params;
 
   GST_DEBUG ("dev start");
   g_mutex_lock (&dev->lock);
@@ -376,7 +377,15 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev)
     GST_ERROR ("error 0x%x starting preview", err);
     goto out;
   }
-  // TODO: set params?
+
+  /* set params */
+  params = gst_droidcamsrc_params_to_string (dev->params);
+  err = dev->dev->ops->set_parameters (dev->dev, params);
+  g_free (params);
+  if (err != 0) {
+    GST_ERROR ("error 0x%x setting parameters", err);
+    goto out;
+  }
 
   ret = TRUE;
 
