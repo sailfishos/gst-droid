@@ -73,7 +73,6 @@ static gboolean gst_droidcamsrc_imgsrc_negotiate (GstDroidCamSrcPad * data);
 static gboolean gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data);
 static void gst_droidcamsrc_start_capture (GstDroidCamSrc * src);
 static void gst_droidcamsrc_stop_capture (GstDroidCamSrc * src);
-static gboolean gst_droidcamsrc_apply_params (GstDroidCamSrc * src);
 static void gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src);
 
 enum
@@ -417,6 +416,10 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       break;
 
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
+      /* set initial photography parameters */
+      gst_droidcamsrc_photography_apply (src, GST_PHOTO_SET_ONLY);
+
+      /* now start */
       if (!gst_droidcamsrc_dev_start (src->dev)) {
         ret = GST_STATE_CHANGE_FAILURE;
       }
@@ -1126,7 +1129,7 @@ out:
   return ret;
 }
 
-static gboolean
+gboolean
 gst_droidcamsrc_apply_params (GstDroidCamSrc * src)
 {
   gchar *params;

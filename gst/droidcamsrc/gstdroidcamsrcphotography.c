@@ -70,9 +70,14 @@ struct Entry Entries[] = {
 struct _GstDroidCamSrcPhotography
 {
   GstPhotographySettings settings;
+  GHashTable *flash;
+  GHashTable *color_tone;
+  GHashTable *focus;
+  GHashTable *scene;
+  GHashTable *wb;
 };
 
-GHashTable *gst_droidcamsrc_photography_load (GKeyFile * file,
+static GHashTable *gst_droidcamsrc_photography_load (GKeyFile * file,
     const gchar * property);
 
 #define PHOTO_IFACE_FUNC(name, tset, tget)					\
@@ -87,6 +92,14 @@ GHashTable *gst_droidcamsrc_photography_load (GKeyFile * file,
     return gst_droidcamsrc_set_##name (GST_DROIDCAMSRC (photo), val);	\
   }
 
+#define APPLY_SETTING(table, val, droid)		\
+  { \
+    const gchar *value = g_hash_table_lookup (table, GINT_TO_POINTER (val));       \
+    if (value) { \
+      GST_INFO_OBJECT (src, "setting %s to %s", droid, value);		\
+      gst_droidcamsrc_params_set_string (src->dev->params, droid, value); \
+    } \
+  }
 PHOTO_IFACE_FUNC (ev_compensation, float, float *);
 PHOTO_IFACE_FUNC (iso_speed, guint, guint *);
 PHOTO_IFACE_FUNC (aperture, guint, guint *);
@@ -117,6 +130,9 @@ PHOTO_IFACE_FUNC (max_exposure_time, guint, guint *);
 
 static GstPhotographyCaps gst_droidcamsrc_get_capabilities (GstDroidCamSrc *
     src);
+static gboolean gst_droidcamsrc_set_and_apply (GstDroidCamSrc * src,
+    const gchar * key, const gchar * value);
+
 static GstPhotographyCaps
 gst_droidcamsrc_photography_get_capabilities (GstPhotography * photo)
 {
@@ -416,7 +432,12 @@ gst_droidcamsrc_photography_set_property (GstDroidCamSrc * src, guint prop_id,
     case PROP_WB_MODE:
     case PROP_COLOR_TONE:
     case PROP_SCENE_MODE:
+      return TRUE;
+
     case PROP_FLASH_MODE:
+      gst_droidcamsrc_set_flash_mode (src, g_value_get_enum (value));
+      return TRUE;
+
     case PROP_FLICKER_MODE:
     case PROP_FOCUS_MODE:
     case PROP_EV_COMP:
@@ -483,7 +504,13 @@ gst_droidcamsrc_photography_init (GstDroidCamSrc * src)
   src->photo->settings.max_exposure_time = 0;
 
   /* load settings */
-  //  src->photo->flash = gst_droidcamsrc_photography_load (file, "flash-mode");
+  src->photo->flash = gst_droidcamsrc_photography_load (file, "flash-mode");
+  src->photo->color_tone =
+      gst_droidcamsrc_photography_load (file, "color-tone-mode");
+  src->photo->focus = gst_droidcamsrc_photography_load (file, "focus-mode");
+  src->photo->scene = gst_droidcamsrc_photography_load (file, "scene-mode");
+  src->photo->wb =
+      gst_droidcamsrc_photography_load (file, "white-balance-mode");
 
   /* free our stuff */
   g_free (file_path);
@@ -493,14 +520,43 @@ gst_droidcamsrc_photography_init (GstDroidCamSrc * src)
 void
 gst_droidcamsrc_photography_destroy (GstDroidCamSrc * src)
 {
-  //  g_hash_table_unref (src->photo->flash);
-  //  src->photo->flash = NULL;
+  g_hash_table_unref (src->photo->flash);
+  src->photo->flash = NULL;
+
+  g_hash_table_unref (src->photo->color_tone);
+  src->photo->color_tone = NULL;
+
+  g_hash_table_unref (src->photo->focus);
+  src->photo->focus = NULL;
+
+  g_hash_table_unref (src->photo->scene);
+  src->photo->scene = NULL;
+
+  g_hash_table_unref (src->photo->wb);
+  src->photo->wb = NULL;
 
   g_slice_free (GstDroidCamSrcPhotography, src->photo);
   src->photo = NULL;
 }
 
-GHashTable *
+void
+gst_droidcamsrc_photography_apply (GstDroidCamSrc * src,
+    GstDroidCamSrcPhotographyApplyType type)
+{
+  // TODO:
+
+  GST_OBJECT_LOCK (src);
+  APPLY_SETTING (src->photo->flash, src->photo->settings.flash_mode,
+      "flash-mode");
+
+  GST_OBJECT_UNLOCK (src);
+
+  if (type == GST_PHOTO_SET_AND_APPLY) {
+    gst_droidcamsrc_apply_params (src);
+  }
+}
+
+static GHashTable *
 gst_droidcamsrc_photography_load (GKeyFile * file, const gchar * property)
 {
   gchar **keys;
@@ -784,8 +840,17 @@ static gboolean
 gst_droidcamsrc_set_flash_mode (GstDroidCamSrc
     * src, GstPhotographyFlashMode flash_mode)
 {
-  // TODO:
-  return FALSE;
+  const gchar *value;
+  value = g_hash_table_lookup (src->photo->flash, GINT_TO_POINTER (flash_mode));
+  if (!value) {
+    return FALSE;
+  }
+
+  GST_OBJECT_LOCK (src);
+  src->photo->settings.flash_mode = flash_mode;
+  GST_OBJECT_UNLOCK (src);
+
+  return gst_droidcamsrc_set_and_apply (src, "flash-mode", value);
 }
 
 static gboolean
@@ -902,4 +967,22 @@ gst_droidcamsrc_set_max_exposure_time (GstDroidCamSrc * src,
 {
   // TODO:
   return FALSE;
+}
+
+static gboolean
+gst_droidcamsrc_set_and_apply (GstDroidCamSrc * src, const gchar * key,
+    const gchar * value)
+{
+  GST_INFO_OBJECT (src, "setting %s to %s", key, value);
+
+  if (!src->dev || !src->dev->params) {
+    return TRUE;
+  }
+
+  if (!gst_droidcamsrc_params_set_string (src->dev->params, key, value)) {
+    GST_WARNING_OBJECT (src, "failed to set %s to %s", key, value);
+    return FALSE;
+  }
+
+  return gst_droidcamsrc_apply_params (src);
 }
