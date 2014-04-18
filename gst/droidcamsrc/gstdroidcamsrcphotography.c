@@ -190,82 +190,178 @@ gst_droidcamsrc_photography_get_property (GstDroidCamSrc * src, guint prop_id,
 {
   switch (prop_id) {
     case PROP_WB_MODE:
-      g_value_set_enum (value, src->photo->settings.wb_mode);
-      break;
+    {
+      GstPhotographyWhiteBalanceMode mode;
+      if (gst_droidcamsrc_get_white_balance_mode (src, &mode)) {
+        g_value_set_enum (value, mode);
+      }
+    }
+      return TRUE;
 
     case PROP_COLOR_TONE:
-      g_value_set_enum (value, src->photo->settings.tone_mode);
-      break;
+    {
+      GstPhotographyColorToneMode tone;
+      if (gst_droidcamsrc_get_color_tone_mode (src, &tone)) {
+        g_value_set_enum (value, tone);
+      }
+    }
+      return TRUE;
 
     case PROP_SCENE_MODE:
-      g_value_set_enum (value, src->photo->settings.scene_mode);
-      break;
+    {
+      GstPhotographySceneMode mode;
+      if (gst_droidcamsrc_get_scene_mode (src, &mode)) {
+        g_value_set_enum (value, mode);
+      }
+    }
+      return TRUE;
 
     case PROP_FLASH_MODE:
-      g_value_set_enum (value, src->photo->settings.flash_mode);
-      break;
+    {
+      GstPhotographyFlashMode mode;
+      if (gst_droidcamsrc_get_flash_mode (src, &mode)) {
+        g_value_set_enum (value, mode);
+      }
+    }
+      return TRUE;
 
     case PROP_FLICKER_MODE:
-      g_value_set_enum (value, src->photo->settings.flicker_mode);
-      break;
+    {
+      GstPhotographyFlickerReductionMode mode;
+      if (gst_droidcamsrc_get_flicker_mode (src, &mode)) {
+        g_value_set_enum (value, mode);
+      }
+    }
+      return TRUE;
 
     case PROP_FOCUS_MODE:
-      g_value_set_enum (value, src->photo->settings.focus_mode);
-      break;
+    {
+      GstPhotographyFocusMode mode;
+      if (gst_droidcamsrc_get_focus_mode (src, &mode)) {
+        g_value_set_enum (value, mode);
+      }
+    }
+      return TRUE;
 
     case PROP_NOISE_REDUCTION:
-      g_value_set_enum (value, src->photo->settings.noise_reduction);
-      break;
+    {
+      GstPhotographyNoiseReduction mode;
+      if (gst_droidcamsrc_get_noise_reduction (src, &mode)) {
+        g_value_set_enum (value, mode);
+      }
+    }
+      return TRUE;
 
     case PROP_EXPOSURE_MODE:
+    {
+      // TODO:
       g_value_set_enum (value, src->photo->settings.exposure_mode);
-      break;
+    }
+      return TRUE;
 
     case PROP_ZOOM:
-      g_value_set_float (value, src->photo->settings.zoom);
-      break;
+    {
+      gfloat zoom;
+      if (gst_droidcamsrc_get_zoom (src, &zoom)) {
+        g_value_set_float (value, zoom);
+      }
+    }
+      return TRUE;
 
     case PROP_EV_COMP:
-      g_value_set_float (value, src->photo->settings.ev_compensation);
-      break;
+    {
+      gfloat ev;
+      if (gst_droidcamsrc_get_ev_compensation (src, &ev)) {
+        g_value_set_float (value, ev);
+      }
+    }
+      return TRUE;
 
     case PROP_ANALOG_GAIN:
+    {
+      // TODO:
       g_value_set_float (value, src->photo->settings.analog_gain);
-      break;
+    }
+      return TRUE;
 
     case PROP_LENS_FOCUS:
+    {
+      // TODO:
       g_value_set_float (value, src->photo->settings.lens_focus);
-      break;
+    }
+      return TRUE;
 
     case PROP_APERTURE:
-      g_value_set_uint (value, src->photo->settings.aperture);
-      break;
+    {
+      guint aperture;
+      if (gst_droidcamsrc_get_aperture (src, &aperture)) {
+        g_value_set_uint (value, aperture);
+      }
+    }
+      return TRUE;
 
     case PROP_ISO_SPEED:
-      g_value_set_uint (value, src->photo->settings.iso_speed);
-      break;
+    {
+      guint iso;
+      if (gst_droidcamsrc_get_iso_speed (src, &iso)) {
+        g_value_set_uint (value, iso);
+      }
+    }
+      return TRUE;
 
     case PROP_COLOR_TEMPERATURE:
+    {
+      // TODO:
       g_value_set_uint (value, src->photo->settings.color_temperature);
-      break;
+    }
+      return TRUE;
 
     case PROP_MIN_EXPOSURE_TIME:
+    {
+      // TODO:
       g_value_set_uint (value, src->photo->settings.min_exposure_time);
-      break;
+    }
+      return TRUE;
 
     case PROP_MAX_EXPOSURE_TIME:
+    {
+      // TODO:
       g_value_set_uint (value, src->photo->settings.max_exposure_time);
-      break;
+    }
+      return TRUE;
 
     case PROP_EXPOSURE_TIME:
-      g_value_set_uint (value, src->photo->settings.exposure_time);
-      break;
+    {
+      guint32 exposure;
+      if (gst_droidcamsrc_get_exposure (src, &exposure)) {
+        g_value_set_uint (value, exposure);
+      }
+    }
+      return TRUE;
 
     case PROP_CAPABILITIES:
+    {
+      gulong capabilities = gst_droidcamsrc_get_capabilities (src);
+      g_value_set_ulong (value, capabilities);
+    }
+      return TRUE;
+
     case PROP_IMAGE_CAPTURE_SUPPORTED_CAPS:
-    case PROP_IMAGE_PREVIEW_SUPPORTED_CAPS:
-    case PROP_WHITE_POINT:
+    {
       // TODO:
+    }
+      return TRUE;
+
+    case PROP_IMAGE_PREVIEW_SUPPORTED_CAPS:
+    {
+      // TODO:
+    }
+      return TRUE;
+
+    case PROP_WHITE_POINT:
+    {
+      // TODO:
+    }
       return TRUE;
   }
 
@@ -570,7 +666,7 @@ gst_droidcamsrc_set_focus_mode (GstDroidCamSrc
 }
 
 static GstPhotographyCaps
-gst_droidcamsrc_get_capabilities (GstDroidCamSrc * photo)
+gst_droidcamsrc_get_capabilities (GstDroidCamSrc * src)
 {
   // TODO:
   return FALSE;
