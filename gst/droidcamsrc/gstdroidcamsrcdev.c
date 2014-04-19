@@ -104,6 +104,11 @@ gst_droidcamsrc_dev_notify_callback (int32_t msg_type,
 
       break;
 
+    case CAMERA_MSG_ERROR:
+      GST_ELEMENT_ERROR (src, LIBRARY, FAILED, (NULL),
+          ("error from camera HAL with args 0x%x 0x%x", ext1, ext2));
+      break;
+
     default:
       GST_WARNING ("unknown message type 0x%x", msg_type);
   }
