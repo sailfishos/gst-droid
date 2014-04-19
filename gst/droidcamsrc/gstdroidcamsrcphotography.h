@@ -78,6 +78,8 @@ gboolean gst_droidcamsrc_photography_set_property (GstDroidCamSrc * src, guint p
 						   const GValue * value, GParamSpec * pspec);
 void gst_droidcamsrc_photography_apply (GstDroidCamSrc * src,
 					GstDroidCamSrcPhotographyApplyType type);
+void gst_droidcamsrc_photography_set_focus (GstDroidCamSrc * src);
+void gst_droidcamsrc_photography_set_flash (GstDroidCamSrc * src);
 
 G_END_DECLS
 

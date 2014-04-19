@@ -117,7 +117,6 @@ static GList *gst_droidcamsrc_photography_load (GKeyFile * file,
     }									\
   }
 
-
 #define SET_ENUM(table,val,droid,memb)					\
   int x;								\
   int len = g_list_length (table);					\
@@ -673,16 +672,9 @@ gst_droidcamsrc_photography_apply (GstDroidCamSrc * src,
   // TODO:
 
   GST_OBJECT_LOCK (src);
-  APPLY_SETTING (src->photo->flash, src->photo->settings.flash_mode,
-      "flash-mode");
-
-  /*
-     // TODO: this needs special handling
-     APPLY_SETTING (src->photo->focus, src->photo->settings.focus_mode,
-     "focus-mode");
-   */
+  gst_droidcamsrc_photography_set_flash (src);
+  gst_droidcamsrc_photography_set_focus (src);
   APPLY_SETTING (src->photo->wb, src->photo->settings.wb_mode, "whitebalance");
-
 
   GST_OBJECT_UNLOCK (src);
 
@@ -1165,4 +1157,75 @@ gst_droidcamsrc_set_and_apply (GstDroidCamSrc * src, const gchar * key,
   }
 
   return gst_droidcamsrc_apply_params (src);
+}
+
+void
+gst_droidcamsrc_photography_set_focus (GstDroidCamSrc * src)
+{
+  int x;
+  int len = g_list_length (src->photo->focus);
+  gchar *value = NULL;
+
+  if (!src->dev || !src->dev->params) {
+    return;
+  }
+
+  for (x = 0; x < len; x++) {
+    struct DataEntry *entry =
+        (struct DataEntry *) g_list_nth_data (src->photo->focus, x);
+    if (src->photo->settings.focus_mode == entry->key) {
+      value = entry->value;
+      break;
+    }
+  }
+
+  if (!value) {
+    return;
+  }
+
+  if (strcmp (value, "continuous")) {
+    gst_droidcamsrc_params_set_string (src->dev->params, "focus-mode", value);
+    return;
+  }
+
+  if (src->mode == MODE_IMAGE) {
+    gst_droidcamsrc_params_set_string (src->dev->params, "focus-mode",
+        "continuous-picture");
+  } else {
+    gst_droidcamsrc_params_set_string (src->dev->params, "focus-mode",
+        "continuous-video");
+  }
+}
+
+void
+gst_droidcamsrc_photography_set_flash (GstDroidCamSrc * src)
+{
+  int x;
+  int len = g_list_length (src->photo->flash);
+  gchar *value = NULL;
+
+  if (!src->dev || !src->dev->params) {
+    return;
+  }
+
+  if (src->mode == MODE_VIDEO && src->video_torch) {
+    gst_droidcamsrc_params_set_string (src->dev->params, "flash-mode", "torch");
+    return;
+  }
+
+
+  for (x = 0; x < len; x++) {
+    struct DataEntry *entry =
+        (struct DataEntry *) g_list_nth_data (src->photo->flash, x);
+    if (src->photo->settings.flash_mode == entry->key) {
+      value = entry->value;
+      break;
+    }
+
+  }
+
+  if (value) {
+    GST_INFO_OBJECT (src, "setting flash-mode to %s", value);
+    gst_droidcamsrc_params_set_string (src->dev->params, "flash-mode", value);
+  }
 }

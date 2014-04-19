@@ -1388,13 +1388,23 @@ static void
 gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
     GstDroidCamSrcPhotographyApplyType type)
 {
-  // TODO:
-
   GST_DEBUG_OBJECT (src, "apply mode settings");
 
-  /* apply focus */
+  if (!src->dev || !src->dev->params) {
+    GST_DEBUG_OBJECT (src, "cannot apply mode settings now");
+    return;
+  }
 
-  /* apply video torch */
+  /* apply focus */
+  gst_droidcamsrc_photography_set_focus (src);
+
+  /* video torch */
+  gst_droidcamsrc_photography_set_flash (src);
 
   /* apply denoising */
+  // TODO:
+
+  if (type == GST_PHOTO_SET_AND_APPLY) {
+    gst_droidcamsrc_apply_params (src);
+  }
 }
