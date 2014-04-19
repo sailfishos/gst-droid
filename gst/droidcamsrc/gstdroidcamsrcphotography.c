@@ -972,8 +972,7 @@ static gboolean
 gst_droidcamsrc_set_color_tone_mode (GstDroidCamSrc *
     src, GstPhotographyColorToneMode tone_mode)
 {
-  // TODO:
-  return FALSE;
+  SET_ENUM (src->photo->color_tone, tone_mode, "effect", tone_mode);
 }
 
 static gboolean
