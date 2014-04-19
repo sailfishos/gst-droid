@@ -142,6 +142,27 @@ gst_droidcamsrc_params_get_int (GstDroidCamSrcParams * params, const char *key)
   return value;
 }
 
+float
+gst_droidcamsrc_params_get_float (GstDroidCamSrcParams * params,
+    const char *key)
+{
+  GList *list;
+  float result;
+
+  g_mutex_lock (&params->lock);
+
+  list = gst_droidcamsrc_params_get_item_locked (params, key);
+  if (!list) {
+    g_mutex_unlock (&params->lock);
+    return 0.0;
+  }
+  // TODO: we don't do any error checking at all for strtof() :/
+  result = strtof (list->data, NULL);
+  g_mutex_unlock (&params->lock);
+
+  return result;
+}
+
 static gboolean
 gst_droidcamsrc_params_parse_dimension (char *d, int *w, int *h)
 {
