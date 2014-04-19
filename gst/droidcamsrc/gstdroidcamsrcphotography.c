@@ -76,6 +76,7 @@ struct _GstDroidCamSrcPhotography
   GList *scene;
   GList *wb;
   GList *iso;
+  GList *flicker;
 };
 
 struct DataEntry
@@ -614,6 +615,7 @@ gst_droidcamsrc_photography_init (GstDroidCamSrc * src)
       gst_droidcamsrc_photography_load (file, "white-balance-mode");
   src->photo->iso = gst_droidcamsrc_photography_load (file, "iso-speed");
   src->photo->iso = g_list_sort (src->photo->iso, sort_desc);
+  src->photo->flicker = gst_droidcamsrc_photography_load (file, "flicker-mode");
 
   /* free our stuff */
   g_free (file_path);
@@ -659,6 +661,11 @@ gst_droidcamsrc_photography_destroy (GstDroidCamSrc * src)
   if (src->photo->iso) {
     g_list_free_full (src->photo->iso, (GDestroyNotify) free_data_entry);
     src->photo->iso = NULL;
+  }
+
+  if (src->photo->flicker) {
+    g_list_free_full (src->photo->flicker, (GDestroyNotify) free_data_entry);
+    src->photo->flicker = NULL;
   }
 
   g_slice_free (GstDroidCamSrcPhotography, src->photo);
@@ -993,6 +1000,7 @@ gst_droidcamsrc_set_flash_mode (GstDroidCamSrc
 static gboolean
 gst_droidcamsrc_set_zoom (GstDroidCamSrc * src, gfloat zoom)
 {
+  // TODO: something is really wrong with our zoom
   int step = zoom;
   int max_zoom;
   gboolean ret;
@@ -1022,11 +1030,10 @@ gst_droidcamsrc_set_zoom (GstDroidCamSrc * src, gfloat zoom)
 }
 
 static gboolean
-gst_droidcamsrc_set_flicker_mode (GstDroidCamSrc * photo,
+gst_droidcamsrc_set_flicker_mode (GstDroidCamSrc * src,
     GstPhotographyFlickerReductionMode flicker_mode)
 {
-  // TODO:
-  return FALSE;
+  SET_ENUM (src->photo->flicker, flicker_mode, "antibanding", flicker_mode);
 }
 
 static gboolean
