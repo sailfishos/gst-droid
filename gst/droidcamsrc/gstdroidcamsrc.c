@@ -74,6 +74,8 @@ static gboolean gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data);
 static void gst_droidcamsrc_start_capture (GstDroidCamSrc * src);
 static void gst_droidcamsrc_stop_capture (GstDroidCamSrc * src);
 static void gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src);
+static void gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
+    GstDroidCamSrcPhotographyApplyType type);
 
 enum
 {
@@ -145,6 +147,7 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   src->captures = 0;
   g_mutex_init (&src->capture_lock);
   src->max_zoom = DEFAULT_MAX_ZOOM;
+  src->video_torch = DEFAULT_VIDEO_TORCH;
 
   gst_droidcamsrc_photography_init (src);
 
@@ -194,7 +197,9 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
       break;
 
     case PROP_VIDEO_TORCH:
-      // TODO:
+      g_value_set_boolean (value, src->video_torch);
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -240,13 +245,19 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
 
       src->mode = mode;
 
-      /* TODO: apply mode settings */
+      /* apply mode settings */
+      gst_droidcamsrc_apply_mode_settings (src, GST_PHOTO_SET_AND_APPLY);
     }
 
       break;
 
     case PROP_VIDEO_TORCH:
-      // TODO:
+      /* set value */
+      src->video_torch = g_value_get_boolean (value);
+
+      /* apply */
+      gst_droidcamsrc_apply_mode_settings (src, GST_PHOTO_SET_AND_APPLY);
+      break;
 
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -418,6 +429,9 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
       /* set initial photography parameters */
       gst_droidcamsrc_photography_apply (src, GST_PHOTO_SET_ONLY);
+
+      /* apply mode settings */
+      gst_droidcamsrc_apply_mode_settings (src, GST_PHOTO_SET_ONLY);
 
       /* now start */
       if (!gst_droidcamsrc_dev_start (src->dev)) {
@@ -1368,4 +1382,19 @@ gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src)
 
 out:
   g_mutex_unlock (&src->dev->lock);
+}
+
+static void
+gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
+    GstDroidCamSrcPhotographyApplyType type)
+{
+  // TODO:
+
+  GST_DEBUG_OBJECT (src, "apply mode settings");
+
+  /* apply focus */
+
+  /* apply video torch */
+
+  /* apply denoising */
 }
