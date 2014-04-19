@@ -611,18 +611,18 @@ gst_droidcamsrc_dev_start_autofocus (GstDroidCamSrcDev * dev)
 
   g_mutex_lock (&dev->lock);
 
-  if (dev->dev) {
+  if (!dev->dev) {
     GST_WARNING ("cannot autofocus because camera is not running");
     goto out;
-
-    err = dev->dev->ops->auto_focus (dev->dev);
-    if (err != 0) {
-      GST_WARNING ("error 0x%x starting autofocus", err);
-      goto out;
-    }
-
-    ret = TRUE;
   }
+
+  err = dev->dev->ops->auto_focus (dev->dev);
+  if (err != 0) {
+    GST_WARNING ("error 0x%x starting autofocus", err);
+    goto out;
+  }
+
+  ret = TRUE;
 
 out:
   g_mutex_unlock (&dev->lock);
