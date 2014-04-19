@@ -29,6 +29,10 @@
 #include "gstdroidcamsrc.h"
 #include <gst/memory/gstwrappedmemory.h>
 #include <unistd.h>
+#ifndef GST_USE_UNSTABLE_API
+#define GST_USE_UNSTABLE_API
+#endif /* GST_USE_UNSTABLE_API */
+#include <gst/interfaces/photography.h>
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 #define GST_CAT_DEFAULT gst_droidcamsrc_debug
@@ -81,6 +85,23 @@ gst_droidcamsrc_dev_notify_callback (int32_t msg_type,
       gst_droidcamsrc_post_message (src,
           gst_structure_new_empty (GST_DROIDCAMSRC_CAPTURE_START));
       g_mutex_unlock (&dev->lock);
+      break;
+
+    case CAMERA_MSG_FOCUS:
+    {
+      GstStructure *s;
+      gint status;
+      if (ext1) {
+        status = GST_PHOTOGRAPHY_FOCUS_STATUS_SUCCESS;
+      } else {
+        status = GST_PHOTOGRAPHY_FOCUS_STATUS_FAIL;
+      }
+
+      s = gst_structure_new (GST_PHOTOGRAPHY_AUTOFOCUS_DONE, "status",
+          G_TYPE_INT, status, NULL);
+      gst_droidcamsrc_post_message (src, s);
+    }
+
       break;
 
     default:
@@ -369,9 +390,11 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev)
   int err;
   gboolean ret = FALSE;
   gchar *params;
+  int msg_type = CAMERA_MSG_ALL_MSGS & ~CAMERA_MSG_PREVIEW_FRAME;
 
   GST_DEBUG ("dev start");
   g_mutex_lock (&dev->lock);
+  dev->dev->ops->enable_msg_type (dev->dev, msg_type);
   err = dev->dev->ops->start_preview (dev->dev);
   if (err != 0) {
     GST_ERROR ("error 0x%x starting preview", err);
@@ -439,9 +462,7 @@ gst_droidcamsrc_dev_capture_image (GstDroidCamSrcDev * dev)
 {
   int err;
   gboolean ret = FALSE;
-  int msg_type =
-      CAMERA_MSG_SHUTTER | CAMERA_MSG_POSTVIEW_FRAME | CAMERA_MSG_RAW_IMAGE |
-      CAMERA_MSG_COMPRESSED_IMAGE;
+  int msg_type = CAMERA_MSG_ALL_MSGS & ~CAMERA_MSG_PREVIEW_FRAME;
 
   GST_DEBUG ("dev capture image");
 
@@ -468,7 +489,7 @@ gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
 {
   int err;
   gboolean ret = FALSE;
-  int msg_type = CAMERA_MSG_VIDEO_FRAME;
+  int msg_type = CAMERA_MSG_ALL_MSGS & ~CAMERA_MSG_PREVIEW_FRAME;
 
   GST_DEBUG ("dev start video recording");
 
