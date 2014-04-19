@@ -49,8 +49,6 @@ gst_droidcamsrc_buffer_pool_alloc_buffer (GstBufferPool * bpool,
   GstStructure *config;
   int width, height, format, usage;
   GstAllocator *allocator;
-  NemoGstBufferOrientationMeta *meta;
-
   GstDroidCamSrcBufferPool *pool = GST_DROIDCAMSRC_BUFFER_POOL (bpool);
 
   GST_INFO_OBJECT (pool, "alloc buffer");
@@ -84,13 +82,16 @@ gst_droidcamsrc_buffer_pool_alloc_buffer (GstBufferPool * bpool,
   gst_buffer_append_memory (*buffer, mem);
 
   /* now our meta */
-  meta =
-      gst_buffer_add_gst_buffer_orientation_meta (*buffer,
-      pool->info->orientation, pool->info->direction);
-
-  if (!meta) {
+  if (!gst_buffer_add_gst_buffer_orientation_meta (*buffer,
+          pool->info->orientation, pool->info->direction)) {
     gst_buffer_unref (*buffer);
     GST_ERROR_OBJECT (pool, "failed to add orientation meta");
+    return GST_FLOW_ERROR;
+  }
+
+  if (!gst_buffer_add_video_crop_meta (*buffer)) {
+    gst_buffer_unref (*buffer);
+    GST_ERROR_OBJECT (pool, "failed to add crop meta");
     return GST_FLOW_ERROR;
   }
 

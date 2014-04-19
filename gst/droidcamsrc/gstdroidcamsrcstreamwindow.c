@@ -151,6 +151,7 @@ gst_droidcamsrc_stream_window_enqueue_buffer (struct preview_stream_ops *w,
   GstDroidCamSrc *src;
   GstBuffer *buff;
   int ret;
+  GstVideoCropMeta *meta;
 
   GST_DEBUG ("enqueue buffer %p", buffer);
 
@@ -178,6 +179,13 @@ gst_droidcamsrc_stream_window_enqueue_buffer (struct preview_stream_ops *w,
     ret = 0;
     goto unlock_and_out;
   }
+
+  /* now update crop meta */
+  meta = gst_buffer_get_video_crop_meta (buff);
+  meta->x = win->left;
+  meta->y = win->top;
+  meta->width = win->width - win->left - win->right;
+  meta->height = win->height - win->top - win->bottom;
 
   g_mutex_unlock (&win->lock);
 
