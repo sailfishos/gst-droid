@@ -106,6 +106,9 @@ struct _GstDroidCamSrc
 
   GstDroidCamSrcPhotography * photo;
   gfloat max_zoom;
+  gfloat min_ev_compensation;
+  gfloat max_ev_compensation;
+  gfloat ev_step;
 };
 
 struct _GstDroidCamSrcClass

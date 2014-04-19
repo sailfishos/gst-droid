@@ -36,6 +36,8 @@ typedef enum
   PROP_READY_FOR_CAPTURE,
   PROP_MAX_ZOOM,
   PROP_VIDEO_TORCH,
+  PROP_MIN_EV_COMPENSATION,
+  PROP_MAX_EV_COMPENSATION,
 
   /* photography interface */
   PROP_WB_MODE,

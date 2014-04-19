@@ -76,6 +76,8 @@ static void gst_droidcamsrc_stop_capture (GstDroidCamSrc * src);
 static void gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src);
 static void gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
     GstDroidCamSrcPhotographyApplyType type);
+static void gst_droidcamsrc_update_ev_compensation_bounds (GstDroidCamSrc *
+    src);
 
 enum
 {
@@ -88,10 +90,12 @@ enum
 
 static guint droidcamsrc_signals[LAST_SIGNAL];
 
-#define DEFAULT_CAMERA_DEVICE GST_DROIDCAMSRC_CAMERA_DEVICE_PRIMARY
-#define DEFAULT_MODE          MODE_IMAGE
-#define DEFAULT_MAX_ZOOM      10.0f
-#define DEFAULT_VIDEO_TORCH   FALSE
+#define DEFAULT_CAMERA_DEVICE        GST_DROIDCAMSRC_CAMERA_DEVICE_PRIMARY
+#define DEFAULT_MODE                 MODE_IMAGE
+#define DEFAULT_MAX_ZOOM             10.0f
+#define DEFAULT_VIDEO_TORCH          FALSE
+#define DEFAULT_MIN_EV_COMPENSATION  -2.5f
+#define DEFAULT_MAX_EV_COMPENSATION  2.5f
 
 static GstDroidCamSrcPad *
 gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
@@ -148,6 +152,9 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   g_mutex_init (&src->capture_lock);
   src->max_zoom = DEFAULT_MAX_ZOOM;
   src->video_torch = DEFAULT_VIDEO_TORCH;
+  src->min_ev_compensation = DEFAULT_MIN_EV_COMPENSATION;
+  src->max_ev_compensation = DEFAULT_MAX_EV_COMPENSATION;
+  src->ev_step = 0.0f;
 
   gst_droidcamsrc_photography_init (src);
 
@@ -198,6 +205,14 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
 
     case PROP_VIDEO_TORCH:
       g_value_set_boolean (value, src->video_torch);
+      break;
+
+    case PROP_MIN_EV_COMPENSATION:
+      g_value_set_float (value, src->min_ev_compensation);
+      break;
+
+    case PROP_MAX_EV_COMPENSATION:
+      g_value_set_float (value, src->max_ev_compensation);
       break;
 
     default:
@@ -422,6 +437,9 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         ret = GST_STATE_CHANGE_FAILURE;
         break;
       }
+
+      /* now that we have camera parameters, we can update min and max ev-compensation */
+      gst_droidcamsrc_update_ev_compensation_bounds (src);
     }
 
       break;
@@ -541,6 +559,20 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
           "depending on resolution/implementation)",
           "Android zoom factor", 1.0f, G_MAXFLOAT,
           DEFAULT_MAX_ZOOM, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_MIN_EV_COMPENSATION,
+      g_param_spec_float ("min-ev-compensation",
+          "Minimum exposure compensation",
+          "Minimum exposure compensation", -2.5f, G_MAXFLOAT,
+          DEFAULT_MAX_EV_COMPENSATION,
+          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_MAX_EV_COMPENSATION,
+      g_param_spec_float ("max-ev-compensation",
+          "Maximum exposure compensation",
+          "Maximum exposure compensation", 2.5f, G_MAXFLOAT,
+          DEFAULT_MAX_EV_COMPENSATION,
+          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_VIDEO_TORCH,
       g_param_spec_boolean ("video-torch", "Video torch",
@@ -1401,4 +1433,62 @@ gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
   if (type == GST_PHOTO_SET_AND_APPLY) {
     gst_droidcamsrc_apply_params (src);
   }
+}
+
+static void
+gst_droidcamsrc_update_ev_compensation_bounds (GstDroidCamSrc * src)
+{
+  GParamSpecFloat *min_pspec;
+  GParamSpecFloat *max_pspec;
+  gfloat step;
+  int min;
+  int max;
+
+  GST_DEBUG_OBJECT (src, "update ev compensation bounds");
+
+  step =
+      gst_droidcamsrc_params_get_float (src->dev->params,
+      "exposure-compensation-step");
+
+  // TODO: hmm, not sure this works.
+  if (step <= 0.0) {
+    GST_WARNING_OBJECT (src, "failed to get exposure-compensation-step");
+    return;
+  }
+
+  min =
+      gst_droidcamsrc_params_get_int (src->dev->params,
+      "min-exposure-compensation");
+  max =
+      gst_droidcamsrc_params_get_int (src->dev->params,
+      "max-exposure-compensation");
+
+  if (min == max) {
+    GST_WARNING_OBJECT (src,
+        "invalid exposure compensation bounds from HAL: %d, %d", min, max);
+    return;
+  }
+
+  min_pspec =
+      G_PARAM_SPEC_FLOAT (g_object_class_find_property (G_OBJECT_GET_CLASS
+          (src), "min-ev-compensation"));
+  max_pspec =
+      G_PARAM_SPEC_FLOAT (g_object_class_find_property (G_OBJECT_GET_CLASS
+          (src), "max-ev-compensation"));
+
+  min_pspec->minimum = min * step;
+  min_pspec->maximum = min_pspec->minimum;
+
+  max_pspec->minimum = max * step;
+  max_pspec->maximum = max_pspec->minimum;
+
+  src->min_ev_compensation = min_pspec->minimum;
+  src->max_ev_compensation = max_pspec->minimum;
+  src->ev_step = step;
+
+  GST_INFO_OBJECT (src, "updated ev compensation bounds to be from %f to %f",
+      min_pspec->minimum, max_pspec->minimum);
+
+  g_object_notify (G_OBJECT (src), "min-ev-compensation");
+  g_object_notify (G_OBJECT (src), "max-ev-compensation");
 }

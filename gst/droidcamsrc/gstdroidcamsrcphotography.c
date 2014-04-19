@@ -1221,7 +1221,6 @@ gst_droidcamsrc_photography_set_flash (GstDroidCamSrc * src)
       value = entry->value;
       break;
     }
-
   }
 
   if (value) {
