@@ -1089,8 +1089,11 @@ static gboolean
 gst_droidcamsrc_get_config (GstDroidCamSrc *
     src, GstPhotographySettings * config)
 {
-  // TODO:
-  return FALSE;
+  GST_OBJECT_LOCK (src);
+  memcpy (config, &src->photo->settings, sizeof (GstPhotographySettings));
+  GST_OBJECT_UNLOCK (src);
+
+  return TRUE;
 }
 
 static gboolean
