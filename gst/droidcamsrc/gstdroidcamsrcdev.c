@@ -104,6 +104,19 @@ gst_droidcamsrc_dev_notify_callback (int32_t msg_type,
 
       break;
 
+    case CAMERA_MSG_FOCUS_MOVE:
+    {
+      // TODO: an idea could be to query focus state when moving stops or starts
+      // and use that to emulate realtime reporting of CAF status
+      GstStructure *s;
+      GST_LOG_OBJECT (src, "focus move %d", ext1);
+
+      s = gst_structure_new ("focus-move", "status", G_TYPE_INT, ext1, NULL);
+      gst_droidcamsrc_post_message (src, s);
+    }
+
+      break;
+
     case CAMERA_MSG_ERROR:
       GST_ELEMENT_ERROR (src, LIBRARY, FAILED, (NULL),
           ("error from camera HAL with args 0x%x 0x%x", ext1, ext2));
