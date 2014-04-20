@@ -36,6 +36,24 @@
 GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 #define GST_CAT_DEFAULT gst_droidcamsrc_debug
 
+void
+gst_droidcamsrc_quirk_free (GstDroidCamSrcQuirk * quirk)
+{
+  if (quirk->prop) {
+    g_free (quirk->prop);
+  }
+
+  if (quirk->on) {
+    g_free (quirk->on);
+  }
+
+  if (quirk->off) {
+    g_free (quirk->off);
+  }
+
+  g_slice_free (GstDroidCamSrcQuirk, quirk);
+}
+
 GstDroidCamSrcQuirk *
 gst_droidcamsrc_quirk_new (GKeyFile * file, const gchar * group)
 {
@@ -54,25 +72,13 @@ gst_droidcamsrc_quirk_new (GKeyFile * file, const gchar * group)
   quirk->direction = g_key_file_get_integer (file, group, "direction", &err);
   CHECK_ERROR (err, group, "direction");
 
+  if (!quirk->prop || !quirk->on || !quirk->off) {
+    GST_WARNING ("incomplete quirk definition for %s", group);
+    gst_droidcamsrc_quirk_free (quirk);
+    quirk = NULL;
+  }
+
   return quirk;
-}
-
-void
-gst_droidcamsrc_quirk_free (GstDroidCamSrcQuirk * quirk)
-{
-  if (quirk->prop) {
-    g_free (quirk->prop);
-  }
-
-  if (quirk->on) {
-    g_free (quirk->on);
-  }
-
-  if (quirk->off) {
-    g_free (quirk->off);
-  }
-
-  g_slice_free (GstDroidCamSrcQuirk, quirk);
 }
 
 GstDroidCamSrcQuirks *
