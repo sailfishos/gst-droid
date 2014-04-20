@@ -1662,6 +1662,20 @@ gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
   /* video torch */
   gst_droidcamsrc_photography_set_flash (src);
 
+  /* face detection quirk */
+  if (src->quirks->face_detection
+      && (src->quirks->face_detection->direction == -1
+          || src->quirks->face_detection->direction ==
+          src->dev->info->direction)) {
+    if (src->mode == MODE_VIDEO || !src->face_detection) {
+      gst_droidcamsrc_params_set_string (src->dev->params,
+          src->quirks->face_detection->prop, src->quirks->face_detection->off);
+    } else {
+      gst_droidcamsrc_params_set_string (src->dev->params,
+          src->quirks->face_detection->prop, src->quirks->face_detection->on);
+    }
+  }
+
   /* face detection */
   if (src->mode == MODE_VIDEO || !src->face_detection) {
     /* stop face detection */
@@ -1672,7 +1686,26 @@ gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
   }
 
   /* image noise reduction */
-  // TODO:
+  if (src->quirks->image_noise_reduction && (src->dev->info->direction == -1
+          || src->dev->info->direction ==
+          src->quirks->image_noise_reduction->direction)) {
+    if (src->quirks->image_noise_reduction && src->mode == MODE_IMAGE) {
+      GST_INFO_OBJECT (src, "enabling image noise reduction");
+      gst_droidcamsrc_params_set_string (src->dev->params,
+          src->quirks->image_noise_reduction->prop,
+          src->quirks->image_noise_reduction->on);
+    } else if (src->quirks->image_noise_reduction && src->mode == MODE_VIDEO) {
+      GST_INFO_OBJECT (src, "disabling image noise reduction");
+      gst_droidcamsrc_params_set_string (src->dev->params,
+          src->quirks->image_noise_reduction->prop,
+          src->quirks->image_noise_reduction->off);
+    } else {
+      GST_ERROR_OBJECT (src, "image noise reduction quirk is missing");
+    }
+  } else {
+    GST_INFO_OBJECT (src,
+        "image noise reduction not applicable for our active device");
+  }
 
   if (type == SET_AND_APPLY) {
     gst_droidcamsrc_apply_params (src);
