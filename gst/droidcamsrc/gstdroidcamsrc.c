@@ -509,6 +509,123 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 }
 
 static gboolean
+gst_droidcamsrc_handle_roi_event (GstDroidCamSrc * src,
+    const GstStructure * structure)
+{
+  /* the code below is mostly based on subdevsrc gst_subdevsrc_libomap3camd_handle_roi_event */
+  guint width, height, count;
+  guint w, h, top, left, prio;
+  const GValue *regions, *region;
+  int x, len;
+  GList *rects = NULL;
+  gchar **array;
+  gchar *param;
+
+  GST_DEBUG_OBJECT (src, "roi event");
+
+  if (!src->dev || !src->dev->params) {
+    GST_WARNING_OBJECT (src, "camera not running");
+    return FALSE;
+  }
+
+  if (!gst_structure_get_uint (structure, "frame-width", &width)
+      || !gst_structure_get_uint (structure, "frame-height", &height)) {
+    GST_WARNING_OBJECT (src, "cannot read width or height from roi event");
+    return FALSE;
+  }
+
+  regions = gst_structure_get_value (structure, "regions");
+  if (!regions) {
+    GST_WARNING_OBJECT (src, "RoI event missing regions data");
+    return FALSE;
+  }
+
+  count = gst_value_list_get_size (regions);
+  /* TODO: cap count to max areas supported by HAL */
+
+  for (x = 0; x < count; x++) {
+    const GstStructure *rs;
+    region = gst_value_list_get_value (regions, x);
+    rs = gst_value_get_structure (region);
+    if (!gst_structure_get_uint (rs, "region-x", &left)
+        || !gst_structure_get_uint (rs, "region-y", &top)
+        || !gst_structure_get_uint (rs, "region-w", &w)
+        || !gst_structure_get_uint (rs, "region-h", &h)) {
+      GST_WARNING_OBJECT (src, "incorrect RoI value %d", x);
+      continue;
+    }
+
+    if (!gst_structure_get_uint (rs, "region-priority", &prio)) {
+      prio = 1;
+    }
+
+    GST_DEBUG_OBJECT (src, "RoI: x=%d, y=%d, w=%d, h=%d, pri=%d",
+        left, top, w, h, prio);
+    if (prio == 0) {
+      GST_DEBUG_OBJECT (src, "resetting RoI");
+      /* toss our rectangles */
+      if (rects) {
+        g_list_free_full (rects, g_free);
+      }
+
+      /* add an empty one */
+      rects = g_list_append (NULL, g_strdup ("(0,0,0,0,0)"));
+
+      /* no point in continuing */
+      break;
+    } else if (prio > 1000) {
+      GST_WARNING_OBJECT (src, "adjusting priority for rectangle %d from %d", x,
+          prio);
+      prio = 1000;
+    }
+
+    /* now scale the rectangle */
+    top = gst_util_uint64_scale (top, 2000, height) - 1000;
+    left = gst_util_uint64_scale (left, 2000, width) - 1000;
+    w = gst_util_uint64_scale (w, 2000, width);
+    h = gst_util_uint64_scale (h, 2000, height);
+
+    GST_DEBUG_OBJECT (src, "adjusted RoI: x=%d, y=%d, w=%d, h=%d, pri=%d",
+        left, top, w, h, prio);
+
+    rects =
+        g_list_append (rects, g_strdup_printf ("(%d,%d,%d,%d,%d)", left, top,
+            left + w, top + h, prio));
+  }
+
+  if (!rects) {
+    GST_DEBUG_OBJECT (src, "no RoI structures found");
+    return FALSE;
+  }
+
+  len = g_list_length (rects);
+
+  array = g_malloc ((len + 1) * sizeof (gchar *));
+  for (x = 0; x < len; x++) {
+    array[x] = g_list_nth_data (rects, x);
+  }
+
+  array[len] = NULL;
+
+  param = g_strjoinv (",", array);
+
+  g_free (array);
+
+  if (!gst_droidcamsrc_params_set_string (src->dev->params, "focus-areas",
+          param)) {
+    GST_WARNING_OBJECT (src, "failed to set focus-areas");
+  } else {
+    if (!gst_droidcamsrc_apply_params (src)) {
+      GST_WARNING_OBJECT (src, "failed to apply parameters");
+    }
+  }
+
+  g_free (param);
+
+  return TRUE;
+}
+
+static gboolean
 gst_droidcamsrc_send_event (GstElement * element, GstEvent * event)
 {
   GstDroidCamSrc *src = GST_DROIDCAMSRC (element);
@@ -537,8 +654,23 @@ gst_droidcamsrc_send_event (GstElement * element, GstEvent * event)
     case GST_EVENT_UNKNOWN:
       break;
 
-    case GST_EVENT_CUSTOM_UPSTREAM:    // TODO:
-      res = TRUE;
+    case GST_EVENT_CUSTOM_UPSTREAM:
+    {
+      const gchar *name;
+      const GstStructure *structure = gst_event_get_structure (event);
+      if (!structure) {
+        break;
+      }
+
+      name = gst_structure_get_name (structure);
+      if (g_strcmp0 (name, "regions-of-interest")) {
+        break;
+      }
+
+      /* now handle ROI event */
+      res = gst_droidcamsrc_handle_roi_event (src, structure);
+    }
+
       break;
 
       /* serialized events */
