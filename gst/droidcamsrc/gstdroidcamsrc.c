@@ -74,8 +74,6 @@ static gboolean gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data);
 static void gst_droidcamsrc_start_capture (GstDroidCamSrc * src);
 static void gst_droidcamsrc_stop_capture (GstDroidCamSrc * src);
 static void gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src);
-static void gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
-    GstDroidCamSrcPhotographyApplyType type);
 static void gst_droidcamsrc_update_ev_compensation_bounds (GstDroidCamSrc *
     src);
 
@@ -267,7 +265,7 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
       src->mode = mode;
 
       /* apply mode settings */
-      gst_droidcamsrc_apply_mode_settings (src, GST_PHOTO_SET_AND_APPLY);
+      gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
     }
 
       break;
@@ -277,13 +275,13 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
       src->video_torch = g_value_get_boolean (value);
 
       /* apply */
-      gst_droidcamsrc_apply_mode_settings (src, GST_PHOTO_SET_AND_APPLY);
+      gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
       break;
 
     case PROP_FACE_DETECTION:
       src->face_detection = g_value_get_boolean (value);
 
-      gst_droidcamsrc_apply_mode_settings (src, GST_PHOTO_SET_AND_APPLY);
+      gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
       break;
 
     default:
@@ -458,13 +456,13 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
       /* set initial photography parameters */
-      gst_droidcamsrc_photography_apply (src, GST_PHOTO_SET_ONLY);
+      gst_droidcamsrc_photography_apply (src, SET_ONLY);
 
       /* apply mode settings */
-      gst_droidcamsrc_apply_mode_settings (src, GST_PHOTO_SET_ONLY);
+      gst_droidcamsrc_apply_mode_settings (src, SET_ONLY);
 
       /* now start */
-      if (!gst_droidcamsrc_dev_start (src->dev)) {
+      if (!gst_droidcamsrc_dev_start (src->dev, FALSE)) {
         ret = GST_STATE_CHANGE_FAILURE;
       }
 
@@ -1585,7 +1583,7 @@ gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src)
   }
   // TODO: there is no lock for accesing the dev so dev can go
   // away by the time we attempt to lock it
-  g_mutex_lock (&src->dev->lock);
+  g_rec_mutex_lock (&src->dev->lock);
 
   if (!src->dev->params) {
     GST_DEBUG_OBJECT (src, "camera not yet opened");
@@ -1624,12 +1622,12 @@ gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src)
   }
 
 out:
-  g_mutex_unlock (&src->dev->lock);
+  g_rec_mutex_unlock (&src->dev->lock);
 }
 
-static void
+void
 gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
-    GstDroidCamSrcPhotographyApplyType type)
+    GstDroidCamSrcApplyType type)
 {
   GST_DEBUG_OBJECT (src, "apply mode settings");
 
@@ -1656,7 +1654,7 @@ gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
   /* apply denoising */
   // TODO:
 
-  if (type == GST_PHOTO_SET_AND_APPLY) {
+  if (type == SET_AND_APPLY) {
     gst_droidcamsrc_apply_params (src);
   }
 }

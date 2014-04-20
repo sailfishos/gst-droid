@@ -674,7 +674,7 @@ gst_droidcamsrc_photography_destroy (GstDroidCamSrc * src)
 
 void
 gst_droidcamsrc_photography_apply (GstDroidCamSrc * src,
-    GstDroidCamSrcPhotographyApplyType type)
+    GstDroidCamSrcApplyType type)
 {
   // TODO:
 
@@ -685,7 +685,7 @@ gst_droidcamsrc_photography_apply (GstDroidCamSrc * src,
 
   GST_OBJECT_UNLOCK (src);
 
-  if (type == GST_PHOTO_SET_AND_APPLY) {
+  if (type == SET_AND_APPLY) {
     gst_droidcamsrc_apply_params (src);
   }
 }

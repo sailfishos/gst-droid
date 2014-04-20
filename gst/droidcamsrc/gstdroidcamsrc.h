@@ -56,6 +56,7 @@ typedef struct _GstDroidCamSrcClass GstDroidCamSrcClass;
 typedef struct _GstDroidCamSrcCamInfo GstDroidCamSrcCamInfo;
 typedef struct _GstDroidCamSrcPad GstDroidCamSrcPad;
 typedef struct _GstDroidCamSrcPhotography GstDroidCamSrcPhotography;
+typedef enum _GstDroidCamSrcApplyType GstDroidCamSrcApplyType;
 
 typedef gboolean (* GstDroidCamSrcNegotiateCallback)(GstDroidCamSrcPad * pad);
 
@@ -118,10 +119,17 @@ struct _GstDroidCamSrcClass
   GstElementClass parent_class;
 };
 
+enum _GstDroidCamSrcApplyType
+{
+  SET_ONLY,
+  SET_AND_APPLY,
+};
+
 GType gst_droidcamsrc_get_type (void);
 void gst_droidcamsrc_post_message (GstDroidCamSrc * src, GstStructure * s);
 void gst_droidcamsrc_timestamp (GstDroidCamSrc * src, GstBuffer * buffer);
 gboolean gst_droidcamsrc_apply_params (GstDroidCamSrc * src);
+void gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src, GstDroidCamSrcApplyType type);
 
 G_END_DECLS
 

@@ -45,7 +45,7 @@ struct _GstDroidCamSrcDev
   GstDroidCamSrcPad *imgsrc;
   GstDroidCamSrcPad *vidsrc;
   GstAllocator *allocator;
-  GMutex lock;
+  GRecMutex lock;
 
   GstDroidCamSrcCamInfo *info;
   GstDroidCamSrcImageCaptureState *img;
@@ -62,7 +62,7 @@ void gst_droidcamsrc_dev_close (GstDroidCamSrcDev * dev);
 gboolean gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev);
 void gst_droidcamsrc_dev_deinit (GstDroidCamSrcDev * dev);
 
-gboolean gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev);
+gboolean gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings);
 void gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev);
 
 gboolean gst_droidcamsrc_dev_set_params (GstDroidCamSrcDev * dev, const gchar *params);

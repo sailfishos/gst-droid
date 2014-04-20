@@ -27,6 +27,7 @@
 G_BEGIN_DECLS
 
 typedef struct _GstDroidCamSrc GstDroidCamSrc;
+typedef enum _GstDroidCamSrcApplyType GstDroidCamSrcApplyType;
 
 typedef enum
 {
@@ -65,12 +66,6 @@ typedef enum
   PROP_EXPOSURE_MODE,
 } GstDroidCamSrcProperties;
 
-typedef enum
-{
-  GST_PHOTO_SET_ONLY,
-  GST_PHOTO_SET_AND_APPLY,
-} GstDroidCamSrcPhotographyApplyType;
-
 void gst_droidcamsrc_photography_register (gpointer g_iface,  gpointer iface_data);
 void gst_droidcamsrc_photography_add_overrides (GObjectClass * klass);
 void gst_droidcamsrc_photography_init (GstDroidCamSrc * src);
@@ -80,7 +75,7 @@ gboolean gst_droidcamsrc_photography_get_property (GstDroidCamSrc * src, guint p
 gboolean gst_droidcamsrc_photography_set_property (GstDroidCamSrc * src, guint prop_id,
 						   const GValue * value, GParamSpec * pspec);
 void gst_droidcamsrc_photography_apply (GstDroidCamSrc * src,
-					GstDroidCamSrcPhotographyApplyType type);
+					GstDroidCamSrcApplyType type);
 void gst_droidcamsrc_photography_set_focus (GstDroidCamSrc * src);
 void gst_droidcamsrc_photography_set_flash (GstDroidCamSrc * src);
 

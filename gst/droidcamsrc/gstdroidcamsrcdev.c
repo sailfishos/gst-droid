@@ -80,11 +80,11 @@ gst_droidcamsrc_dev_notify_callback (int32_t msg_type,
 
   switch (msg_type) {
     case CAMERA_MSG_SHUTTER:
-      g_mutex_lock (&dev->lock);
+      g_rec_mutex_lock (&dev->lock);
       dev->dev->ops->disable_msg_type (dev->dev, CAMERA_MSG_SHUTTER);
       gst_droidcamsrc_post_message (src,
           gst_structure_new_empty (GST_DROIDCAMSRC_CAPTURE_START));
-      g_mutex_unlock (&dev->lock);
+      g_rec_mutex_unlock (&dev->lock);
       break;
 
     case CAMERA_MSG_FOCUS:
@@ -169,7 +169,7 @@ gst_droidcamsrc_dev_data_callback (int32_t msg_type,
         g_mutex_unlock (&dev->imgsrc->lock);
       }
 
-      gst_droidcamsrc_dev_start (dev);
+      gst_droidcamsrc_dev_start (dev, TRUE);
 
       g_mutex_lock (&src->capture_lock);
       --src->captures;
@@ -179,6 +179,7 @@ gst_droidcamsrc_dev_data_callback (int32_t msg_type,
     }
       break;
 
+      /* case CAMERA_MSG_PREVIEW_METADATA: */
     default:
       GST_WARNING ("unknown message type 0x%x", msg_type);
   }
@@ -226,14 +227,14 @@ gst_droidcamsrc_dev_data_timestamp_callback (int64_t timestamp,
   GST_BUFFER_OFFSET_END (buffer) = ++dev->vid->video_frames;
   gst_droidcamsrc_timestamp (src, buffer);
 
-  g_mutex_lock (&dev->lock);
+  g_rec_mutex_lock (&dev->lock);
 
   drop_buffer = !dev->vid->running;
   if (!drop_buffer) {
     ++dev->vid->queued_frames;
   }
 
-  g_mutex_unlock (&dev->lock);
+  g_rec_mutex_unlock (&dev->lock);
 
   if (drop_buffer) {
     gst_buffer_unref (buffer);
@@ -269,7 +270,7 @@ gst_droidcamsrc_dev_new (camera_module_t * hw, GstDroidCamSrcPad * vfsrc,
   dev->imgsrc = imgsrc;
   dev->vidsrc = vidsrc;
 
-  g_mutex_init (&dev->lock);
+  g_rec_mutex_init (&dev->lock);
 
   return dev;
 }
@@ -282,7 +283,7 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
 
   GST_DEBUG ("dev open");
 
-  g_mutex_lock (&dev->lock);
+  g_rec_mutex_lock (&dev->lock);
 
   dev->info = info;
   id = g_strdup_printf ("%d", dev->info->num);
@@ -296,13 +297,13 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
   if (err < 0) {
     dev->dev = NULL;
 
-    g_mutex_unlock (&dev->lock);
+    g_rec_mutex_unlock (&dev->lock);
 
     GST_ERROR ("error 0x%x opening camera", err);
     return FALSE;
   }
 
-  g_mutex_unlock (&dev->lock);
+  g_rec_mutex_unlock (&dev->lock);
 
   return TRUE;
 }
@@ -314,7 +315,7 @@ gst_droidcamsrc_dev_close (GstDroidCamSrcDev * dev)
 
   GST_DEBUG ("dev close");
 
-  g_mutex_lock (&dev->lock);
+  g_rec_mutex_lock (&dev->lock);
 
   if (dev->dev) {
     dev->dev->ops->release (dev->dev);
@@ -326,7 +327,7 @@ gst_droidcamsrc_dev_close (GstDroidCamSrcDev * dev)
     }
   }
 
-  g_mutex_unlock (&dev->lock);
+  g_rec_mutex_unlock (&dev->lock);
 }
 
 void
@@ -337,7 +338,7 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
   dev->hw = NULL;
   dev->info = NULL;
   gst_object_unref (dev->allocator);
-  g_mutex_clear (&dev->lock);
+  g_rec_mutex_clear (&dev->lock);
   g_mutex_init (&dev->vid->lock);
   g_slice_free (GstDroidCamSrcImageCaptureState, dev->img);
   g_slice_free (GstDroidCamSrcVideoCaptureState, dev->vid);
@@ -353,7 +354,7 @@ gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
 
   GST_DEBUG ("dev init");
 
-  g_mutex_lock (&dev->lock);
+  g_rec_mutex_lock (&dev->lock);
 
   dev->win = gst_droid_cam_src_stream_window_new (dev->vfsrc, dev->info);
 
@@ -374,11 +375,11 @@ gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
     goto err;
   }
 
-  g_mutex_unlock (&dev->lock);
+  g_rec_mutex_unlock (&dev->lock);
   return TRUE;
 
 err:
-  g_mutex_unlock (&dev->lock);
+  g_rec_mutex_unlock (&dev->lock);
   gst_droidcamsrc_dev_deinit (dev);
   return FALSE;
 }
@@ -388,7 +389,7 @@ gst_droidcamsrc_dev_deinit (GstDroidCamSrcDev * dev)
 {
   GST_DEBUG ("dev deinit");
 
-  g_mutex_lock (&dev->lock);
+  g_rec_mutex_lock (&dev->lock);
 
   if (dev->params) {
     gst_droidcamsrc_params_destroy (dev->params);
@@ -399,24 +400,29 @@ gst_droidcamsrc_dev_deinit (GstDroidCamSrcDev * dev)
     gst_droid_cam_src_stream_window_destroy (dev->win);
   }
 
-  g_mutex_unlock (&dev->lock);
+  g_rec_mutex_unlock (&dev->lock);
 }
 
 gboolean
-gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev)
+gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
 {
   int err;
   gboolean ret = FALSE;
   gchar *params;
   int msg_type = CAMERA_MSG_ALL_MSGS & ~CAMERA_MSG_PREVIEW_FRAME;
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
   GST_DEBUG ("dev start");
-  g_mutex_lock (&dev->lock);
+  g_rec_mutex_lock (&dev->lock);
   dev->dev->ops->enable_msg_type (dev->dev, msg_type);
   err = dev->dev->ops->start_preview (dev->dev);
   if (err != 0) {
     GST_ERROR ("error 0x%x starting preview", err);
     goto out;
+  }
+
+  if (apply_settings) {
+    gst_droidcamsrc_apply_mode_settings (src, SET_ONLY);
   }
 
   /* set params */
@@ -431,7 +437,7 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev)
   ret = TRUE;
 
 out:
-  g_mutex_unlock (&dev->lock);
+  g_rec_mutex_unlock (&dev->lock);
   return ret;
 }
 
@@ -440,13 +446,13 @@ gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev)
 {
   GST_DEBUG ("dev stop");
 
-  g_mutex_lock (&dev->lock);
+  g_rec_mutex_lock (&dev->lock);
 
   dev->dev->ops->stop_preview (dev->dev);
 
   gst_droid_cam_src_stream_window_clear (dev->win);
 
-  g_mutex_unlock (&dev->lock);
+  g_rec_mutex_unlock (&dev->lock);
 }
 
 gboolean
@@ -455,7 +461,7 @@ gst_droidcamsrc_dev_set_params (GstDroidCamSrcDev * dev, const gchar * params)
   int err;
   gboolean ret = FALSE;
 
-  g_mutex_lock (&dev->lock);
+  g_rec_mutex_lock (&dev->lock);
   if (!dev->dev) {
     GST_ERROR ("camera device is not open");
     goto out;
@@ -470,7 +476,7 @@ gst_droidcamsrc_dev_set_params (GstDroidCamSrcDev * dev, const gchar * params)
   ret = TRUE;
 
 out:
-  g_mutex_unlock (&dev->lock);
+  g_rec_mutex_unlock (&dev->lock);
 
   return ret;
 }
@@ -484,7 +490,7 @@ gst_droidcamsrc_dev_capture_image (GstDroidCamSrcDev * dev)
 
   GST_DEBUG ("dev capture image");
 
-  g_mutex_lock (&dev->lock);
+  g_rec_mutex_lock (&dev->lock);
 
   dev->dev->ops->enable_msg_type (dev->dev, msg_type);
   dev->img->image_preview_sent = FALSE;
@@ -498,7 +504,7 @@ gst_droidcamsrc_dev_capture_image (GstDroidCamSrcDev * dev)
   ret = TRUE;
 
 out:
-  g_mutex_unlock (&dev->lock);
+  g_rec_mutex_unlock (&dev->lock);
   return ret;
 }
 
@@ -515,7 +521,7 @@ gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
   dev->vidsrc->pushed_buffers = 0;
   g_mutex_unlock (&dev->vidsrc->lock);
 
-  g_mutex_lock (&dev->lock);
+  g_rec_mutex_lock (&dev->lock);
   dev->vid->running = TRUE;
   dev->vid->eos_sent = FALSE;
   dev->vid->video_frames = 0;
@@ -539,7 +545,7 @@ gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
   ret = TRUE;
 
 out:
-  g_mutex_unlock (&dev->lock);
+  g_rec_mutex_unlock (&dev->lock);
   return ret;
 }
 
@@ -560,9 +566,9 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
   g_mutex_unlock (&dev->vidsrc->lock);
 
   /* Now stop pushing to the pad */
-  g_mutex_lock (&dev->lock);
+  g_rec_mutex_lock (&dev->lock);
   dev->vid->running = FALSE;
-  g_mutex_unlock (&dev->lock);
+  g_rec_mutex_unlock (&dev->lock);
 
   /* now make sure nothing is being pushed to the queue */
   g_mutex_lock (&dev->vid->lock);
@@ -579,23 +585,23 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
     GST_ERROR ("failed to push EOS event");
   }
 
-  g_mutex_lock (&dev->lock);
+  g_rec_mutex_lock (&dev->lock);
 
   GST_INFO ("waiting for queued frames %i", dev->vid->queued_frames);
 
   if (dev->vid->queued_frames > 0) {
     GST_INFO ("waiting for queued frames to reach 0 from %i",
         dev->vid->queued_frames);
-    g_mutex_unlock (&dev->lock);
+    g_rec_mutex_unlock (&dev->lock);
     usleep (VIDEO_RECORDING_STOP_TIMEOUT);
-    g_mutex_lock (&dev->lock);
+    g_rec_mutex_lock (&dev->lock);
   }
 
   if (dev->vid->queued_frames > 0) {
     GST_WARNING ("video queue still has %i frames", dev->vid->queued_frames);
   }
 
-  g_mutex_unlock (&dev->lock);
+  g_rec_mutex_unlock (&dev->lock);
 
   dev->dev->ops->stop_recording (dev->dev);
 
@@ -608,10 +614,10 @@ gst_droidcamsrc_dev_release_recording_frame (void *data,
 {
   GST_DEBUG ("dev release recording frame %p", data);
 
-  g_mutex_lock (&dev->lock);
+  g_rec_mutex_lock (&dev->lock);
   --dev->vid->queued_frames;
   dev->dev->ops->release_recording_frame (dev->dev, data);
-  g_mutex_unlock (&dev->lock);
+  g_rec_mutex_unlock (&dev->lock);
 }
 
 void
@@ -637,9 +643,9 @@ gst_droidcamsrc_dev_update_params_locked (GstDroidCamSrcDev * dev)
 void
 gst_droidcamsrc_dev_update_params (GstDroidCamSrcDev * dev)
 {
-  g_mutex_lock (&dev->lock);
+  g_rec_mutex_lock (&dev->lock);
   gst_droidcamsrc_dev_update_params_locked (dev);
-  g_mutex_unlock (&dev->lock);
+  g_rec_mutex_unlock (&dev->lock);
 }
 
 gboolean
@@ -648,7 +654,7 @@ gst_droidcamsrc_dev_start_autofocus (GstDroidCamSrcDev * dev)
   int err;
   gboolean ret = FALSE;
 
-  g_mutex_lock (&dev->lock);
+  g_rec_mutex_lock (&dev->lock);
 
   if (!dev->dev) {
     GST_WARNING ("cannot autofocus because camera is not running");
@@ -664,7 +670,7 @@ gst_droidcamsrc_dev_start_autofocus (GstDroidCamSrcDev * dev)
   ret = TRUE;
 
 out:
-  g_mutex_unlock (&dev->lock);
+  g_rec_mutex_unlock (&dev->lock);
 
   return ret;
 }
@@ -674,7 +680,7 @@ gst_droidcamsrc_dev_stop_autofocus (GstDroidCamSrcDev * dev)
 {
   int err;
 
-  g_mutex_lock (&dev->lock);
+  g_rec_mutex_lock (&dev->lock);
 
   if (dev->dev) {
     err = dev->dev->ops->cancel_auto_focus (dev->dev);
@@ -683,7 +689,7 @@ gst_droidcamsrc_dev_stop_autofocus (GstDroidCamSrcDev * dev)
     }
   }
 
-  g_mutex_unlock (&dev->lock);
+  g_rec_mutex_unlock (&dev->lock);
 }
 
 gboolean
@@ -700,7 +706,7 @@ gst_droidcamsrc_dev_enable_face_detection (GstDroidCamSrcDev * dev,
   cmd =
       enable ? CAMERA_CMD_START_FACE_DETECTION : CAMERA_CMD_STOP_FACE_DETECTION;
 
-  g_mutex_lock (&dev->lock);
+  g_rec_mutex_lock (&dev->lock);
   if (!dev->dev) {
     GST_WARNING ("camera is not running yet");
     goto out;
@@ -716,7 +722,7 @@ gst_droidcamsrc_dev_enable_face_detection (GstDroidCamSrcDev * dev,
   res = TRUE;
 
 out:
-  g_mutex_unlock (&dev->lock);
+  g_rec_mutex_unlock (&dev->lock);
 
   return res;
 }
