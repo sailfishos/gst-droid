@@ -187,6 +187,10 @@ gst_droidcamsrc_stream_window_enqueue_buffer (struct preview_stream_ops *w,
   meta->width = win->width - win->left - win->right;
   meta->height = win->height - win->top - win->bottom;
 
+  GST_LOG
+      ("window width = %d, height = %d, crop info: left = %d, top = %d, right = %d, bottom = %d",
+      win->width, win->height, win->left, win->top, win->right, win->bottom);
+
   g_mutex_unlock (&win->lock);
 
   g_mutex_lock (&win->pad->lock);
