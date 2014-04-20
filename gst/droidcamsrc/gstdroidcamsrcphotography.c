@@ -1192,7 +1192,7 @@ gst_droidcamsrc_photography_set_focus (GstDroidCamSrc * src)
     return;
   }
 
-  if (strcmp (value, "continuous")) {
+  if (g_strcmp0 (value, "continuous")) {
     gst_droidcamsrc_params_set_string (src->dev->params, "focus-mode", value);
     return;
   }

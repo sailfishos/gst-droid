@@ -24,7 +24,6 @@
 #endif
 
 #include "gstencoderparams.h"
-#include <string.h>
 
 typedef struct
 {
@@ -103,7 +102,7 @@ find_in_array (Entry entries[], const gchar * str)
   }
 
   for (x = 0; x < len; x++) {
-    if (!strcmp (str, entries[x].str)) {
+    if (!g_strcmp0 (str, entries[x].str)) {
       return entries[x].omx;
     }
   }

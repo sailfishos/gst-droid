@@ -20,7 +20,6 @@
  */
 
 #include "gstdroidcodectype.h"
-#include <string.h>
 #include "plugin.h"
 
 typedef struct _GstDroidCodecType GstDroidCodecType;
@@ -39,8 +38,8 @@ h264 (GstStructure * s)
   const char *alignment = gst_structure_get_string (s, "alignment");
   const char *format = gst_structure_get_string (s, "stream-format");
 
-  return alignment && format && !strcmp (alignment, "au")
-      && !strcmp (format, "byte-stream");
+  return alignment && format && !g_strcmp0 (alignment, "au")
+      && !g_strcmp0 (format, "byte-stream");
 }
 
 static gboolean
@@ -49,11 +48,11 @@ h264_enc (GstStructure * s)
   const char *alignment = gst_structure_get_string (s, "alignment");
   const char *format = gst_structure_get_string (s, "stream-format");
 
-  if (alignment && strcmp (alignment, "au")) {
+  if (alignment && g_strcmp0 (alignment, "au")) {
     return FALSE;
   }
 
-  if (format && strcmp (format, "byte-stream")) {
+  if (format && g_strcmp0 (format, "byte-stream")) {
     return FALSE;
   }
 
@@ -112,7 +111,7 @@ gst_droid_codec_type_from_caps (GstCaps * caps, GstDroidCodecTypeType type)
       continue;
     }
 
-    gboolean is_equal = strcmp (types[x].media_type, name) == 0;
+    gboolean is_equal = g_strcmp0 (types[x].media_type, name) == 0;
     if ((is_equal && !types[x].verify) || (is_equal && types[x].verify
             && types[x].verify (s))) {
       return types[x].codec_type;
@@ -156,7 +155,7 @@ gst_droid_codec_type_get_type (const gchar * type)
   int len = G_N_ELEMENTS (types);
 
   for (x = 0; x < len; x++) {
-    if (!strcmp (type, types[x].codec_type)) {
+    if (!g_strcmp0 (type, types[x].codec_type)) {
       return types[x].type;
     }
   }
@@ -185,7 +184,7 @@ gst_droid_codec_type_compliment_caps (const gchar * type, GstCaps * caps)
   int len = G_N_ELEMENTS (types);
 
   for (x = 0; x < len; x++) {
-    if (!strcmp (type, types[x].codec_type)) {
+    if (!g_strcmp0 (type, types[x].codec_type)) {
       if (types[x].compliment) {
         types[x].compliment (caps);
       }
@@ -202,7 +201,7 @@ gst_droid_codec_type_in_stream_headers (const gchar * type, gboolean * result)
   int len = G_N_ELEMENTS (types);
 
   for (x = 0; x < len; x++) {
-    if (!strcmp (type, types[x].codec_type)) {
+    if (!g_strcmp0 (type, types[x].codec_type)) {
       *result = types[x].in_stream_headers;
       return TRUE;
     }

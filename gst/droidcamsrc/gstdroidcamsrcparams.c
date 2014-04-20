@@ -26,7 +26,6 @@
 #include "gstdroidcamsrcparams.h"
 #include <stdlib.h>
 #include "gst/memory/gstgralloc.h"
-#include <string.h>
 #include "plugin.h"
 #include <gst/memory/gstwrappedmemory.h>
 
@@ -450,7 +449,7 @@ gst_droidcamsrc_params_set_string (GstDroidCamSrcParams * params,
   }
 
   /* update only if not equal */
-  if (strcmp (item->data, value)) {
+  if (g_strcmp0 (item->data, value)) {
     g_free (item->data);
     item->data = g_strdup (value);
     params->is_dirty = TRUE;

@@ -1668,9 +1668,9 @@ gst_droid_codec_apply_encoding_params (GstDroidComponent * comp,
 
   fps = info->fps_n / info->fps_d;
 
-  if (!strcmp (comp->handle->type, GST_DROID_CODEC_TYPE_MPEG4VIDEO_ENC)) {
+  if (!g_strcmp0 (comp->handle->type, GST_DROID_CODEC_TYPE_MPEG4VIDEO_ENC)) {
     ret = gst_droid_codec_apply_mpeg4video_encoding_params (comp, caps, fps);
-  } else if (!strcmp (comp->handle->type, GST_DROID_CODEC_TYPE_AVC_ENC)) {
+  } else if (!g_strcmp0 (comp->handle->type, GST_DROID_CODEC_TYPE_AVC_ENC)) {
     ret = gst_droid_codec_apply_avc_encoding_params (comp, caps, fps);
   } else {
     GST_ERROR_OBJECT ("unknown encoder type %s", comp->handle->type);
