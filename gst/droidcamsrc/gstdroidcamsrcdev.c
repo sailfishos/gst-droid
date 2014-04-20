@@ -685,3 +685,38 @@ gst_droidcamsrc_dev_stop_autofocus (GstDroidCamSrcDev * dev)
 
   g_mutex_unlock (&dev->lock);
 }
+
+gboolean
+gst_droidcamsrc_dev_enable_face_detection (GstDroidCamSrcDev * dev,
+    gboolean enable)
+{
+  int32_t cmd;
+  int err;
+
+  gboolean res = FALSE;
+
+  GST_WARNING ("enable face detection %d", enable);
+
+  cmd =
+      enable ? CAMERA_CMD_START_FACE_DETECTION : CAMERA_CMD_STOP_FACE_DETECTION;
+
+  g_mutex_lock (&dev->lock);
+  if (!dev->dev) {
+    GST_WARNING ("camera is not running yet");
+    goto out;
+  }
+
+  err =
+      dev->dev->ops->send_command (dev->dev, cmd, CAMERA_FACE_DETECTION_SW, 0);
+  if (err != 0) {
+    GST_ERROR ("error 0x%x setting preview window", err);
+    goto out;
+  }
+
+  res = TRUE;
+
+out:
+  g_mutex_unlock (&dev->lock);
+
+  return res;
+}

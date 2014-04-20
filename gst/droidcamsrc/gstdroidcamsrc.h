@@ -104,6 +104,7 @@ struct _GstDroidCamSrc
   GMutex capture_lock;
 
   gboolean video_torch;
+  gboolean face_detection;
 
   GstDroidCamSrcPhotography * photo;
   gfloat max_zoom;

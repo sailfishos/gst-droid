@@ -96,6 +96,7 @@ static guint droidcamsrc_signals[LAST_SIGNAL];
 #define DEFAULT_VIDEO_TORCH          FALSE
 #define DEFAULT_MIN_EV_COMPENSATION  -2.5f
 #define DEFAULT_MAX_EV_COMPENSATION  2.5f
+#define DEFAULT_FACE_DETECTION       FALSE
 
 static GstDroidCamSrcPad *
 gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
@@ -216,6 +217,10 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
       g_value_set_float (value, src->max_ev_compensation);
       break;
 
+    case PROP_FACE_DETECTION:
+      g_value_set_boolean (value, src->face_detection);
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -272,6 +277,12 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
       src->video_torch = g_value_get_boolean (value);
 
       /* apply */
+      gst_droidcamsrc_apply_mode_settings (src, GST_PHOTO_SET_AND_APPLY);
+      break;
+
+    case PROP_FACE_DETECTION:
+      src->face_detection = g_value_get_boolean (value);
+
       gst_droidcamsrc_apply_mode_settings (src, GST_PHOTO_SET_AND_APPLY);
       break;
 
@@ -771,6 +782,12 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
       g_param_spec_boolean ("video-torch", "Video torch",
           "Sets torch light on or off for video recording", DEFAULT_VIDEO_TORCH,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_FACE_DETECTION,
+      g_param_spec_boolean ("face-detection", "Face Detection",
+          "Face detection", DEFAULT_FACE_DETECTION,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   gst_droidcamsrc_photography_add_overrides (gobject_class);
 
   /* Signals */
@@ -1626,6 +1643,15 @@ gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
 
   /* video torch */
   gst_droidcamsrc_photography_set_flash (src);
+
+  /* face detection */
+  if (src->mode == MODE_VIDEO || !src->face_detection) {
+    /* stop face detection */
+    gst_droidcamsrc_dev_enable_face_detection (src->dev, FALSE);
+  } else {
+    /* start face detection */
+    gst_droidcamsrc_dev_enable_face_detection (src->dev, TRUE);
+  }
 
   /* apply denoising */
   // TODO:

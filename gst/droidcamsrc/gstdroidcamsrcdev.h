@@ -77,6 +77,8 @@ void gst_droidcamsrc_dev_update_params (GstDroidCamSrcDev * dev);
 gboolean gst_droidcamsrc_dev_start_autofocus (GstDroidCamSrcDev * dev);
 void gst_droidcamsrc_dev_stop_autofocus (GstDroidCamSrcDev * dev);
 
+gboolean gst_droidcamsrc_dev_enable_face_detection (GstDroidCamSrcDev * dev, gboolean enable);
+
 G_END_DECLS
 
 #endif /* __GST_DROID_CAM_SRC_DEV_H__ */

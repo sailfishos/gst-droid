@@ -38,6 +38,7 @@ typedef enum
   PROP_VIDEO_TORCH,
   PROP_MIN_EV_COMPENSATION,
   PROP_MAX_EV_COMPENSATION,
+  PROP_FACE_DETECTION,
 
   /* photography interface */
   PROP_WB_MODE,
