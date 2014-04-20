@@ -123,6 +123,7 @@ gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
   pad->capture_pad = capture_pad;
   pad->pushed_buffers = 0;
   pad->adjust_segment = FALSE;
+  pad->pending_events = NULL;
   gst_segment_init (&pad->segment, GST_FORMAT_TIME);
 
   gst_element_add_pad (GST_ELEMENT (src), pad->pad);
@@ -507,6 +508,69 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
   return ret;
 }
 
+static gboolean
+gst_droidcamsrc_send_event (GstElement * element, GstEvent * event)
+{
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (element);
+  gboolean res = FALSE;
+
+  GST_DEBUG_OBJECT (src, "handling event %p %" GST_PTR_FORMAT, event, event);
+
+  switch (GST_EVENT_TYPE (event)) {
+    case GST_EVENT_FLUSH_START:
+    case GST_EVENT_FLUSH_STOP:
+    case GST_EVENT_CAPS:
+    case GST_EVENT_STREAM_START:
+    case GST_EVENT_BUFFERSIZE:
+    case GST_EVENT_SEGMENT_DONE:
+    case GST_EVENT_GAP:
+    case GST_EVENT_SEEK:
+    case GST_EVENT_TOC_SELECT:
+    case GST_EVENT_RECONFIGURE:
+    case GST_EVENT_LATENCY:
+    case GST_EVENT_STEP:
+    case GST_EVENT_NAVIGATION:
+    case GST_EVENT_SEGMENT:
+    case GST_EVENT_TOC:
+    case GST_EVENT_SINK_MESSAGE:
+    case GST_EVENT_QOS:
+    case GST_EVENT_UNKNOWN:
+      break;
+
+    case GST_EVENT_CUSTOM_UPSTREAM:    // TODO:
+      res = TRUE;
+      break;
+
+      /* serialized events */
+    case GST_EVENT_EOS:
+    case GST_EVENT_TAG:
+    case GST_EVENT_CUSTOM_DOWNSTREAM:
+    case GST_EVENT_CUSTOM_DOWNSTREAM_STICKY:
+    case GST_EVENT_CUSTOM_BOTH:
+      GST_OBJECT_LOCK (src);
+      src->vfsrc->pending_events =
+          g_list_append (src->vfsrc->pending_events, event);
+      GST_OBJECT_UNLOCK (src);
+      event = NULL;
+      res = TRUE;
+      break;
+
+      /* non serialized events */
+    case GST_EVENT_CUSTOM_DOWNSTREAM_OOB:
+    case GST_EVENT_CUSTOM_BOTH_OOB:
+      res = gst_pad_push_event (src->vfsrc->pad, event);
+      event = NULL;
+      res = TRUE;
+      break;
+  }
+
+  if (event) {
+    gst_event_unref (event);
+  }
+
+  return res;
+}
+
 static void
 gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
 {
@@ -535,6 +599,7 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
 
   gstelement_class->change_state =
       GST_DEBUG_FUNCPTR (gst_droidcamsrc_change_state);
+  gstelement_class->send_event = GST_DEBUG_FUNCPTR (gst_droidcamsrc_send_event);
 
   g_object_class_install_property (gobject_class, PROP_CAMERA_DEVICE,
       g_param_spec_enum ("camera-device", "Camera device",
@@ -603,6 +668,7 @@ gst_droidcamsrc_loop (gpointer user_data)
   GstDroidCamSrcPad *data = (GstDroidCamSrcPad *) user_data;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (data->pad));
   GstBuffer *buffer = NULL;
+  GList *events;
 
   GST_LOG_OBJECT (src, "loop %s", GST_PAD_NAME (data->pad));
 
@@ -707,6 +773,21 @@ out:
     data->open_segment = FALSE;
   }
 
+  /* pending events */
+  GST_OBJECT_LOCK (src);
+  events = data->pending_events;
+  data->pending_events = NULL;
+  GST_OBJECT_UNLOCK (src);
+
+  if (G_UNLIKELY (events)) {
+    GList *tmp;
+    for (tmp = events; tmp; tmp = g_list_next (tmp)) {
+      GstEvent *ev = (GstEvent *) tmp->data;
+      gst_pad_push_event (data->pad, ev);
+    }
+    g_list_free (events);
+  }
+
   /* finally we can push our buffer */
   ret = gst_pad_push (data->pad, buffer);
 
@@ -770,6 +851,14 @@ gst_droidcamsrc_pad_activate_mode (GstPad * pad, GstObject * parent,
     g_queue_clear (data->queue);
     g_mutex_unlock (&data->lock);
 
+    GST_OBJECT_LOCK (src);
+
+    if (data->pending_events) {
+      g_list_free_full (data->pending_events, (GDestroyNotify) gst_event_unref);
+      data->pending_events = NULL;
+    }
+
+    GST_OBJECT_UNLOCK (src);
     return ret;
   }
 

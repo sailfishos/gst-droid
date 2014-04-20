@@ -81,6 +81,7 @@ struct _GstDroidCamSrcPad
   unsigned pushed_buffers;
   GstSegment segment;
   GstDroidCamSrcNegotiateCallback negotiate;
+  GList *pending_events;
 };
 
 struct _GstDroidCamSrc
