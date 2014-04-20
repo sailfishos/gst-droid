@@ -88,13 +88,14 @@ enum
 
 static guint droidcamsrc_signals[LAST_SIGNAL];
 
-#define DEFAULT_CAMERA_DEVICE        GST_DROIDCAMSRC_CAMERA_DEVICE_PRIMARY
-#define DEFAULT_MODE                 MODE_IMAGE
-#define DEFAULT_MAX_ZOOM             10.0f
-#define DEFAULT_VIDEO_TORCH          FALSE
-#define DEFAULT_MIN_EV_COMPENSATION  -2.5f
-#define DEFAULT_MAX_EV_COMPENSATION  2.5f
-#define DEFAULT_FACE_DETECTION       FALSE
+#define DEFAULT_CAMERA_DEVICE          GST_DROIDCAMSRC_CAMERA_DEVICE_PRIMARY
+#define DEFAULT_MODE                   MODE_IMAGE
+#define DEFAULT_MAX_ZOOM               10.0f
+#define DEFAULT_VIDEO_TORCH            FALSE
+#define DEFAULT_MIN_EV_COMPENSATION    -2.5f
+#define DEFAULT_MAX_EV_COMPENSATION    2.5f
+#define DEFAULT_FACE_DETECTION         FALSE
+#define DEFAULT_IMAGE_NOISE_REDUCTION  TRUE
 
 static GstDroidCamSrcPad *
 gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
@@ -152,6 +153,8 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   g_mutex_init (&src->capture_lock);
   src->max_zoom = DEFAULT_MAX_ZOOM;
   src->video_torch = DEFAULT_VIDEO_TORCH;
+  src->face_detection = DEFAULT_FACE_DETECTION;
+  src->image_noise_reduction = DEFAULT_IMAGE_NOISE_REDUCTION;
   src->min_ev_compensation = DEFAULT_MIN_EV_COMPENSATION;
   src->max_ev_compensation = DEFAULT_MAX_EV_COMPENSATION;
   src->ev_step = 0.0f;
@@ -219,6 +222,10 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
       g_value_set_boolean (value, src->face_detection);
       break;
 
+    case PROP_IMAGE_NOISE_REDUCTION:
+      g_value_set_boolean (value, src->image_noise_reduction);
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -273,15 +280,19 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
     case PROP_VIDEO_TORCH:
       /* set value */
       src->video_torch = g_value_get_boolean (value);
-
       /* apply */
       gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
       break;
 
     case PROP_FACE_DETECTION:
       src->face_detection = g_value_get_boolean (value);
-
       gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
+      break;
+
+    case PROP_IMAGE_NOISE_REDUCTION:
+      src->image_noise_reduction = g_value_get_boolean (value);
+      gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
+
       break;
 
     default:
@@ -784,6 +795,12 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
   g_object_class_install_property (gobject_class, PROP_FACE_DETECTION,
       g_param_spec_boolean ("face-detection", "Face Detection",
           "Face detection", DEFAULT_FACE_DETECTION,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_IMAGE_NOISE_REDUCTION,
+      g_param_spec_boolean ("image-noise-reduction", "Image noise reduction",
+          "Vendor specific image noise reduction",
+          DEFAULT_IMAGE_NOISE_REDUCTION,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   gst_droidcamsrc_photography_add_overrides (gobject_class);
@@ -1651,7 +1668,7 @@ gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
     gst_droidcamsrc_dev_enable_face_detection (src->dev, TRUE);
   }
 
-  /* apply denoising */
+  /* image noise reduction */
   // TODO:
 
   if (type == SET_AND_APPLY) {
