@@ -131,6 +131,10 @@ gst_droidcamsrc_params_reload_locked (GstDroidCamSrcParams * params,
 
   g_strfreev (parts);
 
+  if (params->is_dirty) {
+    GST_ERROR ("reloading discarded unset parameters");
+  }
+
   params->is_dirty = FALSE;
 }
 
