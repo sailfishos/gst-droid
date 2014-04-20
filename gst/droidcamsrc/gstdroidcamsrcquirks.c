@@ -39,6 +39,10 @@ GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 void
 gst_droidcamsrc_quirk_free (GstDroidCamSrcQuirk * quirk)
 {
+  if (!quirk) {
+    return;
+  }
+
   if (quirk->prop) {
     g_free (quirk->prop);
   }
