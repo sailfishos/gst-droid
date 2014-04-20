@@ -144,6 +144,7 @@ gst_droidcamsrc_destroy_pad (GstDroidCamSrcPad * pad)
 static void
 gst_droidcamsrc_init (GstDroidCamSrc * src)
 {
+  src->quirks = gst_droidcamsrc_quirks_new ();
   src->hw = NULL;
   src->dev = NULL;
   src->camera_device = DEFAULT_CAMERA_DEVICE;
@@ -317,6 +318,8 @@ gst_droidcamsrc_finalize (GObject * object)
   g_mutex_clear (&src->capture_lock);
 
   gst_droidcamsrc_photography_destroy (src);
+
+  gst_droidcamsrc_quirks_destroy (src->quirks);
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }

@@ -25,6 +25,7 @@
 #include <gst/gst.h>
 #include "gstdroidcamsrcdev.h"
 #include "gstdroidcamsrcenums.h"
+#include "gstdroidcamsrcquirks.h"
 #include <hardware/camera.h>
 #include <gst/meta/nemometa.h>
 #ifndef GST_USE_UNSTABLE_API
@@ -89,6 +90,7 @@ struct _GstDroidCamSrc
 {
   GstElement parent;
 
+  GstDroidCamSrcQuirks *quirks;
   camera_module_t *hw;
   GstDroidCamSrcDev *dev;
   GstDroidCamSrcCamInfo info[MAX_CAMERAS];

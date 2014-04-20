@@ -23,7 +23,8 @@ libgstdroidcamsrc_la_SOURCES = \
 	gstdroidcamsrcstreamwindow.c \
 	gstdroidcamsrcparams.c \
 	gstdroidcamsrcenums.c \
-	gstdroidcamsrcphotography.c
+	gstdroidcamsrcphotography.c \
+	gstdroidcamsrcquirks.c
 
 noinst_HEADERS = \
 	plugin.h \
@@ -34,4 +35,5 @@ noinst_HEADERS = \
 	gstdroidcamsrcstreamwindow.h \
 	gstdroidcamsrcparams.h \
 	gstdroidcamsrcenums.h \
-	gstdroidcamsrcphotography.h
+	gstdroidcamsrcphotography.h \
+	gstdroidcamsrcquirks.h
