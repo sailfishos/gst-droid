@@ -46,7 +46,7 @@ GstCaps *gst_droidcamsrc_params_get_viewfinder_caps (GstDroidCamSrcParams *param
 GstCaps *gst_droidcamsrc_params_get_video_caps (GstDroidCamSrcParams *params);
 GstCaps *gst_droidcamsrc_params_get_image_caps (GstDroidCamSrcParams *params);
 
-gboolean gst_droidcamsrc_params_set_string (GstDroidCamSrcParams *params, const gchar *key,
+void gst_droidcamsrc_params_set_string (GstDroidCamSrcParams *params, const gchar *key,
 					const gchar *value);
 int gst_droidcamsrc_params_get_int (GstDroidCamSrcParams * params, const char *key);
 float gst_droidcamsrc_params_get_float (GstDroidCamSrcParams * params, const char *key);

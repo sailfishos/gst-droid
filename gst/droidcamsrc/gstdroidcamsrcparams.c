@@ -33,46 +33,6 @@ GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
 #define GST_CAT_DEFAULT gst_droidcamsrc_debug
 
 static void
-gst_droidcamsrc_params_destroy_list (gpointer data)
-{
-  GList *list = (GList *) data;
-
-  g_list_free_full (list, (GDestroyNotify) g_free);
-}
-
-static void
-gst_droidcamsrc_params_parse_key_values (GstDroidCamSrcParams * params,
-    const char *key, const char *values)
-{
-  char **value = g_strsplit (values, ",", -1);
-  char **val = value;
-  GList *list = NULL;
-
-  while (*val) {
-    list = g_list_append (list, g_strdup (*val));
-    ++val;
-  }
-
-  g_hash_table_insert (params->params, g_strdup (key), list);
-
-  g_strfreev (value);
-}
-
-static void
-gst_droidcamsrc_params_parse_key_value (GstDroidCamSrcParams * params,
-    const char *key, const char *value)
-{
-  if (g_strrstr (value, ",")) {
-    /* needs farther splitting */
-    gst_droidcamsrc_params_parse_key_values (params, key, value);
-  } else {
-    /* we are done */
-    g_hash_table_insert (params->params, g_strdup (key), g_list_append (NULL,
-            g_strdup (value)));
-  }
-}
-
-static void
 gst_droidcamsrc_params_parse (GstDroidCamSrcParams * params, const char *part)
 {
   gchar **parts = g_strsplit (part, "=", 2);
@@ -85,48 +45,23 @@ gst_droidcamsrc_params_parse (GstDroidCamSrcParams * params, const char *part)
     goto out;
   }
 
-  gst_droidcamsrc_params_parse_key_value (params, key, value);
+  GST_LOG ("param %s = %s", key, value);
+  g_hash_table_insert (params->params, g_strdup (key), g_strdup (value));
 
 out:
   g_strfreev (parts);
 }
 
-static GList *
-gst_droidcamsrc_params_get_item_locked (GstDroidCamSrcParams * params,
-    const char *key)
-{
-  GList *list = g_hash_table_lookup (params->params, key);
-  if (!list) {
-    return NULL;
-  }
-
-  return list;
-}
-
-#if 0
-static gchar *
-gst_droidcamsrc_params_get_string_locked (GstDroidCamSrcParams * params,
-    const char *key)
-{
-  GList *list = gst_droidcamsrc_params_get_item_locked (params, key);
-  if (!list) {
-    return NULL;
-  }
-
-  return list->data;
-}
-#endif
-
 static int
 gst_droidcamsrc_params_get_int_locked (GstDroidCamSrcParams * params,
     const char *key)
 {
-  GList *list = gst_droidcamsrc_params_get_item_locked (params, key);
-  if (!list) {
+  gchar *value = g_hash_table_lookup (params->params, key);
+  if (!value) {
     return -1;
   }
 
-  return atoi (list->data);
+  return atoi (value);
 }
 
 int
@@ -145,18 +80,17 @@ float
 gst_droidcamsrc_params_get_float (GstDroidCamSrcParams * params,
     const char *key)
 {
-  GList *list;
-  float result;
+  gchar *value;
+  float result = 0.0;
 
   g_mutex_lock (&params->lock);
 
-  list = gst_droidcamsrc_params_get_item_locked (params, key);
-  if (!list) {
-    g_mutex_unlock (&params->lock);
-    return 0.0;
+  value = g_hash_table_lookup (params->params, key);
+
+  if (value) {
+    result = strtof (value, NULL);
   }
-  // TODO: we don't do any error checking at all for strtof() :/
-  result = strtof (list->data, NULL);
+
   g_mutex_unlock (&params->lock);
 
   return result;
@@ -188,8 +122,7 @@ gst_droidcamsrc_params_reload_locked (GstDroidCamSrcParams * params,
   }
 
   params->params = g_hash_table_new_full (g_str_hash, g_str_equal,
-      (GDestroyNotify) g_free,
-      (GDestroyNotify) gst_droidcamsrc_params_destroy_list);
+      (GDestroyNotify) g_free, (GDestroyNotify) g_free);
 
   while (*part) {
     gst_droidcamsrc_params_parse (params, *part);
@@ -245,29 +178,8 @@ gst_droidcamsrc_params_to_string (GstDroidCamSrcParams * params)
 
   g_hash_table_iter_init (&iter, params->params);
 
-  /* ugly is the least to be said */
   while (g_hash_table_iter_next (&iter, &key, &value)) {
-    GList *list = (GList *) value;
-    gchar *str = NULL;
-    int len = g_list_length (list);
-    g_assert (len > 0);
-
-    if (len == 1) {
-      /* simple case */
-      str = g_strdup_printf ("%s=%s", (gchar *) key, (gchar *) list->data);
-    } else {
-      int x;
-      for (x = 0; x < len; x++) {
-        GList *item = g_list_nth (list, x);
-        if (str == NULL) {
-          str = g_strdup_printf ("%s=%s", (gchar *) key, (gchar *) item->data);
-        } else {
-          gchar *new_str = g_strjoin (",", str, (gchar *) item->data, NULL);
-          g_free (str);
-          str = new_str;
-        }
-      }
-    }
+    gchar *str = g_strdup_printf ("%s=%s", (gchar *) key, (gchar *) value);
 
     if (string == NULL) {
       string = str;
@@ -298,48 +210,72 @@ gst_droidcamsrc_params_is_dirty (GstDroidCamSrcParams * params)
   return is_dirty;
 }
 
-GstCaps *
-gst_droidcamsrc_params_get_viewfinder_caps (GstDroidCamSrcParams * params)
+static GstCaps *
+gst_droidcamsrc_params_get_caps_locked (GstDroidCamSrcParams * params,
+    const gchar * key, const gchar * media, const gchar * features,
+    const gchar * format)
 {
-  int fps;
-  GstCapsFeatures *feature;
+  gchar *value;
   GstCaps *caps = gst_caps_new_empty ();
-  GList *item;
-
-  g_mutex_lock (&params->lock);
+  gchar **vals;
+  gchar **tmp;
+  int fps;
 
   fps = gst_droidcamsrc_params_get_int_locked (params, "preview-frame-rate");
+
   if (fps == -1) {
-    goto unlock_and_out;
+    return caps;
   }
 
-  item = gst_droidcamsrc_params_get_item_locked (params, "preview-size-values");
-  if (!item) {
-    goto unlock_and_out;
+  value = g_hash_table_lookup (params->params, key);
+  if (!value) {
+    return caps;
   }
 
-  while (item) {
-    int width, height;
+  vals = g_strsplit (value, ",", -1);
+  tmp = vals;
+  if (!vals || !vals[0]) {
+    return caps;
+  }
+
+  while (*tmp) {
+    int w, h;
     GstCaps *caps2;
-
-    if (gst_droidcamsrc_params_parse_dimension (item->data, &width, &height)) {
-      caps2 = gst_caps_new_simple ("video/x-raw",
-          "format", G_TYPE_STRING, "ENCODED",
-          "width", G_TYPE_INT, width,
-          "height", G_TYPE_INT, height,
+    if (gst_droidcamsrc_params_parse_dimension (*tmp, &w, &h)) {
+      caps2 = gst_caps_new_simple (media,
+          "width", G_TYPE_INT, w,
+          "height", G_TYPE_INT, h,
           "framerate", GST_TYPE_FRACTION, fps, 1, NULL);
 
-      feature =
-          gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_HANDLE, NULL);
-      gst_caps_set_features (caps2, 0, feature);
+      if (format) {
+        gst_caps_set_simple (caps2, "format", G_TYPE_STRING, format, NULL);
+      }
+
+      if (features) {
+        gst_caps_set_features (caps2, 0, gst_caps_features_new (features,
+                NULL));
+      }
 
       caps = gst_caps_merge (caps, caps2);
     }
 
-    item = g_list_next (item);
+    ++tmp;
   }
 
-unlock_and_out:
+  g_strfreev (vals);
+
+
+  return caps;
+}
+
+GstCaps *
+gst_droidcamsrc_params_get_viewfinder_caps (GstDroidCamSrcParams * params)
+{
+  GstCaps *caps;
+
+  g_mutex_lock (&params->lock);
+  caps = gst_droidcamsrc_params_get_caps_locked (params, "preview-size-values",
+      "video/x-raw", GST_CAPS_FEATURE_MEMORY_DROID_HANDLE, "ENCODED");
   g_mutex_unlock (&params->lock);
 
   return caps;
@@ -348,45 +284,11 @@ unlock_and_out:
 GstCaps *
 gst_droidcamsrc_params_get_video_caps (GstDroidCamSrcParams * params)
 {
-  GstCaps *caps = gst_caps_new_empty ();
-  GList *item;
-  int fps;
-  GstCapsFeatures *feature;
+  GstCaps *caps;
 
   g_mutex_lock (&params->lock);
-  fps = gst_droidcamsrc_params_get_int_locked (params, "preview-frame-rate");
-  if (fps == -1) {
-    goto unlock_and_out;
-  }
-
-  item = gst_droidcamsrc_params_get_item_locked (params, "video-size-values");
-  if (!item) {
-    goto unlock_and_out;
-  }
-
-  while (item) {
-    int width, height;
-    GstCaps *caps2;
-
-    if (gst_droidcamsrc_params_parse_dimension (item->data, &width, &height)) {
-      caps2 = gst_caps_new_simple ("video/x-raw",
-          "format", G_TYPE_STRING, "ENCODED",
-          "width", G_TYPE_INT, width,
-          "height", G_TYPE_INT, height,
-          "framerate", GST_TYPE_FRACTION, fps, 1, NULL);
-
-      feature =
-          gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA,
-          NULL);
-      gst_caps_set_features (caps2, 0, feature);
-
-      caps = gst_caps_merge (caps, caps2);
-    }
-
-    item = g_list_next (item);
-  }
-
-unlock_and_out:
+  caps = gst_droidcamsrc_params_get_caps_locked (params, "video-size-values",
+      "video/x-raw", GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA, "ENCODED");
   g_mutex_unlock (&params->lock);
 
   return caps;
@@ -395,69 +297,32 @@ unlock_and_out:
 GstCaps *
 gst_droidcamsrc_params_get_image_caps (GstDroidCamSrcParams * params)
 {
-  GstCaps *caps = gst_caps_new_empty ();
-  GList *item;
-  int fps;
+  GstCaps *caps;
 
   g_mutex_lock (&params->lock);
-  fps = gst_droidcamsrc_params_get_int_locked (params, "preview-frame-rate");
-  if (fps == -1) {
-    goto unlock_and_out;
-  }
-
-  item = gst_droidcamsrc_params_get_item_locked (params, "picture-size-values");
-  if (!item) {
-    goto unlock_and_out;
-  }
-
-  while (item) {
-    int width, height;
-    GstCaps *caps2;
-
-    if (gst_droidcamsrc_params_parse_dimension (item->data, &width, &height)) {
-      caps2 = gst_caps_new_simple ("image/jpeg",
-          "width", G_TYPE_INT, width,
-          "height", G_TYPE_INT, height,
-          "framerate", GST_TYPE_FRACTION, fps, 1, NULL);
-
-      caps = gst_caps_merge (caps, caps2);
-    }
-
-    item = g_list_next (item);
-  }
-
-unlock_and_out:
+  caps = gst_droidcamsrc_params_get_caps_locked (params, "picture-size-values",
+      "image/jpeg", NULL, NULL);
   g_mutex_unlock (&params->lock);
 
   return caps;
 }
 
-gboolean
+void
 gst_droidcamsrc_params_set_string (GstDroidCamSrcParams * params,
     const gchar * key, const gchar * value)
 {
-  GList *item;
-  gboolean ret = FALSE;
+  gchar *val;
 
   GST_DEBUG ("setting param %s to %s", key, value);
 
   g_mutex_lock (&params->lock);
-  item = gst_droidcamsrc_params_get_item_locked (params, key);
-  if (g_list_length (item) > 1) {
-    GST_ERROR ("item %s has more than 1 value", key);
-    goto out;
-  }
+  val = g_hash_table_lookup (params->params, key);
 
   /* update only if not equal */
-  if (g_strcmp0 (item->data, value)) {
-    g_free (item->data);
-    item->data = g_strdup (value);
+  if (g_strcmp0 (val, value)) {
+    g_hash_table_insert (params->params, g_strdup (key), g_strdup (value));
     params->is_dirty = TRUE;
   }
 
-  ret = TRUE;
-
-out:
   g_mutex_unlock (&params->lock);
-  return ret;
 }

@@ -1160,10 +1160,7 @@ gst_droidcamsrc_set_and_apply (GstDroidCamSrc * src, const gchar * key,
     return TRUE;
   }
 
-  if (!gst_droidcamsrc_params_set_string (src->dev->params, key, value)) {
-    GST_WARNING_OBJECT (src, "failed to set %s to %s", key, value);
-    return FALSE;
-  }
+  gst_droidcamsrc_params_set_string (src->dev->params, key, value);
 
   return gst_droidcamsrc_apply_params (src);
 }

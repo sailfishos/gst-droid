@@ -611,13 +611,9 @@ gst_droidcamsrc_handle_roi_event (GstDroidCamSrc * src,
 
   g_free (array);
 
-  if (!gst_droidcamsrc_params_set_string (src->dev->params, "focus-areas",
-          param)) {
-    GST_WARNING_OBJECT (src, "failed to set focus-areas");
-  } else {
-    if (!gst_droidcamsrc_apply_params (src)) {
-      GST_WARNING_OBJECT (src, "failed to apply parameters");
-    }
+  gst_droidcamsrc_params_set_string (src->dev->params, "focus-areas", param);
+  if (!gst_droidcamsrc_apply_params (src)) {
+    GST_WARNING_OBJECT (src, "failed to apply parameters");
   }
 
   g_free (param);
@@ -1214,13 +1210,7 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   }
 
   preview = g_strdup_printf ("%ix%i", info.width, info.height);
-  if (!gst_droidcamsrc_params_set_string (src->dev->params, "preview-size",
-          preview)) {
-    g_free (preview);
-    GST_ERROR_OBJECT (src, "failed to set preview-size");
-    goto out;
-  }
-
+  gst_droidcamsrc_params_set_string (src->dev->params, "preview-size", preview);
   g_free (preview);
 
   if (!gst_droidcamsrc_apply_params (src)) {
@@ -1290,13 +1280,7 @@ gst_droidcamsrc_imgsrc_negotiate (GstDroidCamSrcPad * data)
   }
 
   pic = g_strdup_printf ("%ix%i", info.width, info.height);
-  if (!gst_droidcamsrc_params_set_string (src->dev->params, "picture-size",
-          pic)) {
-    g_free (pic);
-    GST_ERROR_OBJECT (src, "failed to set picture-size");
-    goto out;
-  }
-
+  gst_droidcamsrc_params_set_string (src->dev->params, "picture-size", pic);
   g_free (pic);
 
   if (!gst_droidcamsrc_apply_params (src)) {
@@ -1366,12 +1350,7 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
   }
 
   vid = g_strdup_printf ("%ix%i", info.width, info.height);
-  if (!gst_droidcamsrc_params_set_string (src->dev->params, "video-size", vid)) {
-    g_free (vid);
-    GST_ERROR_OBJECT (src, "failed to set video-size");
-    goto out;
-  }
-
+  gst_droidcamsrc_params_set_string (src->dev->params, "video-size", vid);
   g_free (vid);
 
   if (!gst_droidcamsrc_apply_params (src)) {
