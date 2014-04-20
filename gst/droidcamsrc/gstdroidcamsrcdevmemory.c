@@ -88,7 +88,8 @@ gst_droidcamsrc_dev_memory_get (int fd, size_t buf_size, unsigned int num_bufs)
     mem_base = mmap (0, requested_size,
         PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (mem_base == MAP_FAILED) {
-      GST_ERROR ("mmap failed: %s", strerror (errno));
+      GST_ERROR ("mmap failed: %s (fd = %d, requested size = %d)",
+          strerror (errno), fd, requested_size);
       mem_base = NULL;
     }
   }
