@@ -178,8 +178,73 @@ gst_droidcamsrc_dev_data_callback (int32_t msg_type,
       g_object_notify (G_OBJECT (src), "ready-for-capture");
     }
       break;
+    case CAMERA_MSG_PREVIEW_METADATA:
+    {
+      int i;
+      GstStructure *s;
+      int width = 0, height = 0;
+      GValue regions = G_VALUE_INIT;
 
-      /* case CAMERA_MSG_PREVIEW_METADATA: */
+      GST_INFO ("camera detected %d faces", metadata->number_of_faces);
+
+      g_rec_mutex_lock (&dev->lock);
+      if (dev->win) {
+        g_mutex_lock (&dev->win->lock);
+        width = dev->win->width;
+        height = dev->win->height;
+        g_mutex_unlock (&dev->win->lock);
+      }
+      g_rec_mutex_unlock (&dev->lock);
+
+      if (!width || !height) {
+        GST_WARNING ("failed to get preview dimensions");
+        return;
+      }
+
+      s = gst_structure_new ("regions-of-interest", "frame-width", G_TYPE_UINT,
+          width, "frame-height", G_TYPE_UINT, height, NULL);
+
+      g_value_init (&regions, GST_TYPE_LIST);
+
+      for (i = 0; i < metadata->number_of_faces; i++) {
+        GValue region = G_VALUE_INIT;
+        int x, y, w, h, r, b;
+        GstStructure *rs;
+
+        g_value_init (&region, GST_TYPE_STRUCTURE);
+
+        GST_DEBUG ("face %d: left = %d, top = %d, right = %d, bottom = %d",
+            i, metadata->faces->rect[0], metadata->faces->rect[1],
+            metadata->faces->rect[2], metadata->faces->rect[3]);
+        x = gst_util_uint64_scale (metadata->faces[i].rect[0] + 1000, width,
+            2000);
+        y = gst_util_uint64_scale (metadata->faces[i].rect[1] + 1000, height,
+            2000);
+        r = gst_util_uint64_scale (metadata->faces[i].rect[2] + 1000, width,
+            2000);
+        b = gst_util_uint64_scale (metadata->faces[i].rect[3] + 1000, height,
+            2000);
+        w = r - x;
+        h = b - y;
+        rs = gst_structure_new ("region-of-interest",
+            "region-x", G_TYPE_UINT, x,
+            "region-y", G_TYPE_UINT, y,
+            "region-w", G_TYPE_UINT, w,
+            "region-h", G_TYPE_UINT, h,
+            "region-id", G_TYPE_INT, metadata->faces[i].id,
+            "region-score", G_TYPE_INT, metadata->faces[i].score, NULL);
+
+        gst_value_set_structure (&region, rs);
+        gst_structure_free (rs);
+        gst_value_list_append_value (&regions, &region);
+        g_value_unset (&region);
+      }
+
+      gst_structure_take_value (s, "regions", &regions);
+      gst_droidcamsrc_post_message (src, s);
+    }
+      break;
+
     default:
       GST_WARNING ("unknown message type 0x%x", msg_type);
   }
