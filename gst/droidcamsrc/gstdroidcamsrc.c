@@ -1778,4 +1778,6 @@ gst_droidcamsrc_update_ev_compensation_bounds (GstDroidCamSrc * src)
 
   g_object_notify (G_OBJECT (src), "min-ev-compensation");
   g_object_notify (G_OBJECT (src), "max-ev-compensation");
+
+  // TODO: clamp the ev comp value we have
 }

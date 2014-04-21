@@ -618,13 +618,10 @@ gst_droidcamsrc_photography_init (GstDroidCamSrc * src)
   src->photo->settings.max_exposure_time = 0;
   src->photo->settings.color_temperature = 0;
   src->photo->settings.exposure_time = 0;
+  src->photo->settings.exposure_mode = GST_PHOTOGRAPHY_EXPOSURE_MODE_AUTO;
   for (x = 0; x < MAX_WHITE_POINT_VALUES; x++) {
     src->photo->settings.white_point[x] = 0;
   }
-
-  /* TODO: the ones below are the ones I am not sure how to set a default value for */
-
-  src->photo->settings.exposure_mode = GST_PHOTOGRAPHY_EXPOSURE_MODE_AUTO;      /* TODO: seems not to be a property */
 
   /* load settings */
   src->photo->flash = gst_droidcamsrc_photography_load (file, "flash-mode");
@@ -1132,7 +1129,7 @@ static gboolean
 gst_droidcamsrc_set_exposure_mode (GstDroidCamSrc *
     src, GstPhotographyExposureMode exposure_mode)
 {
-  /* not supported */
+  // TODO:
 
   return FALSE;
 }
