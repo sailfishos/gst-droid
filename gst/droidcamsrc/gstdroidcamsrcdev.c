@@ -491,6 +491,7 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
 
   /* set params */
   params = gst_droidcamsrc_params_to_string (dev->params);
+  GST_LOG ("setting parameters %s", params);
   err = dev->dev->ops->set_parameters (dev->dev, params);
   g_free (params);
   if (err != 0) {
