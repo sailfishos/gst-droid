@@ -39,8 +39,6 @@ gst_droidcamsrc_params_parse (GstDroidCamSrcParams * params, const char *part)
   gchar *key = parts[0];
   gchar *value = key ? parts[1] : NULL;
 
-  GST_LOG ("param %s = %s", key, value);
-
   if (!key || !value) {
     goto out;
   }
