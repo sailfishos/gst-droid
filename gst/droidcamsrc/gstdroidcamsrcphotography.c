@@ -707,16 +707,20 @@ gst_droidcamsrc_photography_apply (GstDroidCamSrc * src,
    * exposure
    */
   // TODO: ev compensation
-  // TODO:  iso speed
-  // TODO: color tone
-  // TODO: scene
+  // TODO: iso speed
   // TODO: zoom
-  // TODO: flicker
   // TODO: exposure mode
 
   gst_droidcamsrc_photography_set_flash (src);
   gst_droidcamsrc_photography_set_focus (src);
+
   APPLY_SETTING (src->photo->wb, src->photo->settings.wb_mode, "whitebalance");
+  APPLY_SETTING (src->photo->scene, src->photo->settings.scene_mode,
+      "scene-mode");
+  APPLY_SETTING (src->photo->color_tone, src->photo->settings.tone_mode,
+      "effect");
+  APPLY_SETTING (src->photo->flicker, src->photo->settings.flicker_mode,
+      "antibanding");
 
   GST_OBJECT_UNLOCK (src);
 
@@ -1007,6 +1011,8 @@ static gboolean
 gst_droidcamsrc_set_scene_mode (GstDroidCamSrc
     * src, GstPhotographySceneMode scene_mode)
 {
+  // TODO: an idea would be switching focus mode to macro here if we are in closeup scene
+  // and switch it back to whatever it was when we are in normal mode.
   SET_ENUM (src->photo->scene, scene_mode, "scene-mode", scene_mode);
 }
 
