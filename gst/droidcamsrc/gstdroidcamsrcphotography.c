@@ -169,16 +169,17 @@ static GstPhotographyCaps gst_droidcamsrc_get_capabilities (GstDroidCamSrc *
     src);
 static gboolean gst_droidcamsrc_set_and_apply (GstDroidCamSrc * src,
     const gchar * key, const gchar * value);
+static gboolean gst_droidcamsrc_prepare_for_capture (GstDroidCamSrc * src,
+    GstPhotographyCapturePrepared func,
+    GstCaps * capture_caps, gpointer user_data);
+static void gst_droidcamsrc_set_autofocus (GstDroidCamSrc * src, gboolean on);
+static void gst_droidcamsrc_photography_set_iso (GstDroidCamSrc * src);
 
 static GstPhotographyCaps
 gst_droidcamsrc_photography_get_capabilities (GstPhotography * photo)
 {
   return gst_droidcamsrc_get_capabilities (GST_DROIDCAMSRC (photo));
 }
-
-static gboolean gst_droidcamsrc_prepare_for_capture (GstDroidCamSrc * src,
-    GstPhotographyCapturePrepared func,
-    GstCaps * capture_caps, gpointer user_data);
 
 static gboolean
 gst_droidcamsrc_photography_prepare_for_capture (GstPhotography * photo,
@@ -189,7 +190,6 @@ gst_droidcamsrc_photography_prepare_for_capture (GstPhotography * photo,
       capture_caps, user_data);
 }
 
-static void gst_droidcamsrc_set_autofocus (GstDroidCamSrc * src, gboolean on);
 static void
 gst_droidcamsrc_photography_set_autofocus (GstPhotography * photo, gboolean on)
 {
@@ -707,12 +707,12 @@ gst_droidcamsrc_photography_apply (GstDroidCamSrc * src,
    * exposure
    */
   // TODO: ev compensation
-  // TODO: iso speed
   // TODO: zoom
   // TODO: exposure mode
 
   gst_droidcamsrc_photography_set_flash (src);
   gst_droidcamsrc_photography_set_focus (src);
+  gst_droidcamsrc_photography_set_iso (src);
 
   APPLY_SETTING (src->photo->wb, src->photo->settings.wb_mode, "whitebalance");
   APPLY_SETTING (src->photo->scene, src->photo->settings.scene_mode,
@@ -1282,7 +1282,6 @@ gst_droidcamsrc_photography_set_flash (GstDroidCamSrc * src)
     return;
   }
 
-
   for (x = 0; x < len; x++) {
     struct DataEntry *entry =
         (struct DataEntry *) g_list_nth_data (src->photo->flash, x);
@@ -1296,4 +1295,27 @@ gst_droidcamsrc_photography_set_flash (GstDroidCamSrc * src)
     GST_INFO_OBJECT (src, "setting flash-mode to %s", value);
     gst_droidcamsrc_params_set_string (src->dev->params, "flash-mode", value);
   }
+}
+
+static void
+gst_droidcamsrc_photography_set_iso (GstDroidCamSrc * src)
+{
+  int x;
+  int len = g_list_length (src->photo->iso);
+  gchar *value = NULL;
+
+  for (x = 0; x < len; x++) {
+    struct DataEntry *entry =
+        (struct DataEntry *) g_list_nth_data (src->photo->iso, x);
+    if (src->photo->settings.iso_speed >= entry->key) {
+      value = entry->value;
+      break;
+    }
+  }
+
+  if (!value) {
+    return;
+  }
+
+  gst_droidcamsrc_params_set_string (src->dev->params, "iso", value);
 }
