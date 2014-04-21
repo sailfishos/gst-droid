@@ -439,8 +439,24 @@ gst_droidcamsrc_photography_get_property (GstDroidCamSrc * src, guint prop_id,
 
     case PROP_IMAGE_CAPTURE_SUPPORTED_CAPS:
     {
-      // TODO:
+      GstCaps *caps = NULL;
+
+      g_rec_mutex_lock (&src->dev_lock);
+
+      if (src->dev && src->dev->params) {
+        caps = gst_droidcamsrc_params_get_image_caps (src->dev->params);
+      }
+
+      g_rec_mutex_unlock (&src->dev_lock);
+
+      if (!caps) {
+        caps = gst_pad_get_pad_template_caps (src->imgsrc->pad);
+      }
+
+      gst_value_set_caps (value, caps);
+      gst_caps_unref (caps);
     }
+
       return TRUE;
 
     case PROP_IMAGE_PREVIEW_SUPPORTED_CAPS:
