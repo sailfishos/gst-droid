@@ -986,8 +986,7 @@ static gboolean
 gst_droidcamsrc_set_scene_mode (GstDroidCamSrc
     * src, GstPhotographySceneMode scene_mode)
 {
-  // TODO:
-  return FALSE;
+  SET_ENUM (src->photo->scene, scene_mode, "scene-mode", scene_mode);
 }
 
 static gboolean
