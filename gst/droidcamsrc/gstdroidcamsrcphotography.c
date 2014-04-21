@@ -705,10 +705,10 @@ gst_droidcamsrc_photography_apply (GstDroidCamSrc * src,
    * min exposure time
    * max exposure time
    * exposure
+   * exposure mode
    */
   // TODO: ev compensation
   // TODO: zoom
-  // TODO: exposure mode
 
   gst_droidcamsrc_photography_set_flash (src);
   gst_droidcamsrc_photography_set_focus (src);
@@ -893,11 +893,9 @@ static gboolean
 gst_droidcamsrc_get_exposure_mode (GstDroidCamSrc *
     src, GstPhotographyExposureMode * exposure_mode)
 {
-  GST_OBJECT_LOCK (src);
-  *exposure_mode = src->photo->settings.exposure_mode;
-  GST_OBJECT_UNLOCK (src);
+  /* not supported */
 
-  return TRUE;
+  return FALSE;
 }
 
 static gboolean
@@ -1165,7 +1163,7 @@ static gboolean
 gst_droidcamsrc_set_exposure_mode (GstDroidCamSrc *
     src, GstPhotographyExposureMode exposure_mode)
 {
-  // TODO:
+  /* not supported */
 
   return FALSE;
 }
