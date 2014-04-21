@@ -93,6 +93,7 @@ struct _GstDroidCamSrc
   GstDroidCamSrcQuirks *quirks;
   camera_module_t *hw;
   GstDroidCamSrcDev *dev;
+  GRecMutex dev_lock;
   GstDroidCamSrcCamInfo info[MAX_CAMERAS];
 
   GstDroidCamSrcPad *vfsrc;

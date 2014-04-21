@@ -146,6 +146,7 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
 {
   src->quirks = gst_droidcamsrc_quirks_new ();
   src->hw = NULL;
+  g_rec_mutex_init (&src->dev_lock);
   src->dev = NULL;
   src->camera_device = DEFAULT_CAMERA_DEVICE;
   src->user_camera_device = DEFAULT_CAMERA_DEVICE;
@@ -321,6 +322,8 @@ gst_droidcamsrc_finalize (GObject * object)
 
   gst_droidcamsrc_quirks_destroy (src->quirks);
 
+  g_rec_mutex_clear (&src->dev_lock);
+
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
 
@@ -434,7 +437,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 
       src->dev =
           gst_droidcamsrc_dev_new (src->hw, src->vfsrc, src->imgsrc,
-          src->vidsrc);
+          src->vidsrc, &src->dev_lock);
 
       break;
 
@@ -1597,13 +1600,12 @@ gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src)
 
   GST_DEBUG_OBJECT (src, "update max zoom");
 
+  g_rec_mutex_lock (&src->dev_lock);
+
   if (!src->dev) {
     GST_DEBUG_OBJECT (src, "camera not yet initialized");
-    return;
+    goto out;
   }
-  // TODO: there is no lock for accesing the dev so dev can go
-  // away by the time we attempt to lock it
-  g_rec_mutex_lock (&src->dev->lock);
 
   if (!src->dev->params) {
     GST_DEBUG_OBJECT (src, "camera not yet opened");
@@ -1642,7 +1644,7 @@ gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src)
   }
 
 out:
-  g_rec_mutex_unlock (&src->dev->lock);
+  g_rec_mutex_unlock (&src->dev_lock);
 }
 
 static void
