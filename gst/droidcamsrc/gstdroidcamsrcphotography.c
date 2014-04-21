@@ -467,7 +467,7 @@ gst_droidcamsrc_photography_get_property (GstDroidCamSrc * src, guint prop_id,
 
     case PROP_WHITE_POINT:
     {
-      // TODO:
+      /* not supported */
     }
       return TRUE;
   }
@@ -553,7 +553,7 @@ gst_droidcamsrc_photography_set_property (GstDroidCamSrc * src, guint prop_id,
       return TRUE;
 
     case PROP_WHITE_POINT:
-      // TODO:
+      /* not supported */
       return TRUE;
   }
 
@@ -580,6 +580,7 @@ sort_desc (gconstpointer a, gconstpointer b)
 void
 gst_droidcamsrc_photography_init (GstDroidCamSrc * src)
 {
+  int x;
   GKeyFile *file = g_key_file_new ();
   gchar *file_path =
       g_build_path ("/", SYSCONFDIR, "gst-droid/gstdroidcamsrc.conf", NULL);
@@ -617,8 +618,9 @@ gst_droidcamsrc_photography_init (GstDroidCamSrc * src)
   src->photo->settings.max_exposure_time = 0;
   src->photo->settings.color_temperature = 0;
   src->photo->settings.exposure_time = 0;
-  memset (&src->photo->settings.white_point, 0x0,
-      sizeof (src->photo->settings.white_point));
+  for (x = 0; x < MAX_WHITE_POINT_VALUES; x++) {
+    src->photo->settings.white_point[x] = 0;
+  }
 
   /* TODO: the ones below are the ones I am not sure how to set a default value for */
 
