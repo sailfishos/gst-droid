@@ -1209,6 +1209,8 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   gchar *preview;
   GstVideoInfo info;
 
+  g_rec_mutex_lock (&src->dev_lock);
+
   GST_DEBUG_OBJECT (src, "vfsrc negotiate");
 
   our_caps = gst_droidcamsrc_params_get_viewfinder_caps (src->dev->params);
@@ -1266,6 +1268,8 @@ out:
     gst_caps_unref (our_caps);
   }
 
+  g_rec_mutex_unlock (&src->dev_lock);
+
   return ret;
 }
 
@@ -1278,6 +1282,8 @@ gst_droidcamsrc_imgsrc_negotiate (GstDroidCamSrcPad * data)
   GstCaps *our_caps = NULL;
   gchar *pic;
   GstVideoInfo info;
+
+  g_rec_mutex_lock (&src->dev_lock);
 
   GST_DEBUG_OBJECT (src, "imgsrc negotiate");
 
@@ -1336,6 +1342,8 @@ out:
     gst_caps_unref (our_caps);
   }
 
+  g_rec_mutex_unlock (&src->dev_lock);
+
   return ret;
 }
 
@@ -1348,6 +1356,8 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
   GstCaps *our_caps = NULL;
   gchar *vid;
   GstVideoInfo info;
+
+  g_rec_mutex_lock (&src->dev_lock);
 
   GST_DEBUG_OBJECT (src, "vidsrc negotiate");
 
@@ -1409,6 +1419,8 @@ out:
   if (our_caps) {
     gst_caps_unref (our_caps);
   }
+
+  g_rec_mutex_unlock (&src->dev_lock);
 
   return ret;
 }
