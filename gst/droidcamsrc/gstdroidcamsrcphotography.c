@@ -1066,7 +1066,37 @@ static gboolean
 gst_droidcamsrc_set_focus_mode (GstDroidCamSrc
     * src, GstPhotographyFocusMode focus_mode)
 {
-  SET_ENUM (src->photo->focus, focus_mode, "focus-mode", focus_mode);
+  int x;
+  int len = g_list_length (src->photo->focus);
+  const gchar *value = NULL;
+  for (x = 0; x < len; x++) {
+    struct DataEntry *entry =
+        (struct DataEntry *) g_list_nth_data (src->photo->focus, x);
+    if (focus_mode == entry->key) {
+      value = entry->value;
+      break;
+    }
+  }
+
+  if (!value) {
+    return FALSE;
+  }
+
+  GST_OBJECT_LOCK (src);
+  src->photo->settings.focus_mode = focus_mode;
+  GST_OBJECT_UNLOCK (src);
+
+  if (g_strcmp0 (value, "continuous")) {
+    return gst_droidcamsrc_set_and_apply (src, "focus-mode", value);
+  }
+
+  if (src->mode == MODE_IMAGE) {
+    return gst_droidcamsrc_set_and_apply (src, "focus-mode",
+        "continuous-picture");
+  } else {
+    return gst_droidcamsrc_set_and_apply (src, "focus-mode",
+        "continuous-video");
+  }
 }
 
 static GstPhotographyCaps
