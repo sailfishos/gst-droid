@@ -1692,10 +1692,10 @@ gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
   }
 
   /* apply focus */
-  gst_droidcamsrc_photography_set_focus (src);
+  gst_droidcamsrc_photography_set_focus_to_droid (src);
 
   /* video torch */
-  gst_droidcamsrc_photography_set_flash (src);
+  gst_droidcamsrc_photography_set_flash_to_droid (src);
 
   /* face detection quirk */
   gst_droidcamsrc_apply_quirk (src, src->quirks->face_detection,

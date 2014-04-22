@@ -173,7 +173,7 @@ static gboolean gst_droidcamsrc_prepare_for_capture (GstDroidCamSrc * src,
     GstPhotographyCapturePrepared func,
     GstCaps * capture_caps, gpointer user_data);
 static void gst_droidcamsrc_set_autofocus (GstDroidCamSrc * src, gboolean on);
-static void gst_droidcamsrc_photography_set_iso (GstDroidCamSrc * src);
+static void gst_droidcamsrc_photography_set_iso_to_droid (GstDroidCamSrc * src);
 
 static GstPhotographyCaps
 gst_droidcamsrc_photography_get_capabilities (GstPhotography * photo)
@@ -710,9 +710,9 @@ gst_droidcamsrc_photography_apply (GstDroidCamSrc * src,
   // TODO: ev compensation
   // TODO: zoom
 
-  gst_droidcamsrc_photography_set_flash (src);
-  gst_droidcamsrc_photography_set_focus (src);
-  gst_droidcamsrc_photography_set_iso (src);
+  gst_droidcamsrc_photography_set_flash_to_droid (src);
+  gst_droidcamsrc_photography_set_focus_to_droid (src);
+  gst_droidcamsrc_photography_set_iso_to_droid (src);
 
   APPLY_SETTING (src->photo->wb, src->photo->settings.wb_mode, "whitebalance");
   APPLY_SETTING (src->photo->scene, src->photo->settings.scene_mode,
@@ -1227,7 +1227,7 @@ gst_droidcamsrc_set_and_apply (GstDroidCamSrc * src, const gchar * key,
 }
 
 void
-gst_droidcamsrc_photography_set_focus (GstDroidCamSrc * src)
+gst_droidcamsrc_photography_set_focus_to_droid (GstDroidCamSrc * src)
 {
   int x;
   int len = g_list_length (src->photo->focus);
@@ -1265,7 +1265,7 @@ gst_droidcamsrc_photography_set_focus (GstDroidCamSrc * src)
 }
 
 void
-gst_droidcamsrc_photography_set_flash (GstDroidCamSrc * src)
+gst_droidcamsrc_photography_set_flash_to_droid (GstDroidCamSrc * src)
 {
   int x;
   int len = g_list_length (src->photo->flash);
@@ -1296,7 +1296,7 @@ gst_droidcamsrc_photography_set_flash (GstDroidCamSrc * src)
 }
 
 static void
-gst_droidcamsrc_photography_set_iso (GstDroidCamSrc * src)
+gst_droidcamsrc_photography_set_iso_to_droid (GstDroidCamSrc * src)
 {
   int x;
   int len = g_list_length (src->photo->iso);
