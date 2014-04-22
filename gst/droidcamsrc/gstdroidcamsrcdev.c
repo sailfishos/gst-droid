@@ -516,10 +516,11 @@ gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev)
 }
 
 gboolean
-gst_droidcamsrc_dev_set_params (GstDroidCamSrcDev * dev, const gchar * params)
+gst_droidcamsrc_dev_set_params (GstDroidCamSrcDev * dev)
 {
   int err;
   gboolean ret = FALSE;
+  gchar *params;
 
   g_rec_mutex_lock (dev->lock);
   if (!dev->dev) {
@@ -527,7 +528,22 @@ gst_droidcamsrc_dev_set_params (GstDroidCamSrcDev * dev, const gchar * params)
     goto out;
   }
 
+  if (!dev->params) {
+    GST_ERROR ("camera device is not initialized");
+    goto out;
+  }
+
+  if (!gst_droidcamsrc_params_is_dirty (dev->params)) {
+    GST_DEBUG ("no need to reset params");
+    ret = TRUE;
+    goto out;
+  }
+
+  params = gst_droidcamsrc_params_to_string (dev->params);
+  GST_LOG ("setting parameters %s", params);
   err = dev->dev->ops->set_parameters (dev->dev, params);
+  g_free (params);
+
   if (err != 0) {
     GST_ERROR ("error 0x%x setting parameters", err);
     goto out;

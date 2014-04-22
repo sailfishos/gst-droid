@@ -1428,14 +1428,11 @@ out:
 gboolean
 gst_droidcamsrc_apply_params (GstDroidCamSrc * src)
 {
-  gchar *params;
   gboolean ret = FALSE;
 
   GST_DEBUG_OBJECT (src, "apply params");
 
-  params = gst_droidcamsrc_params_to_string (src->dev->params);
-  ret = gst_droidcamsrc_dev_set_params (src->dev, params);
-  g_free (params);
+  ret = gst_droidcamsrc_dev_set_params (src->dev);
 
   if (!ret) {
     GST_ERROR_OBJECT (src, "failed to apply camera parameters");

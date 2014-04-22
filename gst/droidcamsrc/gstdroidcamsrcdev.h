@@ -66,7 +66,7 @@ void gst_droidcamsrc_dev_deinit (GstDroidCamSrcDev * dev);
 gboolean gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings);
 void gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev);
 
-gboolean gst_droidcamsrc_dev_set_params (GstDroidCamSrcDev * dev, const gchar *params);
+gboolean gst_droidcamsrc_dev_set_params (GstDroidCamSrcDev * dev);
 
 gboolean gst_droidcamsrc_dev_capture_image (GstDroidCamSrcDev * dev);
 
