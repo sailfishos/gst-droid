@@ -74,7 +74,7 @@ gst_droidcamsrc_dev_notify_callback (int32_t msg_type,
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
-  GST_DEBUG ("dev notify callback");
+  GST_DEBUG_OBJECT (src, "dev notify callback");
 
   // TODO: more messages
 
@@ -123,7 +123,7 @@ gst_droidcamsrc_dev_notify_callback (int32_t msg_type,
       break;
 
     default:
-      GST_WARNING ("unknown message type 0x%x", msg_type);
+      GST_WARNING_OBJECT (src, "unknown message type 0x%x", msg_type);
   }
 }
 
@@ -135,7 +135,7 @@ gst_droidcamsrc_dev_data_callback (int32_t msg_type,
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
-  GST_DEBUG ("dev data callback");
+  GST_DEBUG_OBJECT (src, "dev data callback");
 
   switch (msg_type) {
     case CAMERA_MSG_RAW_IMAGE:
@@ -185,7 +185,8 @@ gst_droidcamsrc_dev_data_callback (int32_t msg_type,
       int width = 0, height = 0;
       GValue regions = G_VALUE_INIT;
 
-      GST_INFO ("camera detected %d faces", metadata->number_of_faces);
+      GST_INFO_OBJECT (src, "camera detected %d faces",
+          metadata->number_of_faces);
 
       g_rec_mutex_lock (dev->lock);
       if (dev->win) {
@@ -197,7 +198,7 @@ gst_droidcamsrc_dev_data_callback (int32_t msg_type,
       g_rec_mutex_unlock (dev->lock);
 
       if (!width || !height) {
-        GST_WARNING ("failed to get preview dimensions");
+        GST_WARNING_OBJECT (src, "failed to get preview dimensions");
         return;
       }
 
@@ -213,8 +214,9 @@ gst_droidcamsrc_dev_data_callback (int32_t msg_type,
 
         g_value_init (&region, GST_TYPE_STRUCTURE);
 
-        GST_DEBUG ("face %d: left = %d, top = %d, right = %d, bottom = %d",
-            i, metadata->faces->rect[0], metadata->faces->rect[1],
+        GST_DEBUG_OBJECT (src,
+            "face %d: left = %d, top = %d, right = %d, bottom = %d", i,
+            metadata->faces->rect[0], metadata->faces->rect[1],
             metadata->faces->rect[2], metadata->faces->rect[3]);
         x = gst_util_uint64_scale (metadata->faces[i].rect[0] + 1000, width,
             2000);
@@ -246,7 +248,7 @@ gst_droidcamsrc_dev_data_callback (int32_t msg_type,
       break;
 
     default:
-      GST_WARNING ("unknown message type 0x%x", msg_type);
+      GST_WARNING_OBJECT (src, "unknown message type 0x%x", msg_type);
   }
 
   // TODO:
@@ -269,7 +271,7 @@ gst_droidcamsrc_dev_data_timestamp_callback (int64_t timestamp,
 
   // TODO: not sure what to do with timestamp
 
-  GST_DEBUG ("dev data timestamp callback");
+  GST_DEBUG_OBJECT (src, "dev data timestamp callback");
 
   /* unlikely but just in case */
   if (msg_type != CAMERA_MSG_VIDEO_FRAME) {
@@ -347,11 +349,11 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
   gchar *id;
   GstDroidCamSrc *src;
 
-  GST_DEBUG ("dev open");
-
   g_rec_mutex_lock (dev->lock);
 
   src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+
+  GST_DEBUG_OBJECT (src, "dev open");
 
   dev->info = info;
   id = g_strdup_printf ("%d", dev->info->num);
@@ -474,8 +476,9 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
   int msg_type = CAMERA_MSG_ALL_MSGS & ~CAMERA_MSG_PREVIEW_FRAME;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
-  GST_DEBUG ("dev start");
   g_rec_mutex_lock (dev->lock);
+
+  GST_DEBUG_OBJECT (src, "dev start");
 
   if (apply_settings) {
     gst_droidcamsrc_apply_mode_settings (src, SET_ONLY);
@@ -489,7 +492,7 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
   dev->dev->ops->enable_msg_type (dev->dev, msg_type);
   err = dev->dev->ops->start_preview (dev->dev);
   if (err != 0) {
-    GST_ERROR ("error 0x%x starting preview", err);
+    GST_ERROR_OBJECT (src, "error 0x%x starting preview", err);
     goto out;
   }
 
