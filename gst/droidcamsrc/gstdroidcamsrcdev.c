@@ -467,30 +467,25 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
 {
   int err;
   gboolean ret = FALSE;
-  gchar *params;
   int msg_type = CAMERA_MSG_ALL_MSGS & ~CAMERA_MSG_PREVIEW_FRAME;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
   GST_DEBUG ("dev start");
   g_rec_mutex_lock (dev->lock);
-  dev->dev->ops->enable_msg_type (dev->dev, msg_type);
-  err = dev->dev->ops->start_preview (dev->dev);
-  if (err != 0) {
-    GST_ERROR ("error 0x%x starting preview", err);
-    goto out;
-  }
 
   if (apply_settings) {
     gst_droidcamsrc_apply_mode_settings (src, SET_ONLY);
   }
 
-  /* set params */
-  params = gst_droidcamsrc_params_to_string (dev->params);
-  GST_LOG ("setting parameters %s", params);
-  err = dev->dev->ops->set_parameters (dev->dev, params);
-  g_free (params);
+  /* now set params */
+  if (!gst_droidcamsrc_dev_set_params (dev)) {
+    goto out;
+  }
+
+  dev->dev->ops->enable_msg_type (dev->dev, msg_type);
+  err = dev->dev->ops->start_preview (dev->dev);
   if (err != 0) {
-    GST_ERROR ("error 0x%x setting parameters", err);
+    GST_ERROR ("error 0x%x starting preview", err);
     goto out;
   }
 
