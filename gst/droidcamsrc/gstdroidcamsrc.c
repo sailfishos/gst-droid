@@ -1257,6 +1257,10 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
     goto out;
   }
 
+  if (!gst_droidcamsrc_dev_restart (src->dev)) {
+    goto out;
+  }
+
   ret = TRUE;
 
 out:

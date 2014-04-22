@@ -169,6 +169,13 @@ gst_droidcamsrc_dev_data_callback (int32_t msg_type,
         g_mutex_unlock (&dev->imgsrc->lock);
       }
 
+      /* we need to start restart the preview
+       * android demands this but GStreamer does not know about it.
+       */
+      g_rec_mutex_lock (dev->lock);
+      dev->running = FALSE;
+      g_rec_mutex_unlock (dev->lock);
+
       gst_droidcamsrc_dev_start (dev, TRUE);
 
       g_mutex_lock (&src->capture_lock);
@@ -326,6 +333,7 @@ gst_droidcamsrc_dev_new (camera_module_t * hw, GstDroidCamSrcPad * vfsrc,
 
   dev = g_slice_new0 (GstDroidCamSrcDev);
 
+  dev->running = FALSE;
   dev->info = NULL;
   dev->img = g_slice_new0 (GstDroidCamSrcImageCaptureState);
   dev->vid = g_slice_new0 (GstDroidCamSrcVideoCaptureState);
@@ -478,6 +486,12 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
 
   g_rec_mutex_lock (dev->lock);
 
+  if (dev->running) {
+    GST_WARNING_OBJECT (src, "preview is already running");
+    ret = TRUE;
+    goto out;
+  }
+
   GST_DEBUG_OBJECT (src, "dev start");
 
   if (apply_settings) {
@@ -496,6 +510,8 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
     goto out;
   }
 
+  dev->running = TRUE;
+
   ret = TRUE;
 
 out:
@@ -506,11 +522,12 @@ out:
 void
 gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev)
 {
-  GST_DEBUG ("dev stop");
-
   g_rec_mutex_lock (dev->lock);
 
+  GST_DEBUG ("dev stop");
+
   dev->dev->ops->stop_preview (dev->dev);
+  dev->running = FALSE;
 
   gst_droid_cam_src_stream_window_clear (dev->win);
 
@@ -805,4 +822,25 @@ out:
   g_rec_mutex_unlock (dev->lock);
 
   return res;
+}
+
+gboolean
+gst_droidcamsrc_dev_restart (GstDroidCamSrcDev * dev)
+{
+  gboolean ret = FALSE;
+
+  g_rec_mutex_lock (dev->lock);
+
+  GST_DEBUG ("dev restart");
+
+  if (dev->running) {
+    gst_droidcamsrc_dev_stop (dev);
+    ret = gst_droidcamsrc_dev_start (dev, TRUE);
+  } else {
+    ret = TRUE;
+  }
+
+  g_rec_mutex_unlock (dev->lock);
+
+  return ret;
 }
