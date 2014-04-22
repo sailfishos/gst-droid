@@ -1101,8 +1101,11 @@ gst_droidcamsrc_set_focus_mode (GstDroidCamSrc
 static GstPhotographyCaps
 gst_droidcamsrc_get_capabilities (GstDroidCamSrc * src)
 {
-  // TODO:
-  return FALSE;
+  return GST_PHOTOGRAPHY_CAPS_FLASH | GST_PHOTOGRAPHY_CAPS_FOCUS |
+      GST_PHOTOGRAPHY_CAPS_ISO_SPEED | GST_PHOTOGRAPHY_CAPS_ZOOM |
+      GST_PHOTOGRAPHY_CAPS_EV_COMP | GST_PHOTOGRAPHY_CAPS_WB_MODE |
+      GST_PHOTOGRAPHY_CAPS_SCENE | GST_PHOTOGRAPHY_CAPS_TONE |
+      GST_PHOTOGRAPHY_CAPS_FLICKER_REDUCTION;
 }
 
 static gboolean
