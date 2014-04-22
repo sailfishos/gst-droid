@@ -1727,6 +1727,7 @@ gst_droidcamsrc_update_ev_compensation_bounds (GstDroidCamSrc * src)
   gfloat step;
   int min;
   int max;
+  gfloat new_val = 0.0;
 
   GST_DEBUG_OBJECT (src, "update ev compensation bounds");
 
@@ -1776,5 +1777,11 @@ gst_droidcamsrc_update_ev_compensation_bounds (GstDroidCamSrc * src)
   g_object_notify (G_OBJECT (src), "min-ev-compensation");
   g_object_notify (G_OBJECT (src), "max-ev-compensation");
 
-  // TODO: clamp the ev comp value we have
+  g_object_get (src, "ev-compensation", &new_val, NULL);
+
+  if (new_val > src->max_ev_compensation || new_val < src->min_ev_compensation) {
+    new_val =
+        CLAMP (new_val, src->min_ev_compensation, src->max_ev_compensation);
+    g_object_set (src, "ev-compensation", new_val, NULL);
+  }
 }
