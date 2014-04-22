@@ -414,7 +414,6 @@ gboolean
 gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
 {
   int err;
-  gchar *params;
 
   GST_DEBUG ("dev init");
 
@@ -423,10 +422,6 @@ gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
   dev->win = gst_droid_cam_src_stream_window_new (dev->vfsrc, dev->info);
 
   gst_droidcamsrc_dev_update_params_locked (dev);
-
-  params = gst_droidcamsrc_params_to_string (dev->params);
-  dev->dev->ops->set_parameters (dev->dev, params);
-  g_free (params);
 
   dev->dev->ops->set_callbacks (dev->dev, gst_droidcamsrc_dev_notify_callback,
       gst_droidcamsrc_dev_data_callback,
@@ -695,6 +690,8 @@ gst_droidcamsrc_dev_update_params_locked (GstDroidCamSrcDev * dev)
   if (dev->params) {
     gst_droidcamsrc_params_reload (dev->params, params);
   } else {
+    /* we should set params when we open the device for the first time to mimic android */
+    dev->dev->ops->set_parameters (dev->dev, params);
     dev->params = gst_droidcamsrc_params_new (params);
   }
 
