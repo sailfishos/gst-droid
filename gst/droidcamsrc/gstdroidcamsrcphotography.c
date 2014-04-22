@@ -176,6 +176,8 @@ static void gst_droidcamsrc_set_autofocus (GstDroidCamSrc * src, gboolean on);
 static void gst_droidcamsrc_photography_set_iso_to_droid (GstDroidCamSrc * src);
 static void gst_droidcamsrc_photography_set_zoom_to_droid (GstDroidCamSrc *
     src);
+static void
+gst_droidcamsrc_photography_set_ev_compensation_to_droid (GstDroidCamSrc * src);
 
 static GstPhotographyCaps
 gst_droidcamsrc_photography_get_capabilities (GstPhotography * photo)
@@ -709,12 +711,11 @@ gst_droidcamsrc_photography_apply (GstDroidCamSrc * src,
    * exposure
    * exposure mode
    */
-  // TODO: ev compensation
-
   gst_droidcamsrc_photography_set_flash_to_droid (src);
   gst_droidcamsrc_photography_set_focus_to_droid (src);
   gst_droidcamsrc_photography_set_iso_to_droid (src);
   gst_droidcamsrc_photography_set_zoom_to_droid (src);
+  gst_droidcamsrc_photography_set_ev_compensation_to_droid (src);
 
   APPLY_SETTING (src->photo->wb, src->photo->settings.wb_mode, "whitebalance");
   APPLY_SETTING (src->photo->scene, src->photo->settings.scene_mode,
@@ -946,8 +947,28 @@ gst_droidcamsrc_get_max_exposure_time (GstDroidCamSrc * src,
 static gboolean
 gst_droidcamsrc_set_ev_compensation (GstDroidCamSrc * src, gfloat ev_comp)
 {
-  // TODO:
-  return FALSE;
+  int val;
+  gchar *value;
+  gboolean ret;
+
+  ev_comp = CLAMP (ev_comp, src->min_ev_compensation, src->max_ev_compensation);
+  val = ev_comp / src->ev_step;
+
+  value = g_strdup_printf ("%d", val);
+
+  GST_WARNING_OBJECT (src, "setting exposure-compensation to %s", value);
+
+  ret = gst_droidcamsrc_set_and_apply (src, "exposure-compensation", value);
+
+  g_free (value);
+
+  if (ret) {
+    GST_OBJECT_LOCK (src);
+    src->photo->settings.ev_compensation = ev_comp;
+    GST_OBJECT_UNLOCK (src);
+  }
+
+  return ret;
 }
 
 static gboolean
@@ -1335,6 +1356,28 @@ gst_droidcamsrc_photography_set_zoom_to_droid (GstDroidCamSrc * src)
   GST_DEBUG_OBJECT (src, "zoom set to %s", value);
 
   gst_droidcamsrc_params_set_string (src->dev->params, "zoom", value);
+
+  g_free (value);
+}
+
+static void
+gst_droidcamsrc_photography_set_ev_compensation_to_droid (GstDroidCamSrc * src)
+{
+  int val;
+  gchar *value;
+  gfloat ev_comp;
+
+  ev_comp =
+      CLAMP (src->photo->settings.ev_compensation, src->min_ev_compensation,
+      src->max_ev_compensation);
+  val = ev_comp / src->ev_step;
+
+  value = g_strdup_printf ("%d", val);
+
+  GST_WARNING_OBJECT (src, "setting exposure-compensation to %s", value);
+
+  gst_droidcamsrc_params_set_string (src->dev->params, "exposure-compensation",
+      value);
 
   g_free (value);
 }
