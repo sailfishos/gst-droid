@@ -956,7 +956,7 @@ gst_droidcamsrc_set_ev_compensation (GstDroidCamSrc * src, gfloat ev_comp)
 
   value = g_strdup_printf ("%d", val);
 
-  GST_WARNING_OBJECT (src, "setting exposure-compensation to %s", value);
+  GST_INFO_OBJECT (src, "setting exposure-compensation to %s", value);
 
   ret = gst_droidcamsrc_set_and_apply (src, "exposure-compensation", value);
 
@@ -1374,7 +1374,7 @@ gst_droidcamsrc_photography_set_ev_compensation_to_droid (GstDroidCamSrc * src)
 
   value = g_strdup_printf ("%d", val);
 
-  GST_WARNING_OBJECT (src, "setting exposure-compensation to %s", value);
+  GST_INFO_OBJECT (src, "setting exposure-compensation to %s", value);
 
   gst_droidcamsrc_params_set_string (src->dev->params, "exposure-compensation",
       value);
