@@ -174,6 +174,8 @@ static gboolean gst_droidcamsrc_prepare_for_capture (GstDroidCamSrc * src,
     GstCaps * capture_caps, gpointer user_data);
 static void gst_droidcamsrc_set_autofocus (GstDroidCamSrc * src, gboolean on);
 static void gst_droidcamsrc_photography_set_iso_to_droid (GstDroidCamSrc * src);
+static void gst_droidcamsrc_photography_set_zoom_to_droid (GstDroidCamSrc *
+    src);
 
 static GstPhotographyCaps
 gst_droidcamsrc_photography_get_capabilities (GstPhotography * photo)
@@ -708,11 +710,11 @@ gst_droidcamsrc_photography_apply (GstDroidCamSrc * src,
    * exposure mode
    */
   // TODO: ev compensation
-  // TODO: zoom
 
   gst_droidcamsrc_photography_set_flash_to_droid (src);
   gst_droidcamsrc_photography_set_focus_to_droid (src);
   gst_droidcamsrc_photography_set_iso_to_droid (src);
+  gst_droidcamsrc_photography_set_zoom_to_droid (src);
 
   APPLY_SETTING (src->photo->wb, src->photo->settings.wb_mode, "whitebalance");
   APPLY_SETTING (src->photo->scene, src->photo->settings.scene_mode,
@@ -1024,7 +1026,6 @@ gst_droidcamsrc_set_flash_mode (GstDroidCamSrc
 static gboolean
 gst_droidcamsrc_set_zoom (GstDroidCamSrc * src, gfloat zoom)
 {
-  // TODO: something is really wrong with our zoom
   int step = zoom;
   int max_zoom;
   gboolean ret;
@@ -1316,4 +1317,21 @@ gst_droidcamsrc_photography_set_iso_to_droid (GstDroidCamSrc * src)
   }
 
   gst_droidcamsrc_params_set_string (src->dev->params, "iso", value);
+}
+
+static void
+gst_droidcamsrc_photography_set_zoom_to_droid (GstDroidCamSrc * src)
+{
+  gchar *value;
+  int step = src->photo->settings.zoom;
+
+  step -= 1;
+
+  value = g_strdup_printf ("%d", step);
+
+  GST_DEBUG_OBJECT (src, "zoom set to %s", value);
+
+  gst_droidcamsrc_params_set_string (src->dev->params, "zoom", value);
+
+  g_free (value);
 }
