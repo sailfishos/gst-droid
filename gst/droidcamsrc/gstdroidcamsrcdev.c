@@ -345,10 +345,13 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
 {
   int err;
   gchar *id;
+  GstDroidCamSrc *src;
 
   GST_DEBUG ("dev open");
 
   g_rec_mutex_lock (dev->lock);
+
+  src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
   dev->info = info;
   id = g_strdup_printf ("%d", dev->info->num);
@@ -364,7 +367,8 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
 
     g_rec_mutex_unlock (dev->lock);
 
-    GST_ERROR ("error 0x%x opening camera", err);
+    GST_ELEMENT_ERROR (src, LIBRARY, INIT, (NULL), ("error 0x%x opening camera",
+            err));
     return FALSE;
   }
 
