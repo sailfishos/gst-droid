@@ -522,9 +522,6 @@ gst_droidcamsrc_dev_set_params (GstDroidCamSrcDev * dev)
   gchar *params;
 
   g_rec_mutex_lock (dev->lock);
-
-  GST_DEBUG ("set params");
-
   if (!dev->dev) {
     GST_ERROR ("camera device is not open");
     goto out;

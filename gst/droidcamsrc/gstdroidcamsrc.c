@@ -1253,21 +1253,7 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   gst_droidcamsrc_params_set_string (src->dev->params, "preview-size", preview);
   g_free (preview);
 
-  /* seems there is an issue with camera HAL.
-   * sometimes pipeline starts up with 640x480 preview resolution if
-   * dev_start gets called before we negotoate preview size.
-   * Sometimes when switching between 4:3 and 16:9 aspect ratios
-   * we get the same symptoms.
-   * The best solution for now is to restart the pipeline to make sure
-   * the new preview size gets applied.
-   */
-  gst_droidcamsrc_dev_stop (src->dev);
-
   if (!gst_droidcamsrc_apply_params (src)) {
-    goto out;
-  }
-
-  if (!gst_droidcamsrc_dev_start (src->dev, TRUE)) {
     goto out;
   }
 
