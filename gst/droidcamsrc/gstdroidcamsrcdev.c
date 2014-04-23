@@ -194,15 +194,19 @@ gst_droidcamsrc_dev_data_callback (int32_t msg_type,
 
       GST_INFO_OBJECT (src, "camera detected %d faces",
           metadata->number_of_faces);
-
-      g_rec_mutex_lock (dev->lock);
+      /*
+       * It should be safe to access window here
+       * We cannot really take dev->lock otherwise we might deadlock
+       * if we happen to try to acquire it while the device is being stopped.
+       * window gets destroyed when we destroy the whole device so it is
+       * not going anywhere.
+       */
       if (dev->win) {
         g_mutex_lock (&dev->win->lock);
         width = dev->win->width;
         height = dev->win->height;
         g_mutex_unlock (&dev->win->lock);
       }
-      g_rec_mutex_unlock (dev->lock);
 
       if (!width || !height) {
         GST_WARNING_OBJECT (src, "failed to get preview dimensions");
