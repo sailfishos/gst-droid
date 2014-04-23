@@ -526,10 +526,13 @@ gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev)
 
   GST_DEBUG ("dev stop");
 
-  dev->dev->ops->stop_preview (dev->dev);
-  dev->running = FALSE;
-
-  gst_droid_cam_src_stream_window_clear (dev->win);
+  if (dev->running) {
+    GST_DEBUG ("stopping preview");
+    dev->dev->ops->stop_preview (dev->dev);
+    dev->running = FALSE;
+    gst_droid_cam_src_stream_window_clear (dev->win);
+    GST_DEBUG ("stopped preview");
+  }
 
   g_rec_mutex_unlock (dev->lock);
 }
