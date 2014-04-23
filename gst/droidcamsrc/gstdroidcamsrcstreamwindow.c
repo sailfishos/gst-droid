@@ -193,7 +193,11 @@ gst_droidcamsrc_stream_window_enqueue_buffer (struct preview_stream_ops *w,
 
   g_mutex_unlock (&win->lock);
 
-  g_mutex_lock (&win->pad->lock);
+  /* it should be safe to access that variable without locking.
+   * pad gets activated during READY_TO_PAUSED and deactivated during
+   * PAUSED_TO_READY while we start the preview during PAUSED_TO_PLAYING
+   * and stop it during PLAYING_TO_PAUSED.
+   */
   if (!win->pad->running) {
     gst_buffer_unref (buff);
     GST_DEBUG ("unreffing buffer because pad task is not running");
@@ -202,7 +206,11 @@ gst_droidcamsrc_stream_window_enqueue_buffer (struct preview_stream_ops *w,
   }
   // TODO: duration, offset, offset_end ...
   gst_droidcamsrc_timestamp (src, buff);
+
+  g_mutex_lock (&win->pad->queue_lock);
+
   g_queue_push_tail (win->pad->queue, buff);
+
   g_cond_signal (&win->pad->cond);
 
   ret = 0;
@@ -214,7 +222,7 @@ unlock_and_out:
   return ret;
 
 unlock_pad_and_out:
-  g_mutex_unlock (&win->pad->lock);
+  g_mutex_unlock (&win->pad->queue_lock);
 
   return ret;
 }

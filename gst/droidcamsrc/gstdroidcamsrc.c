@@ -114,7 +114,7 @@ gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
   gst_pad_set_event_function (pad->pad, gst_droidcamsrc_pad_event);
   gst_pad_set_query_function (pad->pad, gst_droidcamsrc_pad_query);
 
-  g_mutex_init (&pad->lock);
+  g_mutex_init (&pad->queue_lock);
   g_cond_init (&pad->cond);
   pad->queue = g_queue_new ();
   pad->running = FALSE;
@@ -135,7 +135,7 @@ static void
 gst_droidcamsrc_destroy_pad (GstDroidCamSrcPad * pad)
 {
   /* we don't destroy the pad itself */
-  g_mutex_clear (&pad->lock);
+  g_mutex_clear (&pad->queue_lock);
   g_cond_clear (&pad->cond);
   g_queue_free (pad->queue);
   g_slice_free (GstDroidCamSrcPad, pad);
@@ -838,10 +838,9 @@ gst_droidcamsrc_loop (gpointer user_data)
 
   GST_LOG_OBJECT (src, "loop %s", GST_PAD_NAME (data->pad));
 
-  g_mutex_lock (&data->lock);
   if (!data->running) {
     GST_DEBUG_OBJECT (src, "task is not running");
-    goto unlock_and_out;
+    goto exit;
   }
 
   /* stream start */
@@ -878,26 +877,30 @@ gst_droidcamsrc_loop (gpointer user_data)
     }
 
     /* toss our queue */
+    g_mutex_lock (&data->queue_lock);
     g_queue_foreach (data->queue, (GFunc) gst_buffer_unref, NULL);
     g_queue_clear (data->queue);
+    g_mutex_unlock (&data->queue_lock);
   }
 
+  g_mutex_lock (&data->queue_lock);
   buffer = g_queue_pop_head (data->queue);
   if (buffer) {
-    g_mutex_unlock (&data->lock);
+    g_mutex_unlock (&data->queue_lock);
     goto out;
   }
 
   if (!buffer) {
-    g_cond_wait (&data->cond, &data->lock);
+    g_cond_wait (&data->cond, &data->queue_lock);
     buffer = g_queue_pop_head (data->queue);
   }
 
+  g_mutex_unlock (&data->queue_lock);
+
   if (!buffer) {
     /* we got signaled to exit */
-    goto unlock_and_out;
+    goto exit;
   } else {
-    g_mutex_unlock (&data->lock);
     goto out;
   }
 
@@ -905,8 +908,7 @@ gst_droidcamsrc_loop (gpointer user_data)
 error:
   gst_pad_pause_task (data->pad);
 
-unlock_and_out:
-  g_mutex_unlock (&data->lock);
+exit:
   return;
 
 out:
@@ -963,9 +965,9 @@ out:
         gst_flow_get_name (ret), GST_PAD_NAME (data->pad));
   }
 
-  g_mutex_lock (&data->lock);
+  g_mutex_lock (&data->queue_lock);
   data->pushed_buffers++;
-  g_mutex_unlock (&data->lock);
+  g_mutex_unlock (&data->queue_lock);
 }
 
 static gboolean
@@ -987,14 +989,10 @@ gst_droidcamsrc_pad_activate_mode (GstPad * pad, GstObject * parent,
     return FALSE;
   }
 
-  g_mutex_lock (&data->lock);
-  data->running = active;
-  g_cond_signal (&data->cond);
-  g_mutex_unlock (&data->lock);
-
   if (active) {
     // TODO: review locking for the remaining 2 pads
     /* No need for locking here since the task is not running */
+    data->running = TRUE;
     data->open_stream = TRUE;
     data->open_segment = TRUE;
     data->pushed_buffers = 0;
@@ -1004,6 +1002,10 @@ gst_droidcamsrc_pad_activate_mode (GstPad * pad, GstObject * parent,
     }
   } else {
     gboolean ret = FALSE;
+
+    data->running = FALSE;
+    g_cond_signal (&data->cond);
+
     if (!gst_pad_stop_task (pad)) {
       GST_ERROR_OBJECT (src, "failed to stop pad task");
       ret = FALSE;
@@ -1011,11 +1013,11 @@ gst_droidcamsrc_pad_activate_mode (GstPad * pad, GstObject * parent,
       ret = TRUE;
     }
 
-    g_mutex_lock (&data->lock);
+    g_mutex_lock (&data->queue_lock);
     /* toss the queue */
     g_queue_foreach (data->queue, (GFunc) gst_buffer_unref, NULL);
     g_queue_clear (data->queue);
-    g_mutex_unlock (&data->lock);
+    g_mutex_unlock (&data->queue_lock);
 
     GST_OBJECT_LOCK (src);
 
@@ -1079,9 +1081,9 @@ gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent, GstEvent * event)
         ret = FALSE;
       } else if (data->capture_pad) {
         /* wake pad up to renegotiate */
-        g_mutex_lock (&data->lock);
+        g_mutex_lock (&data->queue_lock);
         g_cond_signal (&data->cond);
-        g_mutex_unlock (&data->lock);
+        g_mutex_unlock (&data->queue_lock);
         ret = TRUE;
       } else {
         /* pad will negotiate later */

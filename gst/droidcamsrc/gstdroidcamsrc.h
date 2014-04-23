@@ -73,7 +73,7 @@ struct _GstDroidCamSrcPad
   GstPad *pad;
   GQueue *queue;
   GCond cond;
-  GMutex lock;
+  GMutex queue_lock;
   gboolean running;
   gboolean open_stream;
   gboolean open_segment;
