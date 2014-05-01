@@ -27,8 +27,8 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
-GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
-#define GST_CAT_DEFAULT gst_droidcamsrc_debug
+GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
+#define GST_CAT_DEFAULT gst_droid_camsrc_debug
 
 typedef struct _GstDroidCamSrcDevMemory GstDroidCamSrcDevMemory;
 

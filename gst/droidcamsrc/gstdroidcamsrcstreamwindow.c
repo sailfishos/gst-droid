@@ -29,8 +29,8 @@
 #include "gst/memory/gstgralloc.h"
 #include <unistd.h>
 
-GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
-#define GST_CAT_DEFAULT gst_droidcamsrc_debug
+GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
+#define GST_CAT_DEFAULT gst_droid_camsrc_debug
 
 #define ACQUIRE_BUFFER_TRIALS                  4
 #define MIN_UNDEQUEUED_BUFFER_COUNT            2

@@ -28,8 +28,8 @@
 #include <gst/interfaces/nemovideotexture.h>
 #include "gst/memory/gstgralloc.h"
 
-GST_DEBUG_CATEGORY_STATIC (gst_droid_egl_sink_debug);
-#define GST_CAT_DEFAULT gst_droid_egl_sink_debug
+GST_DEBUG_CATEGORY_EXTERN (gst_droid_eglsink_debug);
+#define GST_CAT_DEFAULT gst_droid_eglsink_debug
 
 static void gst_droideglsink_video_texture_init (NemoGstVideoTextureClass *
     iface);
@@ -731,19 +731,3 @@ gst_droideglsink_video_texture_init (NemoGstVideoTextureClass * iface)
   iface->get_frame_info = gst_droidcamsrc_get_frame_info;
   iface->get_frame_meta = gst_droidcamsrc_get_frame_meta;
 }
-
-static gboolean
-plugin_init (GstPlugin * plugin)
-{
-  GST_DEBUG_CATEGORY_INIT (gst_droid_egl_sink_debug, "droideglsink",
-      0, "Android EGL sink");
-
-  return gst_element_register (plugin, "droideglsink", GST_RANK_PRIMARY,
-      GST_TYPE_DROIDEGLSINK);
-}
-
-GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
-    GST_VERSION_MINOR,
-    droideglsink,
-    "Android EGL sink",
-    plugin_init, VERSION, "LGPL", PACKAGE_NAME, "http://foolab.org/")

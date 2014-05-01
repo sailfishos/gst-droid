@@ -28,8 +28,8 @@
 #include "gstdroidcamsrc.h"
 #include <gst/meta/nemometa.h>
 
-GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
-#define GST_CAT_DEFAULT gst_droidcamsrc_debug
+GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
+#define GST_CAT_DEFAULT gst_droid_camsrc_debug
 
 #define gst_droidcamsrc_buffer_pool_parent_class parent_class
 G_DEFINE_TYPE (GstDroidCamSrcBufferPool, gst_droidcamsrc_buffer_pool,

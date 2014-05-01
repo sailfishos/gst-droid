@@ -1,7 +1,8 @@
 AM_CPPFLAGS = -DSYSCONFDIR=\"$(sysconfdir)\"
-plugin_LTLIBRARIES = libgstdroidcamsrc.la
+noinst_LTLIBRARIES = libgstdroidcamsrc.la
 libgstdroidcamsrc_la_CFLAGS = $(GST_CFLAGS) $(NGI_CFLAGS) $(EGL_CFLAGS) \
                               $(DROID_CFLAGS) $(NGM_CFLAGS)\
+			      -I$(top_builddir)/gst/ \
 			      -I$(top_builddir)/gst-libs/ \
                               -I$(top_builddir)/inc/hybris/
 
@@ -11,11 +12,7 @@ libgstdroidcamsrc_la_LIBADD = $(GST_LIBS) $(NGI_LIBS) $(EGL_LIBS) \
                               -lgstbasecamerabinsrc-1.0 \
                               -lgstphotography-1.0
 
-libgstdroidcamsrc_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
-libgstdroidcamsrc_la_LIBTOOLFLAGS = --tag=disable-static
-
 libgstdroidcamsrc_la_SOURCES = \
-	plugin.c \
 	gstdroidcamsrc.c \
 	gstdroidcamsrcdev.c \
 	gstdroidcamsrcdevmemory.c \
@@ -27,7 +24,6 @@ libgstdroidcamsrc_la_SOURCES = \
 	gstdroidcamsrcquirks.c
 
 noinst_HEADERS = \
-	plugin.h \
 	gstdroidcamsrc.h \
 	gstdroidcamsrcdev.h \
 	gstdroidcamsrcdevmemory.h \

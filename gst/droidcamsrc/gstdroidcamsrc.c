@@ -39,8 +39,8 @@ G_DEFINE_TYPE_WITH_CODE (GstDroidCamSrc, gst_droidcamsrc, GST_TYPE_ELEMENT,
     G_IMPLEMENT_INTERFACE (GST_TYPE_PHOTOGRAPHY,
         gst_droidcamsrc_photography_register));
 
-GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
-#define GST_CAT_DEFAULT gst_droidcamsrc_debug
+GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
+#define GST_CAT_DEFAULT gst_droid_camsrc_debug
 
 static GstStaticPadTemplate vf_src_template_factory =
 GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_VIEWFINDER_PAD_NAME,

@@ -70,6 +70,8 @@ struct _GstDroidEglSinkClass
   GstVideoSinkClass parent_class;
 };
 
+GType gst_droideglsink_get_type (void);
+
 G_END_DECLS
 
 #endif /* __GST_DROID_EGL_SINK_H__ */

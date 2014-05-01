@@ -25,27 +25,52 @@
 
 #include <gst/gst.h>
 #include "plugin.h"
+#include "gstdroidcamsrc.h"
+#include "gstdroideglsink.h"
+#include "gstdroiddec.h"
+#include "gstdroidenc.h"
 
-GST_DEBUG_CATEGORY (gst_droid_debug);
-#define GST_CAT_DEFAULT gst_droid_debug
+GST_DEBUG_CATEGORY (gst_droid_camsrc_debug);
+GST_DEBUG_CATEGORY (gst_droid_dec_debug);
+GST_DEBUG_CATEGORY (gst_droid_enc_debug);
+GST_DEBUG_CATEGORY (gst_droid_codec_debug);
+GST_DEBUG_CATEGORY (gst_droid_eglsink_debug);
 
 static gboolean
 plugin_init (GstPlugin * plugin)
 {
-  GST_DEBUG_CATEGORY_INIT (gst_droid_debug, "droid",
-      0, "Android HAL plugin");
+  gboolean ok = TRUE;
 
-  return TRUE;
+  GST_DEBUG_CATEGORY_INIT (gst_droid_camsrc_debug, "droidcamsrc",
+      0, "Android HAL camera source");
+
+  GST_DEBUG_CATEGORY_INIT (gst_droid_eglsink_debug, "droideglsink",
+      0, "Android EGL sink");
+
+  GST_DEBUG_CATEGORY_INIT (gst_droid_dec_debug, "droiddec",
+      0, "Android HAL decoder");
+
+  GST_DEBUG_CATEGORY_INIT (gst_droid_enc_debug, "droidenc",
+      0, "Android HAL encoder");
+
+  GST_DEBUG_CATEGORY_INIT (gst_droid_codec_debug, "droidcodec",
+      0, "Android HAL codec");
+
+  ok &= gst_element_register (plugin, "droidcamsrc", GST_RANK_PRIMARY,
+      GST_TYPE_DROIDCAMSRC);
+  ok &= gst_element_register (plugin, "droideglsink", GST_RANK_PRIMARY,
+      GST_TYPE_DROIDEGLSINK);
+
+  ok &= gst_element_register (plugin, "droiddec", GST_RANK_PRIMARY + 1,
+      GST_TYPE_DROIDDEC);
+  ok &= gst_element_register (plugin, "droidenc", GST_RANK_PRIMARY + 1,
+      GST_TYPE_DROIDENC);
+
+  return ok;
 }
 
-GST_PLUGIN_DEFINE (
-    GST_VERSION_MAJOR,
+GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
     droid,
     "Android HAL plugins",
-    plugin_init,
-    VERSION,
-    "LGPL",
-    PACKAGE_NAME,
-    "http://foolab.org/"
-)
+    plugin_init, VERSION, "LGPL", PACKAGE_NAME, "http://foolab.org/")

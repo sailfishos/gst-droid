@@ -33,8 +33,8 @@
     e = NULL;								\
   }
 
-GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
-#define GST_CAT_DEFAULT gst_droidcamsrc_debug
+GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
+#define GST_CAT_DEFAULT gst_droid_camsrc_debug
 
 void
 gst_droidcamsrc_quirk_free (GstDroidCamSrcQuirk * quirk)

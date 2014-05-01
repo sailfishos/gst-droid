@@ -38,7 +38,7 @@
 
 GST_DEFINE_MINI_OBJECT_TYPE (GstDroidCodec, gst_droid_codec);
 
-GST_DEBUG_CATEGORY (gst_droid_codec_debug);
+GST_DEBUG_CATEGORY_EXTERN (gst_droid_codec_debug);
 #define GST_CAT_DEFAULT gst_droid_codec_debug
 
 static GstDroidCodec *codec = NULL;

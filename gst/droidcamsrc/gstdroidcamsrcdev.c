@@ -34,8 +34,8 @@
 #endif /* GST_USE_UNSTABLE_API */
 #include <gst/interfaces/photography.h>
 
-GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
-#define GST_CAT_DEFAULT gst_droidcamsrc_debug
+GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
+#define GST_CAT_DEFAULT gst_droid_camsrc_debug
 
 #define VIDEO_RECORDING_STOP_TIMEOUT                 100000     /* us */
 

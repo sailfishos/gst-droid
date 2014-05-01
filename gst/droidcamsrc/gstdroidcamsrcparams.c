@@ -29,8 +29,8 @@
 #include "plugin.h"
 #include <gst/memory/gstwrappedmemory.h>
 
-GST_DEBUG_CATEGORY_EXTERN (gst_droidcamsrc_debug);
-#define GST_CAT_DEFAULT gst_droidcamsrc_debug
+GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
+#define GST_CAT_DEFAULT gst_droid_camsrc_debug
 
 static void
 gst_droidcamsrc_params_parse (GstDroidCamSrcParams * params, const char *part)
