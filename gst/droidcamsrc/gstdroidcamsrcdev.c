@@ -33,6 +33,7 @@
 #define GST_USE_UNSTABLE_API
 #endif /* GST_USE_UNSTABLE_API */
 #include <gst/interfaces/photography.h>
+#include "gstdroidcamsrcexif.h"
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
 #define GST_CAT_DEFAULT gst_droid_camsrc_debug
@@ -150,6 +151,8 @@ gst_droidcamsrc_dev_data_callback (int32_t msg_type,
         GST_ERROR_OBJECT (src, "invalid memory from camera hal");
       } else {
         GstBuffer *buffer;
+        GstTagList *tags;
+        GstEvent *event = NULL;
         void *d = g_malloc (size);
         memcpy (d, addr, size);
         buffer = gst_buffer_new_wrapped (d, size);
@@ -162,8 +165,19 @@ gst_droidcamsrc_dev_data_callback (int32_t msg_type,
 
         gst_droidcamsrc_timestamp (src, buffer);
 
-        // TODO: extract and post exif
+        tags = gst_droidcamsrc_exif_tags_from_jpeg_data (d, size);
+        if (tags) {
+          GST_INFO_OBJECT (src, "pushing tags %" GST_PTR_FORMAT, tags);
+          event = gst_event_new_tag (tags);
+        }
+
         g_mutex_lock (&dev->imgsrc->queue_lock);
+
+        if (event) {
+          src->imgsrc->pending_events =
+              g_list_append (src->imgsrc->pending_events, event);
+        }
+
         g_queue_push_tail (dev->imgsrc->queue, buffer);
         g_cond_signal (&dev->imgsrc->cond);
         g_mutex_unlock (&dev->imgsrc->queue_lock);

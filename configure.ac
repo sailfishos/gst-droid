@@ -48,6 +48,7 @@ PKG_CHECK_MODULES(GST, [
   gstreamer-base-1.0 >= $GST_REQUIRED
   gstreamer-video-1.0 >= $GST_REQUIRED
   gstreamer-plugins-bad-1.0 >= $GST_REQUIRED
+  gstreamer-tag-1.0 >= $GST_REQUIRED
 ], [
   AC_SUBST(GST_CFLAGS)
   AC_SUBST(GST_LIBS)
@@ -124,6 +125,17 @@ PKG_CHECK_MODULES(EGL, [
 ], [
   AC_MSG_ERROR([
       egl not found
+  ])
+])
+
+PKG_CHECK_MODULES(EXIF, [
+  libexif
+], [
+  AC_SUBST(EXIF_CFLAGS)
+  AC_SUBST(EXIF_LIBS)
+], [
+  AC_MSG_ERROR([
+      libexif not found
   ])
 ])
 

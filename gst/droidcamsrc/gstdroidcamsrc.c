@@ -943,8 +943,11 @@ out:
 
   /* pending events */
   GST_OBJECT_LOCK (src);
+  /* queue lock is needed for imgsrc pad */
+  g_mutex_lock (&data->queue_lock);
   events = data->pending_events;
   data->pending_events = NULL;
+  g_mutex_unlock (&data->queue_lock);
   GST_OBJECT_UNLOCK (src);
 
   if (G_UNLIKELY (events)) {
@@ -1021,6 +1024,13 @@ gst_droidcamsrc_pad_activate_mode (GstPad * pad, GstObject * parent,
 
     GST_OBJECT_LOCK (src);
 
+    /*
+     * We have 2 pads making use of such lists:
+     * - vfsrc which always accesses the list with the object lock so it should be safe.
+     *   It's also safe for it because it's not running so the object lock is needed in
+     *   order to prevent us from messing up the list if we happen to get events.
+     * - imgsrc which is also not running. GstDRoidCamSrcDev is also gone long ago
+     */
     if (data->pending_events) {
       g_list_free_full (data->pending_events, (GDestroyNotify) gst_event_unref);
       data->pending_events = NULL;
