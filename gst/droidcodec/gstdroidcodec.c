@@ -793,9 +793,12 @@ static gboolean
 gst_droid_codec_wait_for_state (GstDroidComponent * comp,
     OMX_STATETYPE new_state)
 {
-  while (g_atomic_int_get (&comp->state) != new_state
-      && !gst_droid_codec_has_error (comp)) {
-    usleep (WAIT_TIMEOUT);
+  int x = 0;
+  for (x = 0; x < 20; x++) {
+    if (g_atomic_int_get (&comp->state) != new_state
+        && !gst_droid_codec_has_error (comp)) {
+      usleep (WAIT_TIMEOUT);
+    }
   }
 
   if (gst_droid_codec_has_error (comp)) {
