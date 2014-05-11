@@ -805,6 +805,12 @@ gst_droid_codec_wait_for_state (GstDroidComponent * comp,
     return FALSE;
   }
 
+  if (g_atomic_int_get (&comp->state) != new_state) {
+    GST_WARNING_OBJECT (comp->parent, "timeout waiting for state change to %s",
+        gst_omx_state_to_string (new_state));
+    return FALSE;
+  }
+
   return TRUE;
 }
 
