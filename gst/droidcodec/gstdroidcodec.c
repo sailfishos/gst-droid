@@ -646,6 +646,8 @@ gst_droid_codec_get (void)
     g_mutex_init (&codec->lock);
     gst_mini_object_init (GST_MINI_OBJECT_CAST (codec), 0, GST_TYPE_DROID_CODEC,
         NULL, NULL, (GstMiniObjectFreeFunction) gst_droid_codec_free);
+  } else {
+    gst_mini_object_ref (GST_MINI_OBJECT (codec));
   }
 
   G_UNLOCK (codec);
