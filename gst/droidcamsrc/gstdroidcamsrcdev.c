@@ -43,6 +43,7 @@ GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
 struct _GstDroidCamSrcImageCaptureState
 {
   gboolean image_preview_sent;
+  gboolean image_start_sent;
 };
 
 struct _GstDroidCamSrcVideoCaptureState
@@ -82,9 +83,12 @@ gst_droidcamsrc_dev_notify_callback (int32_t msg_type,
   switch (msg_type) {
     case CAMERA_MSG_SHUTTER:
       g_rec_mutex_lock (dev->lock);
-      dev->dev->ops->disable_msg_type (dev->dev, CAMERA_MSG_SHUTTER);
-      gst_droidcamsrc_post_message (src,
-          gst_structure_new_empty (GST_DROIDCAMSRC_CAPTURE_START));
+      if (!dev->img->image_start_sent) {
+        dev->dev->ops->disable_msg_type (dev->dev, CAMERA_MSG_SHUTTER);
+        gst_droidcamsrc_post_message (src,
+            gst_structure_new_empty (GST_DROIDCAMSRC_CAPTURE_START));
+        dev->img->image_start_sent = TRUE;
+      }
       g_rec_mutex_unlock (dev->lock);
       break;
 
@@ -610,6 +614,7 @@ gst_droidcamsrc_dev_capture_image (GstDroidCamSrcDev * dev)
 
   dev->dev->ops->enable_msg_type (dev->dev, msg_type);
   dev->img->image_preview_sent = FALSE;
+  dev->img->image_start_sent = FALSE;
 
   err = dev->dev->ops->take_picture (dev->dev);
   if (err != 0) {
