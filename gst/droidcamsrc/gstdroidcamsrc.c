@@ -96,6 +96,7 @@ static guint droidcamsrc_signals[LAST_SIGNAL];
 #define DEFAULT_MAX_EV_COMPENSATION    2.5f
 #define DEFAULT_FACE_DETECTION         FALSE
 #define DEFAULT_IMAGE_NOISE_REDUCTION  TRUE
+#define DEFAULT_SENSOR_ORIENTATION     0
 
 static GstDroidCamSrcPad *
 gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
@@ -226,6 +227,16 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
 
     case PROP_IMAGE_NOISE_REDUCTION:
       g_value_set_boolean (value, src->image_noise_reduction);
+      break;
+
+    case PROP_SENSOR_ORIENTATION:
+      g_rec_mutex_lock (&src->dev_lock);
+      if (!src->dev || !src->dev->info) {
+        g_value_set_int (value, DEFAULT_SENSOR_ORIENTATION);
+      } else {
+        g_value_set_int (value, src->dev->info->orientation);
+      }
+      g_rec_mutex_unlock (&src->dev_lock);
       break;
 
     default:
@@ -464,6 +475,8 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         ret = GST_STATE_CHANGE_FAILURE;
         break;
       }
+
+      g_object_notify (G_OBJECT (src), "sensor-orientation");
 
       /* now that we have camera parameters, we can update min and max ev-compensation */
       gst_droidcamsrc_update_ev_compensation_bounds (src);
@@ -808,6 +821,12 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
           "Vendor specific image noise reduction",
           DEFAULT_IMAGE_NOISE_REDUCTION,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_SENSOR_ORIENTATION,
+      g_param_spec_int ("sensor-orientation", "Sensor orientation",
+          "Sensor orientation as reported by HAL", 0, 270,
+          DEFAULT_SENSOR_ORIENTATION,
+          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   gst_droidcamsrc_photography_add_overrides (gobject_class);
 
