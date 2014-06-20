@@ -65,6 +65,8 @@ gst_droidcamsrc_stream_window_dequeue_buffer (struct preview_stream_ops *w,
   g_mutex_lock (&win->lock);
 
 retry:
+  GST_DEBUG ("needs reconfigure? %d", win->needs_reconfigure);
+
   if (!win->pool || (win->pool && win->needs_reconfigure)) {
     /* create and re/configure the pool */
     gst_droid_cam_src_stream_window_configure_buffer_pool_locked (win);
@@ -231,11 +233,35 @@ static int
 gst_droidcamsrc_stream_window_cancel_buffer (struct preview_stream_ops *w,
     buffer_handle_t * buffer)
 {
+  GstDroidCamSrcStreamWindow *win;
+  GstBuffer *buff;
+  int ret;
+
   GST_DEBUG ("cancel buffer");
 
-  // TODO:
+  win = container_of (w, GstDroidCamSrcStreamWindow, window);
 
-  return 0;
+  g_mutex_lock (&win->lock);
+
+  buff = g_hash_table_lookup (win->map, buffer);
+
+  if (!buff) {
+    GST_ERROR ("no buffer corresponding to handle %p", buffer);
+    ret = -1;
+    // TODO: an idea would be to keep the old hash values and match buffers against
+    // our pool when we dequeue and enqueue
+    goto unlock_and_out;
+  }
+
+  g_hash_table_remove (win->map, buffer);
+
+  /* back to the pool */
+  gst_buffer_unref (buff);
+  ret = 0;
+
+unlock_and_out:
+  g_mutex_unlock (&win->lock);
+  return ret;
 }
 
 static int
