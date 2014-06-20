@@ -4,7 +4,8 @@ libgstdroidcamsrc_la_CFLAGS = $(GST_CFLAGS) $(NGI_CFLAGS) $(EGL_CFLAGS) \
                               $(DROID_CFLAGS) $(NGM_CFLAGS) $(EXIF_CFLAGS) \
 			      -I$(top_builddir)/gst/ \
 			      -I$(top_builddir)/gst-libs/ \
-                              -I$(top_builddir)/inc/hybris/
+                              -I$(top_builddir)/inc/hybris/ \
+                              -I$(top_builddir)/inc/
 
 libgstdroidcamsrc_la_LIBADD = $(GST_LIBS) $(NGI_LIBS) $(EGL_LIBS) \
                               $(DROID_LIBS) $(NGM_LIBS) $(EXIF_LIBS) \

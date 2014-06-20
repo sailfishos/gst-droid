@@ -27,6 +27,7 @@
 #include "gstdroidcamsrcbufferpool.h"
 #include "gstdroidcamsrc.h"
 #include "gst/memory/gstgralloc.h"
+#include "gstdroidmacros.h"
 #include <unistd.h>
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
@@ -35,11 +36,6 @@ GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
 #define ACQUIRE_BUFFER_TRIALS                  4
 #define MIN_UNDEQUEUED_BUFFER_COUNT            2
 #define ACQUIRE_BUFFER_TIMEOUT                 10000    /* us */
-
-// TODO: keep this in 1 place
-#define container_of(ptr, type, member) ({                      \
-        const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
-        (type *)( (char *)__mptr - offsetof(type,member) );})
 
 static void
     gst_droid_cam_src_stream_window_configure_buffer_pool_locked

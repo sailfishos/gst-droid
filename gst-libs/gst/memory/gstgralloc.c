@@ -25,12 +25,9 @@
 
 #include <gst/gst.h>
 #include "gstgralloc.h"
+#include "gstdroidmacros.h"
 #include <hardware/gralloc.h>
 #include <system/window.h>
-
-#define container_of(ptr, type, member) ({			\
-	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
-	(type *)( (char *)__mptr - offsetof(type,member) );})
 
 GST_DEBUG_CATEGORY_STATIC (droid_memory_debug);
 #define GST_CAT_DEFAULT droid_memory_debug

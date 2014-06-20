@@ -4,7 +4,11 @@ libgstdroidmemory_@GST_API_VERSION@_ladir = $(libdir)
 libgstdroidmemory_@GST_API_VERSION@_la_includedir = \
 	$(includedir)/gstreamer-@GST_API_VERSION@/gst/allocators
 
-libgstdroidmemory_@GST_API_VERSION@_la_CFLAGS = $(GST_CFLAGS) $(DROID_CFLAGS) $(HARDWARE_CFLAGS)
+libgstdroidmemory_@GST_API_VERSION@_la_CFLAGS = $(GST_CFLAGS) \
+						$(DROID_CFLAGS) \
+						$(HARDWARE_CFLAGS) \
+						-I$(top_builddir)/inc/
+
 libgstdroidmemory_@GST_API_VERSION@_la_LIBADD = $(GST_LIBS) $(DROID_LIBS) $(HARDWARE_LIBS)
 
 noinst_HEADERS =
