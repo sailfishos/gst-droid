@@ -116,6 +116,7 @@ gst_gralloc_allocator_new (void)
 static void
 gralloc_mem_allocator_init (GstGrallocAllocator * allocator)
 {
+  // TODO: error checking
   EGLConfig config;
   EGLint num_config;
   static EGLint const attribute_list[] = {
@@ -131,34 +132,11 @@ gralloc_mem_allocator_init (GstGrallocAllocator * allocator)
 
   allocator->dpy = eglGetDisplay (EGL_DEFAULT_DISPLAY);
 
-  if (!allocator->dpy) {
-    GST_ERROR ("failed to get EGLDisplay");
-    return;
-  }
-
-  if (!eglInitialize (allocator->dpy, NULL, NULL)) {
-    GST_ERROR ("failed to initialize EGL");
-    return;
-  }
-
-  if (!eglChooseConfig (allocator->dpy, attribute_list, &config, 1,
-          &num_config)) {
-    GST_ERROR ("failed to choose an EGL config");
-    return;
-  }
-
-  if (num_config == 0) {
-    GST_ERROR ("no valid EGL configurations");
-    return;
-  }
+  eglInitialize (allocator->dpy, NULL, NULL);
+  eglChooseConfig (allocator->dpy, attribute_list, &config, 1, &num_config);
 
   allocator->ctx =
       eglCreateContext (allocator->dpy, config, EGL_NO_CONTEXT, NULL);
-
-  if (allocator->ctx == EGL_NO_CONTEXT) {
-    GST_ERROR ("failed to create an EGL context");
-    return;
-  }
 
   *(void **) &allocator->eglHybrisCreateNativeBuffer =
       eglGetProcAddress ("eglHybrisCreateNativeBuffer");
