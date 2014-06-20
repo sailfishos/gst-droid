@@ -61,7 +61,9 @@ typedef struct
   GstMemory mem;
 
   struct ANativeWindowBuffer *remote;
-  struct ANativeWindowBuffer buff;
+
+  void (*incRef) (struct android_native_base_t * base);
+  void (*decRef) (struct android_native_base_t * base);
 
 } GstGrallocMemory;
 
@@ -85,11 +87,14 @@ incRef (struct android_native_base_t *base)
   struct ANativeWindowBuffer *self =
       container_of (base, struct ANativeWindowBuffer, common);
 
-  GstGrallocMemory *mem = container_of (self, GstGrallocMemory, buff);
+  GstGrallocMemory *mem = container_of (&self, GstGrallocMemory, remote);
 
   gst_memory_ref (GST_MEMORY_CAST (mem));
 
   GST_DEBUG ("ref %p", mem);
+
+  // TODO: crash
+  //  mem->incRef(base);
 }
 
 static void
@@ -97,11 +102,14 @@ decRef (struct android_native_base_t *base)
 {
   struct ANativeWindowBuffer *self =
       container_of (base, struct ANativeWindowBuffer, common);
-  GstGrallocMemory *mem = container_of (self, GstGrallocMemory, buff);
+  GstGrallocMemory *mem = container_of (&self, GstGrallocMemory, remote);
 
   gst_memory_unref (GST_MEMORY_CAST (mem));
 
   GST_DEBUG ("unref %p", mem);
+
+  // TODO: crash
+  //  mem->decRef(base);
 }
 
 GstAllocator *
@@ -232,19 +240,11 @@ gst_gralloc_allocator_alloc (GstAllocator * allocator, gint width, gint height,
     return NULL;
   }
 
-  memset (mem->buff.common.reserved, 0, sizeof (mem->buff.common.reserved));
+  mem->incRef = mem->remote->common.incRef;
+  mem->decRef = mem->remote->common.decRef;
 
-  mem->buff.width = mem->remote->width;
-  mem->buff.height = mem->remote->height;
-  mem->buff.stride = mem->remote->stride;
-  mem->buff.format = mem->remote->format;
-  mem->buff.usage = mem->remote->usage;
-  mem->buff.handle = mem->remote->handle;
-  mem->buff.common.magic = mem->remote->common.magic;
-  mem->buff.common.version = mem->remote->common.version;
-
-  mem->buff.common.incRef = incRef;
-  mem->buff.common.decRef = decRef;
+  mem->remote->common.incRef = incRef;
+  mem->remote->common.decRef = decRef;
 
   gst_memory_init (GST_MEMORY_CAST (mem),
       GST_MEMORY_FLAG_NO_SHARE | GST_MEMORY_FLAG_NOT_MAPPABLE, allocator, NULL,
@@ -362,7 +362,7 @@ gst_memory_get_native_buffer (GstMemory * mem)
     return NULL;
   }
 
-  return &((GstGrallocMemory *) mem)->buff;
+  return ((GstGrallocMemory *) mem)->remote;
 }
 
 GstVideoFormat
