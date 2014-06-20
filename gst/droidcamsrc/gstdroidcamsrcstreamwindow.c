@@ -447,7 +447,10 @@ static void
 
   if (win->pool) {
     /* we will ignore the error here */
-    gst_buffer_pool_set_active (GST_BUFFER_POOL (win->pool), FALSE);
+    if (!gst_buffer_pool_set_active (GST_BUFFER_POOL (win->pool), FALSE)) {
+      GST_WARNING ("Failed to deactivate buffer pool");
+    }
+
     gst_object_unref (win->pool);
   }
 
