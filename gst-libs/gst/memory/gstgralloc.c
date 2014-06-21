@@ -321,6 +321,14 @@ gst_memory_get_native_buffer (GstMemory * mem)
   return &((GstGrallocMemory *) mem)->buff;
 }
 
+GstMemory *
+gst_memory_from_native_buffer (struct ANativeWindowBuffer * buffer)
+{
+  GstGrallocMemory *mem = container_of (buffer, GstGrallocMemory, buff);
+
+  return GST_MEMORY_CAST (mem);
+}
+
 GstVideoFormat
 gst_gralloc_hal_to_gst (int hal)
 {
