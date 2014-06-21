@@ -306,7 +306,6 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
     case PROP_IMAGE_NOISE_REDUCTION:
       src->image_noise_reduction = g_value_get_boolean (value);
       gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
-
       break;
 
     default:
