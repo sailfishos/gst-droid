@@ -824,7 +824,7 @@ gst_droidcamsrc_dev_enable_face_detection (GstDroidCamSrcDev * dev,
 
   gboolean res = FALSE;
 
-  GST_WARNING ("enable face detection %d", enable);
+  GST_LOG ("enable face detection %d", enable);
 
   cmd =
       enable ? CAMERA_CMD_START_FACE_DETECTION : CAMERA_CMD_STOP_FACE_DETECTION;
