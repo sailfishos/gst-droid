@@ -37,6 +37,9 @@ GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
 #define MIN_UNDEQUEUED_BUFFER_COUNT            2
 #define ACQUIRE_BUFFER_TIMEOUT                 10000    /* us */
 
+static GstBuffer *gst_droidcamsrc_stream_window_get_buffer (buffer_handle_t *
+    handle);
+
 static void
     gst_droid_cam_src_stream_window_configure_buffer_pool_locked
     (GstDroidCamSrcStreamWindow * win);
@@ -132,8 +135,6 @@ retry:
 
   GST_LOG ("dequeue buffer done %p", *buffer);
 
-  g_hash_table_insert (win->map, *buffer, buff);
-
   res = 0;
 
 unlock_and_exit:
@@ -158,17 +159,14 @@ gst_droidcamsrc_stream_window_enqueue_buffer (struct preview_stream_ops *w,
   g_mutex_lock (&win->lock);
 
   src = GST_DROIDCAMSRC (GST_PAD_PARENT (win->pad->pad));
-  buff = g_hash_table_lookup (win->map, buffer);
+
+  buff = gst_droidcamsrc_stream_window_get_buffer (buffer);
 
   if (!buff) {
     GST_ERROR ("no buffer corresponding to handle %p", buffer);
     ret = -1;
-    // TODO: an idea would be to keep the old hash values and match buffers against
-    // our pool when we dequeue and enqueue
     goto unlock_and_out;
   }
-
-  g_hash_table_remove (win->map, buffer);
 
   /* if the buffer pool is not our current pool then just release it */
   if (buff->pool != GST_BUFFER_POOL (win->pool)) {
@@ -239,17 +237,13 @@ gst_droidcamsrc_stream_window_cancel_buffer (struct preview_stream_ops *w,
 
   g_mutex_lock (&win->lock);
 
-  buff = g_hash_table_lookup (win->map, buffer);
+  buff = gst_droidcamsrc_stream_window_get_buffer (buffer);
 
   if (!buff) {
     GST_ERROR ("no buffer corresponding to handle %p", buffer);
     ret = -1;
-    // TODO: an idea would be to keep the old hash values and match buffers against
-    // our pool when we dequeue and enqueue
     goto unlock_and_out;
   }
-
-  g_hash_table_remove (win->map, buffer);
 
   /* back to the pool */
   gst_buffer_unref (buff);
@@ -385,7 +379,6 @@ gst_droid_cam_src_stream_window_new (GstDroidCamSrcPad * pad,
   win->allocator = gst_gralloc_allocator_new ();
   win->pool = NULL;
   win->info = info;
-  win->map = g_hash_table_new (g_direct_hash, g_direct_equal);
   g_mutex_init (&win->lock);
 
   win->window.dequeue_buffer = gst_droidcamsrc_stream_window_dequeue_buffer;
@@ -424,9 +417,6 @@ gst_droid_cam_src_stream_window_destroy (GstDroidCamSrcStreamWindow * win)
     gst_object_unref (win->pool);
   }
 
-  g_hash_table_unref (win->map);
-  win->map = NULL;
-
   g_slice_free (GstDroidCamSrcStreamWindow, win);
 }
 
@@ -451,8 +441,6 @@ static void
   }
 
   win->pool = gst_droid_cam_src_buffer_pool_new (win->info);
-
-  g_hash_table_remove_all (win->map);
 
   if (!win->count || !win->width || !win->height || !win->usage || !win->format) {
     GST_ERROR ("incomplete configuration");
@@ -522,8 +510,22 @@ gst_droid_cam_src_stream_window_clear (GstDroidCamSrcStreamWindow * win)
     gst_object_unref (win->pool);
 
     win->pool = NULL;
-    g_hash_table_remove_all (win->map);
   }
 
   g_mutex_unlock (&win->lock);
+}
+
+static GstBuffer *
+gst_droidcamsrc_stream_window_get_buffer (buffer_handle_t * handle)
+{
+  GstMemory *mem;
+  GstBuffer *buff;
+  struct ANativeWindowBuffer *buffer =
+      container_of (handle, struct ANativeWindowBuffer, handle);
+
+  mem = gst_memory_from_native_buffer (buffer);
+  buff = gst_mini_object_get_qdata (GST_MINI_OBJECT (mem),
+      g_quark_from_string (GST_DROIDCAMSRC_BUFFER_POOL_QDATA));
+
+  return buff;
 }

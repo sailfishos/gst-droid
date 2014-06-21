@@ -94,6 +94,9 @@ gst_droidcamsrc_buffer_pool_alloc_buffer (GstBufferPool * bpool,
     GST_ERROR_OBJECT (pool, "failed to add crop meta");
     return GST_FLOW_ERROR;
   }
+  // This is not the most elegant way but I found no way to get the buffer given a memory.
+  gst_mini_object_set_qdata (GST_MINI_OBJECT (mem),
+      g_quark_from_string (GST_DROIDCAMSRC_BUFFER_POOL_QDATA), *buffer, NULL);
 
   return GST_FLOW_OK;
 }

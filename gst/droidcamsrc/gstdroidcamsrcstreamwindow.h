@@ -43,7 +43,6 @@ struct _GstDroidCamSrcStreamWindow
   gboolean needs_reconfigure;
   int top, left, bottom, right;
   GstDroidCamSrcBufferPool *pool;
-  GHashTable *map;
   GMutex lock;
   GstDroidCamSrcPad *pad;
   GstAllocator *allocator;

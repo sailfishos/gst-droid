@@ -41,6 +41,8 @@ G_BEGIN_DECLS
 #define GST_DROIDCAMSRC_BUFFER_POOL_TOP_KEY    "top"
 #define GST_DROIDCAMSRC_BUFFER_POOL_BOTTOM_KEY "bottom"
 
+#define GST_DROIDCAMSRC_BUFFER_POOL_QDATA      "GstDroidCamSrcBufferPoolQDate"
+
 typedef struct _GstDroidCamSrcBufferPool GstDroidCamSrcBufferPool;
 typedef struct _GstDroidCamSrcBufferPoolClass GstDroidCamSrcBufferPoolClass;
 typedef struct _GstDroidCamSrcCamInfo GstDroidCamSrcCamInfo;
