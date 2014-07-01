@@ -428,6 +428,7 @@ static void
   GstCaps *caps;
   GstCapsFeatures *feature;
   GstVideoFormat fmt;
+  const gchar *format;
 
   GST_DEBUG ("stream window configure buffer pool");
 
@@ -458,8 +459,13 @@ static void
     GST_ERROR ("failed to get buffer pool config");
     goto clean_and_out;
   }
-
-  caps = gst_caps_new_simple ("video/x-raw", "format", G_TYPE_STRING, gst_video_format_to_string (fmt), "width", G_TYPE_INT, win->width, "height", G_TYPE_INT, win->height, "framerate", GST_TYPE_FRACTION, 30, 1, NULL);       // TODO: 30 is hardcoded
+  format = gst_video_format_to_string (fmt);
+  /* TODO: 30 is hardcoded */
+  caps = gst_caps_new_simple ("video/x-raw",
+      "format", G_TYPE_STRING, format,
+      "width", G_TYPE_INT, win->width,
+      "height", G_TYPE_INT, win->height,
+      "framerate", GST_TYPE_FRACTION, 30, 1, NULL);
   feature = gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_HANDLE, NULL);
   gst_caps_set_features (caps, 0, feature);
 
