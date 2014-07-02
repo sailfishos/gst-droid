@@ -41,8 +41,7 @@ static GstBuffer *gst_droidcamsrc_stream_window_get_buffer (buffer_handle_t *
     handle);
 
 static void
-    gst_droid_cam_src_stream_window_configure_buffer_pool_locked
-    (GstDroidCamSrcStreamWindow * win);
+gst_droidcamsrc_stream_window_reset_buffer_pool_locked (GstDroidCamSrcStreamWindow * win);
 
 static int
 gst_droidcamsrc_stream_window_dequeue_buffer (struct preview_stream_ops *w,
@@ -68,7 +67,7 @@ retry:
 
   if (!win->pool || (win->pool && win->needs_reconfigure)) {
     /* create and re/configure the pool */
-    gst_droid_cam_src_stream_window_configure_buffer_pool_locked (win);
+    gst_droidcamsrc_stream_window_reset_buffer_pool_locked (win);
   }
 
   if (!win->pool) {
@@ -421,7 +420,7 @@ gst_droid_cam_src_stream_window_destroy (GstDroidCamSrcStreamWindow * win)
 }
 
 static void
-    gst_droid_cam_src_stream_window_configure_buffer_pool_locked
+gst_droidcamsrc_stream_window_reset_buffer_pool_locked
     (GstDroidCamSrcStreamWindow * win)
 {
   GstStructure *config;
