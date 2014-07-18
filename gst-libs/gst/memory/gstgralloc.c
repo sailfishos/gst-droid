@@ -251,8 +251,8 @@ gst_gralloc_allocator_wrap (GstAllocator * allocator, gint width, gint height,
   err =
       alloc->gralloc->lock (alloc->gralloc,
       ((GstGrallocMemory *) mem)->buff.handle,
-      GRALLOC_USAGE_SW_READ_NEVER | GRALLOC_USAGE_SW_WRITE_RARELY, 0, 0, width,
-      height, &addr);
+      GST_GRALLOC_USAGE_SW_READ_NEVER | GST_GRALLOC_USAGE_SW_WRITE_RARELY, 0, 0,
+      width, height, &addr);
   if (err != 0) {
     gst_memory_unref (mem);
     GST_ERROR ("failed to lock the buffer: %d", err);
