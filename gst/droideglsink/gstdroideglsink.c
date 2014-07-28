@@ -416,7 +416,7 @@ gst_droideglsink_get_gralloc_memory (GstDroidEglSink * sink, GstBuffer * buffer)
 }
 
 static GstBuffer *
-gst_droidcamsrc_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
+gst_droideglsink_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
 {
   GstMapInfo info;
   GstVideoInfo format;
@@ -551,7 +551,7 @@ gst_droidcamsrc_acquire_frame (NemoGstVideoTexture * iface)
   } else {
     /* Construct a new buffer */
     sink->acquired_buffer =
-        gst_droidcamsrc_copy_buffer (sink, sink->last_buffer);
+        gst_droideglsink_copy_buffer (sink, sink->last_buffer);
   }
 
   if (!sink->acquired_buffer) {
