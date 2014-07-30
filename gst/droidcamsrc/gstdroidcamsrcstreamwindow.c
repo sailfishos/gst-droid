@@ -468,7 +468,7 @@ gst_droidcamsrc_stream_window_reset_buffer_pool_locked
   feature = gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_HANDLE, NULL);
   gst_caps_set_features (caps, 0, feature);
 
-  gst_buffer_pool_config_set_params (config, caps, -1, win->count, win->count);
+  gst_buffer_pool_config_set_params (config, caps, 0, win->count, win->count);
   gst_buffer_pool_config_set_allocator (config, win->allocator, NULL);
 
   gst_structure_set (config,

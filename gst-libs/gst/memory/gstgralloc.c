@@ -212,7 +212,7 @@ gst_gralloc_allocator_alloc (GstAllocator * allocator, gint width, gint height,
 
   gst_memory_init (GST_MEMORY_CAST (mem),
       GST_MEMORY_FLAG_NO_SHARE | GST_MEMORY_FLAG_NOT_MAPPABLE, allocator, NULL,
-      -1, -1, 0, -1);
+      0, 0, 0, 0);
 
   GST_DEBUG_OBJECT (alloc, "alloc %p", mem);
 
