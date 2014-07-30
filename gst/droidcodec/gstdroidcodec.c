@@ -1218,6 +1218,7 @@ gst_droid_codec_return_output_buffers (GstDroidComponent * comp)
         gst_memory_ref (gralloc);
 
         gst_buffer_insert_memory (buffer, 0, gralloc);
+        GST_BUFFER_FLAG_UNSET (buffer, GST_BUFFER_FLAG_TAG_MEMORY);
       }
 
       omx =
