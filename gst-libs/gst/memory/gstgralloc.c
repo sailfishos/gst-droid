@@ -65,8 +65,6 @@ G_DEFINE_TYPE (GstGrallocAllocator, gralloc_mem_allocator, GST_TYPE_ALLOCATOR);
 
 static gboolean gst_gralloc_mem_is_span (GstMemory * mem1, GstMemory * mem2,
     gsize * offset);
-static GstMemory *gst_gralloc_mem_copy (GstMemory * mem, gssize offset,
-    gssize size);
 static void gst_gralloc_allocator_free (GstAllocator * allocator,
     GstMemory * mem);
 
@@ -114,7 +112,7 @@ gralloc_mem_allocator_init (GstGrallocAllocator * allocator)
 
   alloc->mem_map = NULL;
   alloc->mem_unmap = NULL;
-  alloc->mem_copy = gst_gralloc_mem_copy;
+  alloc->mem_copy = NULL;
   alloc->mem_share = NULL;
   alloc->mem_is_span = gst_gralloc_mem_is_span;
 
@@ -287,15 +285,6 @@ static gboolean
 gst_gralloc_mem_is_span (GstMemory * mem1, GstMemory * mem2, gsize * offset)
 {
   return FALSE;
-}
-
-static GstMemory *
-gst_gralloc_mem_copy (GstMemory * mem, gssize offset, gssize size)
-{
-  /* TODO: bad but playbin needs it
-   * https://bugzilla.gnome.org/show_bug.cgi?id=727409
-   */
-  return gst_memory_ref (mem);
 }
 
 static void
