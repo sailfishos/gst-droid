@@ -381,6 +381,9 @@ gst_droid_cam_src_get_hw (GstDroidCamSrc * src)
     return FALSE;
   }
 
+  GST_INFO_OBJECT (src, "Found camera API version 0x%d",
+      src->hw->common.module_api_version);
+
   if (src->hw->common.module_api_version > CAMERA_MODULE_API_VERSION_1_0) {
     GST_ERROR_OBJECT (src, "unsupported camera API version");
     src->hw = NULL;
