@@ -370,6 +370,7 @@ gst_droid_cam_src_get_hw (GstDroidCamSrc * src)
 {
   int err;
   int num;
+  gboolean front_found, back_found;
 
   GST_DEBUG_OBJECT (src, "get hw");
 
@@ -403,12 +404,22 @@ gst_droid_cam_src_get_hw (GstDroidCamSrc * src)
   }
 
   src->info[0].num = src->info[1].num = -1;
-  if (!gst_droidcamsrc_fill_info (src, &src->info[0], CAMERA_FACING_BACK)) {
+
+  back_found =
+      gst_droidcamsrc_fill_info (src, &src->info[0], CAMERA_FACING_BACK);
+  if (!back_found) {
     GST_WARNING_OBJECT (src, "cannot find back camera");
   }
 
-  if (!gst_droidcamsrc_fill_info (src, &src->info[1], CAMERA_FACING_FRONT)) {
+  front_found =
+      gst_droidcamsrc_fill_info (src, &src->info[1], CAMERA_FACING_FRONT);
+  if (!front_found) {
     GST_WARNING_OBJECT (src, "cannot find front camera");
+  }
+
+  if (!front_found && !back_found) {
+    GST_ERROR_OBJECT (src, "no cameras found");
+    return FALSE;
   }
 
   return TRUE;
