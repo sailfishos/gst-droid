@@ -26,7 +26,7 @@
 #include <gst/gst.h>
 #include "gstdroidcodecallocatorgralloc.h"
 #include "gst/memory/gstgralloc.h"
-#include <android/system/window.h>
+#include <system/window.h>
 
 GST_DEBUG_CATEGORY_STATIC (droid_codec_gralloc_debug);
 #define GST_CAT_DEFAULT droid_codec_gralloc_debug
