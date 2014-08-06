@@ -219,24 +219,17 @@ gst_gralloc_allocator_alloc (GstAllocator * allocator, gint width, gint height,
 
 GstMemory *
 gst_gralloc_allocator_wrap (GstAllocator * allocator, gint width, gint height,
-    int usage, guint8 * data, gsize size, GstVideoFormat format)
+    int usage, guint8 * data, gsize size, int hal_format)
 {
   GstGrallocAllocator *alloc;
   int err;
   void *addr = NULL;
-  int hal_format = 0;
 
   if (!GST_IS_GRALLOC_ALLOCATOR (allocator)) {
     return NULL;
   }
 
   alloc = GST_GRALLOC_ALLOCATOR (allocator);
-
-  hal_format = gst_gralloc_gst_to_hal (format);
-
-  if (hal_format == 0) {
-    return NULL;
-  }
 
   GstMemory *mem = gst_gralloc_allocator_alloc (allocator, width, height,
       hal_format, usage);
@@ -316,27 +309,4 @@ gst_memory_from_native_buffer (struct ANativeWindowBuffer * buffer)
   GstGrallocMemory *mem = container_of (buffer, GstGrallocMemory, buff);
 
   return GST_MEMORY_CAST (mem);
-}
-
-GstVideoFormat
-gst_gralloc_hal_to_gst (int hal)
-{
-  switch (hal) {
-    case HAL_PIXEL_FORMAT_YV12:
-      return GST_VIDEO_FORMAT_YV12;
-    default:
-      return GST_VIDEO_FORMAT_UNKNOWN;
-  }
-}
-
-int
-gst_gralloc_gst_to_hal (GstVideoFormat gst)
-{
-  switch (gst) {
-    case GST_VIDEO_FORMAT_YV12:
-      return HAL_PIXEL_FORMAT_YV12;
-      break;
-    default:
-      return 0;
-  }
 }

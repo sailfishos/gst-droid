@@ -426,8 +426,6 @@ gst_droidcamsrc_stream_window_reset_buffer_pool_locked
   GstStructure *config;
   GstCaps *caps;
   GstCapsFeatures *feature;
-  GstVideoFormat fmt;
-  const gchar *format;
 
   GST_DEBUG ("stream window configure buffer pool");
 
@@ -447,21 +445,15 @@ gst_droidcamsrc_stream_window_reset_buffer_pool_locked
     goto clean_and_out;
   }
 
-  fmt = gst_gralloc_hal_to_gst (win->format);
-  if (fmt == GST_VIDEO_FORMAT_UNKNOWN) {
-    GST_WARNING ("unknown hal format 0x%x. using ENCODED instead", win->format);
-    fmt = GST_VIDEO_FORMAT_ENCODED;
-  }
-
   config = gst_buffer_pool_get_config (GST_BUFFER_POOL (win->pool));
   if (!config) {
     GST_ERROR ("failed to get buffer pool config");
     goto clean_and_out;
   }
-  format = gst_video_format_to_string (fmt);
+
   /* TODO: 30 is hardcoded */
   caps = gst_caps_new_simple ("video/x-raw",
-      "format", G_TYPE_STRING, format,
+      "format", G_TYPE_STRING, "ENCODED",
       "width", G_TYPE_INT, win->width,
       "height", G_TYPE_INT, win->height,
       "framerate", GST_TYPE_FRACTION, 30, 1, NULL);

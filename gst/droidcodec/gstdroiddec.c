@@ -110,7 +110,6 @@ static GstVideoCodecState *
 gst_droiddec_configure_state (GstVideoDecoder * decoder, gsize width,
     gsize height, int hal_fmt)
 {
-  GstVideoFormat fmt;
   GstVideoCodecState *out;
   GstCapsFeatures *feature;
   GstDroidDec *dec = GST_DROIDDEC (decoder);
@@ -118,15 +117,8 @@ gst_droiddec_configure_state (GstVideoDecoder * decoder, gsize width,
   GST_DEBUG_OBJECT (dec, "configure state: width: %d, height: %d, fmt: 0x%x",
       width, height, hal_fmt);
 
-  fmt = gst_gralloc_hal_to_gst (hal_fmt);
-  if (fmt == GST_VIDEO_FORMAT_UNKNOWN) {
-    GST_WARNING_OBJECT (dec, "unknown hal format 0x%x. Using ENCODED instead",
-        hal_fmt);
-    fmt = GST_VIDEO_FORMAT_ENCODED;
-  }
-
   out = gst_video_decoder_set_output_state (GST_VIDEO_DECODER (dec),
-      fmt, width, height, dec->in_state);
+      GST_VIDEO_FORMAT_ENCODED, width, height, dec->in_state);
 
   if (!out->caps) {
     /* we will add our caps */
