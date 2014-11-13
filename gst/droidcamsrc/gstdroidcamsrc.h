@@ -33,6 +33,7 @@
 #endif /* GST_USE_UNSTABLE_API */
 #include <gst/basecamerabinsrc/gstcamerabin-enum.h>
 #include <gst/basecamerabinsrc/gstbasecamerasrc.h>
+#include "droidmediacamera.h"
 
 G_BEGIN_DECLS
 
@@ -91,7 +92,6 @@ struct _GstDroidCamSrc
   GstElement parent;
 
   GstDroidCamSrcQuirks *quirks;
-  camera_module_t *hw;
   GstDroidCamSrcDev *dev;
   GRecMutex dev_lock;
   GstDroidCamSrcCamInfo info[MAX_CAMERAS];

@@ -146,7 +146,6 @@ static void
 gst_droidcamsrc_init (GstDroidCamSrc * src)
 {
   src->quirks = gst_droidcamsrc_quirks_new ();
-  src->hw = NULL;
   g_rec_mutex_init (&src->dev_lock);
   src->dev = NULL;
   src->camera_device = DEFAULT_CAMERA_DEVICE;
@@ -342,11 +341,11 @@ static gboolean
 gst_droidcamsrc_fill_info (GstDroidCamSrc * src, GstDroidCamSrcCamInfo * target,
     int facing)
 {
-  struct camera_info info;
+  DroidMediaCameraInfo info;
   int x;
 
   for (x = 0; x < MAX_CAMERAS; x++) {
-    src->hw->get_camera_info (x, &info);
+    droid_media_camera_get_info (&info, x);
 
     if (info.facing == facing) {
       target->num = x;
@@ -368,31 +367,12 @@ gst_droidcamsrc_fill_info (GstDroidCamSrc * src, GstDroidCamSrcCamInfo * target,
 static gboolean
 gst_droid_cam_src_get_hw (GstDroidCamSrc * src)
 {
-  int err;
   int num;
   gboolean front_found, back_found;
 
   GST_DEBUG_OBJECT (src, "get hw");
 
-  err =
-      hw_get_module (CAMERA_HARDWARE_MODULE_ID,
-      (const struct hw_module_t **) &src->hw);
-  if (err < 0) {
-    GST_ERROR_OBJECT (src, "error 0x%x getting camera hardware module", err);
-    return FALSE;
-  }
-
-  GST_INFO_OBJECT (src, "Found camera API version %d.%d",
-      src->hw->common.module_api_version << 8,
-      src->hw->common.module_api_version & 0xFF);
-
-  if (src->hw->common.module_api_version > CAMERA_MODULE_API_VERSION_1_0) {
-    GST_ERROR_OBJECT (src, "unsupported camera API version");
-    src->hw = NULL;
-    return FALSE;
-  }
-
-  num = src->hw->get_number_of_cameras ();
+  num = droid_media_camera_get_number_of_cameras ();
   if (num < 0) {
     GST_ERROR_OBJECT (src, "no camera hardware found");
     return FALSE;
@@ -462,7 +442,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       }
 
       src->dev =
-          gst_droidcamsrc_dev_new (src->hw, src->vfsrc, src->imgsrc,
+          gst_droidcamsrc_dev_new (src->vfsrc, src->imgsrc,
           src->vidsrc, &src->dev_lock);
 
       break;
@@ -546,7 +526,6 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
     case GST_STATE_CHANGE_READY_TO_NULL:
       gst_droidcamsrc_dev_destroy (src->dev);
       src->dev = NULL;
-      src->hw = NULL;
       break;
 
     default:

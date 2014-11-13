@@ -9,6 +9,7 @@ libgstdroid_la_CFLAGS = $(GST_CFLAGS) $(NGI_CFLAGS) $(EGL_CFLAGS) \
 	                -I$(top_builddir)/gst-libs/ \
                         -I$(top_builddir)/inc/hybris/ \
                         -I$(top_builddir)/inc/omx/ \
+                        -I$(top_builddir)/inc/ \
                         -Idroidcamsrc/ \
                         -Idroideglsink/ \
                         -Idroidcodec/

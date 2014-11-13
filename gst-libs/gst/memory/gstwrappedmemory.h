@@ -33,10 +33,11 @@ G_BEGIN_DECLS
 GstAllocator * gst_wrapped_memory_allocator_new (void);
 
 gboolean       gst_is_wrapped_memory_memory (GstMemory * mem);
-
 GstMemory    * gst_wrapped_memory_allocator_wrap (GstAllocator * allocator,
-						  void *data, gsize size,
-						  GFunc cb, gpointer user_data);
+						  void *data, GFunc cb, gpointer user_data);
+GstMemory    * gst_wrapped_memory_allocator_memory_new (GstAllocator * allocator);
+void           gst_wrapped_memory_allocator_memory_set_data(GstMemory *mem, gpointer data,
+							    GFunc cb, gpointer user_data);
 
 G_END_DECLS
 

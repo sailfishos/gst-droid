@@ -24,9 +24,8 @@
 
 #include <gst/gst.h>
 #include <hardware/camera.h>
-#include "gstdroidcamsrcbufferpool.h"
 #include "gstdroidcamsrcparams.h"
-#include "gstdroidcamsrcstreamwindow.h"
+#include "droidmediacamera.h"
 
 G_BEGIN_DECLS
 
@@ -34,26 +33,25 @@ typedef struct _GstDroidCamSrcDev GstDroidCamSrcDev;
 typedef struct _GstDroidCamSrcImageCaptureState GstDroidCamSrcImageCaptureState;
 typedef struct _GstDroidCamSrcVideoCaptureState GstDroidCamSrcVideoCaptureState;
 typedef struct _GstDroidCamSrcCamInfo GstDroidCamSrcCamInfo;
+typedef struct _GstDroidCamSrcPad GstDroidCamSrcPad;
 
 struct _GstDroidCamSrcDev
 {
-  camera_module_t *hw;
-  camera_device_t *dev;
+  DroidMediaCamera *cam;
   GstDroidCamSrcParams *params;
-  GstDroidCamSrcStreamWindow *win;
   GstDroidCamSrcPad *vfsrc;
   GstDroidCamSrcPad *imgsrc;
   GstDroidCamSrcPad *vidsrc;
   GstAllocator *allocator;
   gboolean running;
   GRecMutex *lock;
-
+  DroidMediaCameraCallbacks *cb;
   GstDroidCamSrcCamInfo *info;
   GstDroidCamSrcImageCaptureState *img;
   GstDroidCamSrcVideoCaptureState *vid;
 };
 
-GstDroidCamSrcDev *gst_droidcamsrc_dev_new (camera_module_t *hw, GstDroidCamSrcPad *vfsrc,
+GstDroidCamSrcDev *gst_droidcamsrc_dev_new (GstDroidCamSrcPad *vfsrc,
 					    GstDroidCamSrcPad *imgsrc,
 					    GstDroidCamSrcPad *vidsrc, GRecMutex * lock);
 void gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev);

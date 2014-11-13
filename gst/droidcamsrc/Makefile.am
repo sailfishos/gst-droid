@@ -16,21 +16,16 @@ libgstdroidcamsrc_la_LIBADD = $(GST_LIBS) $(NGI_LIBS) $(EGL_LIBS) \
 libgstdroidcamsrc_la_SOURCES = \
 	gstdroidcamsrc.c \
 	gstdroidcamsrcdev.c \
-	gstdroidcamsrcdevmemory.c \
-	gstdroidcamsrcbufferpool.c \
-	gstdroidcamsrcstreamwindow.c \
 	gstdroidcamsrcparams.c \
 	gstdroidcamsrcenums.c \
 	gstdroidcamsrcphotography.c \
 	gstdroidcamsrcquirks.c \
-	gstdroidcamsrcexif.c
+	gstdroidcamsrcexif.c \
+        hybris.c
 
 noinst_HEADERS = \
 	gstdroidcamsrc.h \
 	gstdroidcamsrcdev.h \
-	gstdroidcamsrcdevmemory.h \
-	gstdroidcamsrcbufferpool.h \
-	gstdroidcamsrcstreamwindow.h \
 	gstdroidcamsrcparams.h \
 	gstdroidcamsrcenums.h \
 	gstdroidcamsrcphotography.h \
