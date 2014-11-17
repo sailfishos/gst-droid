@@ -507,8 +507,8 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
   dev->info = NULL;
   gst_object_unref (dev->allocator);
   dev->allocator = NULL;
-  // TODO:
-  g_mutex_init (&dev->vid->lock);
+
+  g_mutex_clear (&dev->vid->lock);
 
   g_slice_free (DroidMediaCameraCallbacks, dev->cb);
   g_slice_free (GstDroidCamSrcImageCaptureState, dev->img);
