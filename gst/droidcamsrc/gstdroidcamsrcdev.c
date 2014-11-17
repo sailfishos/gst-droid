@@ -363,6 +363,8 @@ gst_droidcamsrc_dev_frame_available(void *user)
   DroidMediaBuffer *buffer;
   DroidMediaBufferCallbacks cb;
   GstMemory *mem;
+  GstVideoCropMeta *crop_meta;
+  DroidMediaRect rect;
 
   GST_DEBUG_OBJECT (src, "frame available");
 
@@ -392,6 +394,20 @@ gst_droidcamsrc_dev_frame_available(void *user)
   gst_buffer_insert_memory (buff, 0, mem);
   gst_droidcamsrc_timestamp (src, buff);
 
+  rect = droid_media_buffer_get_crop_rect (buffer);
+  crop_meta = gst_buffer_add_video_crop_meta (buff);
+  crop_meta->x = rect.right;
+  crop_meta->y = rect.top;
+  crop_meta->width = rect.right - rect.left;
+  crop_meta->height = rect.bottom - rect.top;
+
+  gst_buffer_add_gst_buffer_orientation_meta (buff,
+      dev->info->orientation, dev->info->direction);
+
+  gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE, GST_VIDEO_FORMAT_ENCODED,
+			     droid_media_buffer_get_width(buffer),
+			     droid_media_buffer_get_height(buffer));
+
   g_mutex_lock (&pad->queue_lock);
 
   g_queue_push_tail (pad->queue, buff);
@@ -399,8 +415,6 @@ gst_droidcamsrc_dev_frame_available(void *user)
   g_cond_signal (&pad->cond);
 
   g_mutex_unlock (&pad->queue_lock);
-
-  // TODO:
 }
 
 GstDroidCamSrcDev *
