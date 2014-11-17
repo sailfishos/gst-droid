@@ -643,7 +643,8 @@ gboolean
 gst_droidcamsrc_dev_capture_image (GstDroidCamSrcDev * dev)
 {
   gboolean ret = FALSE;
-  int msg_type = CAMERA_MSG_ALL_MSGS & ~CAMERA_MSG_PREVIEW_FRAME;
+  int msg_type = CAMERA_MSG_SHUTTER | CAMERA_MSG_RAW_IMAGE
+    | CAMERA_MSG_POSTVIEW_FRAME | CAMERA_MSG_COMPRESSED_IMAGE;
 
   GST_DEBUG ("dev capture image");
 
