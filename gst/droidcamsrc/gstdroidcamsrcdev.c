@@ -786,8 +786,12 @@ static void
 gst_droidcamsrc_dev_release_preview_frame (DroidMediaBuffer *buffer,
     GstDroidCamSrcDev *dev)
 {
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+
+  GST_DEBUG_OBJECT (src, "release preview frame");
+
   // TODO:
-  droid_media_camera_release_buffer (dev->cam, buffer, NULL, NULL);
+  droid_media_buffer_release (buffer, NULL, NULL);
 }
 
 void
