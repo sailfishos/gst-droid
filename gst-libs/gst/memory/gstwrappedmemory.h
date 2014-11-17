@@ -38,6 +38,7 @@ GstMemory    * gst_wrapped_memory_allocator_wrap (GstAllocator * allocator,
 GstMemory    * gst_wrapped_memory_allocator_memory_new (GstAllocator * allocator);
 void           gst_wrapped_memory_allocator_memory_set_data(GstMemory *mem, gpointer data,
 							    GFunc cb, gpointer user_data);
+void         * gst_wrapped_memory_get_data (GstMemory * mem);
 
 G_END_DECLS
 

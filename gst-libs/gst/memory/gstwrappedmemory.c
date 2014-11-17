@@ -154,10 +154,26 @@ gst_wrapped_memory_allocator_memory_new (GstAllocator * allocator)
 void
 gst_wrapped_memory_allocator_memory_set_data(GstMemory *mem, gpointer data, GFunc cb, gpointer user_data)
 {
-  GstWrappedMemory *m = (GstWrappedMemory *)mem;
+  GstWrappedMemory *m;
+
+  if (!gst_is_wrapped_memory_memory (mem)) {
+    return;
+  }
+
+  m = (GstWrappedMemory *)mem;
+
   m->cb = cb;
   m->data = data;
   m->user_data = user_data;
+}
+
+void *gst_wrapped_memory_get_data (GstMemory * mem)
+{
+  if (!gst_is_wrapped_memory_memory (mem)) {
+    return NULL;
+  }
+
+  return ((GstWrappedMemory *)mem)->data;
 }
 
 gboolean
