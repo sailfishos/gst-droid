@@ -396,7 +396,7 @@ gst_droidcamsrc_dev_frame_available(void *user)
 
   rect = droid_media_buffer_get_crop_rect (buffer);
   crop_meta = gst_buffer_add_video_crop_meta (buff);
-  crop_meta->x = rect.right;
+  crop_meta->x = rect.left;
   crop_meta->y = rect.top;
   crop_meta->width = rect.right - rect.left;
   crop_meta->height = rect.bottom - rect.top;
