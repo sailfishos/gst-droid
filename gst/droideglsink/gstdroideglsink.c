@@ -27,6 +27,7 @@
 #include <gst/video/video.h>
 #include <gst/interfaces/nemovideotexture.h>
 #include "gst/memory/gstgralloc.h"
+#include "gst/memory/gstwrappedmemory.h"
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_eglsink_debug);
 #define GST_CAT_DEFAULT gst_droid_eglsink_debug
@@ -407,7 +408,7 @@ gst_droideglsink_get_gralloc_memory (GstDroidEglSink * sink, GstBuffer * buffer)
   for (x = 0; x < num; x++) {
     GstMemory *mem = gst_buffer_peek_memory (buffer, x);
 
-    if (mem && gst_memory_is_type (mem, GST_ALLOCATOR_GRALLOC)) {
+    if (mem && gst_memory_is_type (mem, GST_ALLOCATOR_WRAPPED_MEMORY)) {
       return mem;
     }
   }
@@ -604,7 +605,7 @@ gst_droidcamsrc_bind_frame (NemoGstVideoTexture * iface, EGLImageKHR * image)
   sink->image =
       sink->eglCreateImageKHR (sink->dpy, EGL_NO_CONTEXT,
       EGL_NATIVE_BUFFER_ANDROID,
-      (EGLClientBuffer) gst_memory_get_native_buffer (mem), eglImgAttrs);
+      (EGLClientBuffer) gst_wrapped_memory_get_data (mem), eglImgAttrs);
 
   /* Buffer will not go anywhere so we should be safe to unlock. */
   g_mutex_unlock (&sink->lock);
