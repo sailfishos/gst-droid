@@ -334,6 +334,7 @@ gst_droidcamsrc_dev_data_timestamp_callback (void *user,
   g_rec_mutex_unlock (dev->lock);
 
   if (drop_buffer) {
+    GST_INFO_OBJECT (src, "dropping buffer because video recording is not running");
     gst_buffer_unref (buffer);
   } else {
     g_mutex_lock (&dev->vidsrc->queue_lock);
