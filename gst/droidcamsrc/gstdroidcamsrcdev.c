@@ -272,6 +272,10 @@ gst_droidcamsrc_dev_data_callback (void *user, int32_t msg_type, DroidMediaData 
     }
       break;
 #endif
+    case CAMERA_MSG_PREVIEW_FRAME:
+      GST_LOG_OBJECT (src, "dropping preview frame message");
+      break;
+
     default:
       GST_WARNING_OBJECT (src, "unknown message type 0x%x", msg_type);
   }
