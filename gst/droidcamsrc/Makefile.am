@@ -20,8 +20,7 @@ libgstdroidcamsrc_la_SOURCES = \
 	gstdroidcamsrcenums.c \
 	gstdroidcamsrcphotography.c \
 	gstdroidcamsrcquirks.c \
-	gstdroidcamsrcexif.c \
-        hybris.c
+	gstdroidcamsrcexif.c
 
 noinst_HEADERS = \
 	gstdroidcamsrc.h \
