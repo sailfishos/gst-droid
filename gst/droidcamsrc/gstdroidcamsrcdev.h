@@ -45,7 +45,6 @@ struct _GstDroidCamSrcDev
   GstAllocator *allocator;
   gboolean running;
   GRecMutex *lock;
-  DroidMediaCameraCallbacks *cb;
   GstDroidCamSrcCamInfo *info;
   GstDroidCamSrcImageCaptureState *img;
   GstDroidCamSrcVideoCaptureState *vid;

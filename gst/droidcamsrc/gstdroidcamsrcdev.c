@@ -442,7 +442,6 @@ gst_droidcamsrc_dev_new (GstDroidCamSrcPad * vfsrc,
   dev->info = NULL;
   dev->img = g_slice_new0 (GstDroidCamSrcImageCaptureState);
   dev->vid = g_slice_new0 (GstDroidCamSrcVideoCaptureState);
-  dev->cb = g_slice_new0 (DroidMediaCameraCallbacks);
 
   g_mutex_init (&dev->vid->lock);
 
@@ -524,7 +523,6 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
 
   g_mutex_clear (&dev->vid->lock);
 
-  g_slice_free (DroidMediaCameraCallbacks, dev->cb);
   g_slice_free (GstDroidCamSrcImageCaptureState, dev->img);
   g_slice_free (GstDroidCamSrcVideoCaptureState, dev->vid);
   g_slice_free (GstDroidCamSrcDev, dev);
@@ -538,13 +536,22 @@ gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
 
   g_rec_mutex_lock (dev->lock);
 
-  dev->cb->notify = gst_droidcamsrc_dev_notify_callback;
-  dev->cb->post_data_timestamp = gst_droidcamsrc_dev_data_timestamp_callback;
-  dev->cb->post_data = gst_droidcamsrc_dev_data_callback;
-  dev->cb->buffers_released = gst_droidcamsrc_dev_buffers_released;
-  dev->cb->frame_available = gst_droidcamsrc_dev_frame_available;
+  {
+    DroidMediaCameraCallbacks cb;
 
-  droid_media_camera_set_callbacks (dev->cam, dev->cb, dev);
+    cb.notify = gst_droidcamsrc_dev_notify_callback;
+    cb.post_data_timestamp = gst_droidcamsrc_dev_data_timestamp_callback;
+    cb.post_data = gst_droidcamsrc_dev_data_callback;
+    droid_media_camera_set_callbacks (dev->cam, &cb, dev);
+  }
+
+  {
+    DroidMediaRenderingCallbacks cb;
+    cb.buffers_released = gst_droidcamsrc_dev_buffers_released;
+    cb.frame_available = gst_droidcamsrc_dev_frame_available;
+    droid_media_camera_set_rendering_callbacks (dev->cam, &cb, dev);
+  }
+
   gst_droidcamsrc_dev_update_params_locked (dev);
 
   g_rec_mutex_unlock (dev->lock);
