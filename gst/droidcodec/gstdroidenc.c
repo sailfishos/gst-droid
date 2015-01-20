@@ -49,6 +49,140 @@ enum
   PROP_TARGET_BITRATE,
 };
 
+#define GST_DROID_ENC_TARGET_BITRATE_DEFAULT 192000
+
+static void
+gst_droidenc_signal_eos (GstDroidEnc * enc)
+{
+  GST_DEBUG_OBJECT (enc, "codec signaled EOS");
+
+  // TODO:
+}
+
+static void
+gst_droidenc_error (GstDroidEnc * enc, int err)
+{
+  GST_DEBUG_OBJECT (enc, "codec error");
+
+  GST_ELEMENT_ERROR (enc, LIBRARY, FAILED, NULL, ("error 0x%x from android codec", -err));
+
+  // TODO:
+}
+
+static void
+gst_droidenc_buffers_released(void *user)
+{
+  /* TODO: Not sure what to do here really */
+  // TODO: remove this unused function
+}
+
+static void
+gst_droidenc_data_available(GstDroidEnc *enc, DroidMediaCodecData *data)
+{
+  GstVideoCodecFrame *frame;
+
+  GST_DEBUG_OBJECT (enc, "data available");
+
+  if (data->codec_config) {
+    GstBuffer *codec_data =
+      gst_buffer_new_allocate (NULL, data->size, NULL);
+    GST_INFO_OBJECT (enc, "received codec_data");
+    gst_buffer_fill (codec_data, 0, data->data, data->size);
+
+    GST_BUFFER_OFFSET (codec_data) = 0;
+    GST_BUFFER_OFFSET_END (codec_data) = 0;
+    GST_BUFFER_TIMESTAMP (codec_data) = GST_CLOCK_TIME_NONE;
+    GST_BUFFER_DURATION (codec_data) = GST_CLOCK_TIME_NONE;
+    GST_BUFFER_FLAG_SET (codec_data, GST_BUFFER_FLAG_HEADER);
+
+    if (enc->in_stream_headers) {
+      GstVideoEncoder *encoder = GST_VIDEO_ENCODER (enc);
+      GList *headers = NULL;
+      headers = g_list_append (headers, codec_data);
+      gst_video_encoder_set_headers (encoder, headers);
+    } else {
+      gst_buffer_replace (&enc->out_state->codec_data, codec_data);
+    }
+
+    return;
+  }
+
+  frame = gst_video_encoder_get_oldest_frame (GST_VIDEO_ENCODER (enc));
+  if (!frame) {
+    // TODO:
+    GST_WARNING_OBJECT (enc, "buffer without frame");
+    return;
+  }
+  // TODO:
+  //  frame->pts = data->ts;
+
+  frame->output_buffer = gst_video_encoder_allocate_output_buffer (GST_VIDEO_ENCODER (enc),
+								   data->size);
+  gst_buffer_fill (frame->output_buffer, 0, data->data, data->size);
+
+  GST_BUFFER_TIMESTAMP (frame->output_buffer) = data->ts;
+
+  if (data->sync) {
+    GST_VIDEO_CODEC_FRAME_SET_SYNC_POINT(frame);
+  }
+
+  gst_video_encoder_finish_frame (GST_VIDEO_ENCODER (enc), frame);
+
+#if 0
+  GstDroidDec *dec = (GstDroidDec *) user;
+  DroidMediaBuffer *buffer;
+  DroidMediaBufferCallbacks cb;
+  GstMemory *mem;
+  guint width, height;
+
+  
+
+  GST_DEBUG_OBJECT (dec, "frame available");
+
+  mem = gst_wrapped_memory_allocator_memory_new (dec->allocator);
+
+  cb.ref = (void (*)(void *))gst_memory_ref;
+  cb.unref = (void (*)(void *))gst_memory_unref;
+  cb.data = mem;
+
+  buffer = droid_media_codec_acquire_buffer(dec->codec, &cb);
+  if (!buffer) {
+    GST_ERROR_OBJECT (dec, "failed to acquire buffer from droidmedia");
+    gst_memory_unref (mem);
+    return;
+  }
+
+  gst_wrapped_memory_allocator_memory_set_data (mem, buffer,
+	(GFunc)gst_droiddec_release_frame, NULL);
+
+  GstBuffer *buff = gst_buffer_new ();
+
+  gst_buffer_insert_memory (buff, 0, mem);
+
+  width = droid_media_buffer_get_width(buffer);
+  height = droid_media_buffer_get_height(buffer);
+
+  gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE, GST_VIDEO_FORMAT_ENCODED,
+			     width, height);
+
+  frame = gst_video_decoder_get_oldest_frame (GST_VIDEO_DECODER (dec));
+
+  if (!frame) {
+    // TODO:
+    GST_WARNING_OBJECT (dec, "buffer without frame");
+    gst_buffer_unref (buff);
+    return;
+  }
+
+  frame->output_buffer = buff;
+
+  /* We get the timestamp in ns already */
+  frame->pts = droid_media_buffer_get_timestamp (buffer);
+
+  gst_video_decoder_finish_frame (GST_VIDEO_DECODER (dec), frame);
+#endif
+}
+
 static gboolean
 gst_droidenc_do_handle_frame (GstVideoEncoder * encoder,
     GstVideoCodecFrame * frame)
@@ -57,6 +191,26 @@ gst_droidenc_do_handle_frame (GstVideoEncoder * encoder,
   GstDroidEnc *enc = GST_DROIDENC (encoder);
 
   GST_DEBUG_OBJECT (enc, "do handle frame");
+
+  /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
+   * cannot write the input buffer. We end up waiting for the write operation
+   * which does not happen because stagefright needs us to provide
+   * output buffers to be filled (which can not happen because _loop() tries
+   * to call get_oldest_frame() which acquires the stream lock the base class
+   * is holding before calling us
+   */
+  // TODO: Check that we are still in a sane state
+
+  GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
+  if (!gst_droid_codec_consume_frame (enc->codec, frame, frame->pts)) {
+    ret = FALSE;
+    goto out;
+  }
+
+  ret = TRUE;
+
+#if 0
+
 
   /* This can deadlock if omx does not provide an input buffer and we end up
    * waiting for a buffer which does not happen because omx needs us to provide
@@ -76,10 +230,17 @@ out:
   GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
 
   GST_DEBUG_OBJECT (enc, "do handle frame done %d", ret);
+#endif
+
+out:
+  GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
+
+  GST_DEBUG_OBJECT (enc, "do handle frame done %d", ret);
 
   return ret;
 }
 
+#if 0
 static void
 gst_droidenc_stop_loop (GstVideoEncoder * encoder)
 {
@@ -124,6 +285,7 @@ gst_droidenc_stop_loop (GstVideoEncoder * encoder)
 
   GST_DEBUG_OBJECT (enc, "stopped loop");
 }
+#endif
 
 static GstVideoCodecState *
 gst_droidenc_configure_state (GstVideoEncoder * encoder,
@@ -151,6 +313,7 @@ gst_droidenc_configure_state (GstVideoEncoder * encoder,
   return out;
 }
 
+#if 0
 static void
 gst_droidenc_loop (GstDroidEnc * enc)
 {
@@ -284,6 +447,7 @@ gst_droidenc_loop (GstDroidEnc * enc)
     return;
   }
 }
+#endif
 
 static void
 gst_droidenc_set_property (GObject * object, guint prop_id,
@@ -293,7 +457,7 @@ gst_droidenc_set_property (GObject * object, guint prop_id,
 
   switch (prop_id) {
     case PROP_TARGET_BITRATE:
-      enc->target_bitrate = g_value_get_uint (value);
+      enc->target_bitrate = g_value_get_int (value);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -309,7 +473,7 @@ gst_droidenc_get_property (GObject * object, guint prop_id, GValue * value,
 
   switch (prop_id) {
     case PROP_TARGET_BITRATE:
-      g_value_set_uint (value, enc->target_bitrate);
+      g_value_set_int (value, enc->target_bitrate);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -372,7 +536,7 @@ gst_droidenc_stop (GstVideoEncoder * encoder)
   GST_DEBUG_OBJECT (enc, "stop");
 
   GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
-  gst_droidenc_stop_loop (encoder);
+  //  gst_droidenc_stop_loop (encoder);
   GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
 
   if (enc->in_state) {
@@ -384,12 +548,13 @@ gst_droidenc_stop (GstVideoEncoder * encoder)
     gst_video_codec_state_unref (enc->out_state);
     enc->out_state = NULL;
   }
-
+#if 0
   if (enc->comp) {
     gst_droid_codec_stop_component (enc->comp);
     gst_droid_codec_destroy_component (enc->comp);
     enc->comp = NULL;
   }
+#endif
 
   GST_DEBUG_OBJECT (enc, "stopped");
 
@@ -405,7 +570,8 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
 
   GST_DEBUG_OBJECT (enc, "set format %" GST_PTR_FORMAT, state->caps);
 
-  if (enc->comp) {
+  if (enc->codec) {
+    /* TODO */
     GST_ERROR_OBJECT (enc, "cannot renegotiate");
     return FALSE;
   }
@@ -425,6 +591,7 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
 
   if (!type) {
     GST_DEBUG_OBJECT (enc, "failed to get any encoder");
+    /* TODO: in_state */
     gst_caps_unref (caps);
     return FALSE;
   }
@@ -432,10 +599,15 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
   if (!gst_droid_codec_type_in_stream_headers (type, &enc->in_stream_headers)) {
     GST_ERROR_OBJECT (enc,
         "cannot determine header requirements for encoder %s", type);
+    /* TODO: in_state */
     gst_caps_unref (caps);
     return FALSE;
   }
 
+  enc->out_state =
+      gst_droidenc_configure_state (encoder, &state->info, caps, type);
+
+#if 0
   enc->comp =
       gst_droid_codec_get_component (enc->codec, type, GST_ELEMENT (enc));
   if (!enc->comp) {
@@ -456,9 +628,6 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
     return FALSE;
   }
 
-  enc->out_state =
-      gst_droidenc_configure_state (encoder, &state->info, caps, type);
-
   /* now start */
   if (!gst_droid_codec_start_component (enc->comp, enc->in_state->caps,
           enc->out_state->caps)) {
@@ -472,6 +641,49 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
     return FALSE;
   }
 
+#endif
+
+  DroidMediaCodecEncoderMetaData md;
+  md.parent.type = "video/mp4v-es"; // TODO: type;
+  md.parent.width = state->info.width;
+  md.parent.height = state->info.height;
+  md.parent.fps = state->info.fps_n / state->info.fps_d; // TODO: bad
+  md.parent.flags = DROID_MEDIA_CODEC_HW_ONLY;
+  md.bitrate = enc->target_bitrate;
+  md.stride = state->info.width;
+  md.slice_height = state->info.height;
+
+  /* TODO: get this from caps */
+  md.meta_data = true;
+
+  enc->codec = droid_media_codec_create_encoder (&md);
+
+  if (!enc->codec) {
+    GST_ELEMENT_ERROR(enc, LIBRARY, SETTINGS, NULL, ("Failed to create encoder"));
+    return FALSE;
+  }
+
+  {
+    DroidMediaCodecCallbacks cb;
+    cb.signal_eos = gst_droidenc_signal_eos;
+    cb.error = gst_droidenc_error;
+    droid_media_codec_set_callbacks (enc->codec, &cb, enc);
+  }
+
+
+  {
+    DroidMediaCodecDataCallbacks cb;
+    cb.data_available = gst_droidenc_data_available;
+    droid_media_codec_set_data_callbacks (enc->codec, &cb, enc);
+  }
+
+  if (!droid_media_codec_start (enc->codec)) {
+    // TODO: error
+    droid_media_codec_destroy (enc->codec);
+    enc->codec = NULL;
+    return FALSE;
+  }
+
   return TRUE;
 }
 
@@ -482,7 +694,7 @@ gst_droidenc_finish (GstVideoEncoder * encoder)
 
   GST_DEBUG_OBJECT (enc, "finish");
 
-  gst_droidenc_stop_loop (encoder);
+  //  gst_droidenc_stop_loop (encoder);
 
   return GST_FLOW_OK;
 }
@@ -496,10 +708,12 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
 
   GST_DEBUG_OBJECT (enc, "handle frame");
 
-  if (!enc->comp) {
+  if (!enc->codec) {
     GST_ERROR_OBJECT (enc, "component not initialized");
     goto out;
   }
+
+#if 0
 
   if (gst_droid_codec_has_error (enc->comp)) {
     GST_ERROR_OBJECT (enc, "not handling frame while omx is in error state");
@@ -524,13 +738,16 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
     }
   }
 
-  if (gst_droidenc_do_handle_frame (encoder, frame)) {
-    ret = GST_FLOW_OK;
+  if (!gst_droid_codec_is_running (enc->comp)) {
+    ret = GST_FLOW_FLUSHING;
     goto out;
   }
 
-  if (!gst_droid_codec_is_running (enc->comp)) {
-    ret = GST_FLOW_FLUSHING;
+
+#endif
+
+  if (gst_droidenc_do_handle_frame (encoder, frame)) {
+    ret = GST_FLOW_OK;
     goto out;
   }
 
@@ -550,6 +767,7 @@ gst_droidenc_flush (GstVideoEncoder * encoder)
 
   GST_DEBUG_OBJECT (enc, "flush");
 
+#if 0
   if (!enc->comp) {
     GST_DEBUG_OBJECT (enc, "no component to flush");
     return TRUE;
@@ -561,6 +779,7 @@ gst_droidenc_flush (GstVideoEncoder * encoder)
   if (!gst_droid_codec_flush (enc->comp, TRUE)) {
     return FALSE;
   }
+#endif
 
   GST_DEBUG_OBJECT (enc, "Flushed");
 
@@ -571,7 +790,12 @@ static void
 gst_droidenc_init (GstDroidEnc * enc)
 {
   enc->codec = gst_droid_codec_get ();
+  enc->codec = NULL;
+
+#if 0
   enc->comp = NULL;
+#endif
+
   enc->in_state = NULL;
   enc->out_state = NULL;
   enc->target_bitrate = GST_DROID_ENC_TARGET_BITRATE_DEFAULT;
@@ -593,7 +817,7 @@ gst_droidenc_change_state (GstElement * element, GstStateChange transition)
 
   if (transition == GST_STATE_CHANGE_PAUSED_TO_READY) {
     GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
-    gst_droidenc_stop_loop (encoder);
+    //    gst_droidenc_stop_loop (encoder);
     GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
   }
 
@@ -678,8 +902,8 @@ gst_droidenc_class_init (GstDroidEncClass * klass)
   gstvideoencoder_class->flush = GST_DEBUG_FUNCPTR (gst_droidenc_flush);
 
   g_object_class_install_property (gobject_class, PROP_TARGET_BITRATE,
-      g_param_spec_uint ("target-bitrate", "Target Bitrate",
-          "Target bitrate (0xffffffff=component default)", 0, G_MAXUINT,
+      g_param_spec_int ("target-bitrate", "Target Bitrate",
+          "Target bitrate", 0, G_MAXINT,
           GST_DROID_ENC_TARGET_BITRATE_DEFAULT,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 }

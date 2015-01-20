@@ -36,11 +36,11 @@ G_BEGIN_DECLS
 typedef enum {
   GST_DROID_CODEC_DECODER,
   GST_DROID_CODEC_ENCODER,
-} GstDroidCodecTypeType;
+} GstDroidCodecCodecType;
 
-const gchar *gst_droid_codec_type_from_caps (GstCaps * caps, GstDroidCodecTypeType type);
-GstCaps *gst_droid_codec_type_all_caps (GstDroidCodecTypeType type);
-GstDroidCodecTypeType gst_droid_codec_type_get_type (const gchar *type);
+const gchar *gst_droid_codec_type_from_caps (GstCaps * caps, GstDroidCodecCodecType type);
+GstCaps *gst_droid_codec_type_all_caps (GstDroidCodecCodecType type);
+GstDroidCodecCodecType gst_droid_codec_type_get_type (const gchar *type);
 gchar *gst_droid_codec_type_get_path (const gchar *type);
 void gst_droid_codec_type_compliment_caps (const gchar * type, GstCaps * caps);
 gboolean gst_droid_codec_type_in_stream_headers (const gchar * type, gboolean * result);

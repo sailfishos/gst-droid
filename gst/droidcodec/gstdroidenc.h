@@ -45,12 +45,15 @@ typedef struct _GstDroidEncClass GstDroidEncClass;
 struct _GstDroidEnc
 {
   GstVideoEncoder parent;
+  DroidMediaCodec *codec;
+#if 0
   GstDroidCodec *codec;
   GstDroidComponent *comp;
+#endif
   GstVideoCodecState *in_state;
   GstVideoCodecState *out_state;
   gboolean first_frame_sent;
-  guint32 target_bitrate;
+  gint32 target_bitrate;
   gboolean in_stream_headers;
 };
 

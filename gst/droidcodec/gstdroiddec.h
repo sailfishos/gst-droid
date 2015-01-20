@@ -45,8 +45,16 @@ typedef struct _GstDroidDecClass GstDroidDecClass;
 struct _GstDroidDec
 {
   GstVideoDecoder parent;
+  DroidMediaCodec *codec;
+  GstAllocator *allocator;
+  gboolean eos;
+  GMutex eos_lock;
+  GCond eos_cond;
+
+#if 0
   GstDroidCodec *codec;
   GstDroidComponent *comp;
+#endif
   GstVideoCodecState *in_state;
   GstVideoCodecState *out_state;
 };

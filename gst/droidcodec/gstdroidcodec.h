@@ -24,13 +24,12 @@
 
 #include <gst/gst.h>
 #include <gst/video/video.h>
+#include "droidmediacodec.h"
 
 #include <OMX_Core.h>
 #include <OMX_Component.h>
 
 G_BEGIN_DECLS
-
-#define GST_DROID_ENC_TARGET_BITRATE_DEFAULT (0xffffffff)
 
 #define GST_TYPE_DROID_CODEC (gst_droid_codec_get_type())
 
@@ -105,7 +104,7 @@ gboolean gst_droid_codec_configure_component (GstDroidComponent *comp,
 gboolean gst_droid_codec_start_component (GstDroidComponent * comp, GstCaps * sink, GstCaps * src);
 void gst_droid_codec_stop_component (GstDroidComponent * comp);
 gboolean gst_droid_codec_set_codec_data (GstDroidComponent * comp, GstBuffer * codec_data);
-gboolean gst_droid_codec_consume_frame (GstDroidComponent * comp, GstVideoCodecFrame * frame);
+gboolean gst_droid_codec_consume_frame (DroidMediaCodec * codec, GstVideoCodecFrame * frame, GstClockTime ts);
 GstBuffer *gst_omx_buffer_get_buffer (GstDroidComponent * comp, OMX_BUFFERHEADERTYPE * buff);
 
 gboolean gst_droid_codec_return_output_buffers (GstDroidComponent * comp);

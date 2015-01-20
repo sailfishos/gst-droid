@@ -25,7 +25,7 @@
 typedef struct _GstDroidCodecType GstDroidCodecType;
 
 static gboolean
-mpeg4v (GstStructure * s)
+is_mpeg4v (GstStructure * s)
 {
   gint val;
 
@@ -33,11 +33,12 @@ mpeg4v (GstStructure * s)
 }
 
 static gboolean
-h264 (GstStructure * s)
+h264_dec (GstStructure * s)
 {
   const char *alignment = gst_structure_get_string (s, "alignment");
   const char *format = gst_structure_get_string (s, "stream-format");
 
+  /* Enforce alignment and format */
   return alignment && format && !g_strcmp0 (alignment, "au")
       && !g_strcmp0 (format, "byte-stream");
 }
@@ -48,6 +49,7 @@ h264_enc (GstStructure * s)
   const char *alignment = gst_structure_get_string (s, "alignment");
   const char *format = gst_structure_get_string (s, "stream-format");
 
+  /* We can accept caps without alignment or format and will add them later on */
   if (alignment && g_strcmp0 (alignment, "au")) {
     return FALSE;
   }
@@ -68,10 +70,11 @@ h264_compliment (GstCaps * caps)
 
 struct _GstDroidCodecType
 {
-  GstDroidCodecTypeType type;
+  GstDroidCodecCodecType type;
   const gchar *media_type;
   const gchar *codec_type;
-    gboolean (*verify) (GstStructure * s);
+
+  gboolean (*verify) (GstStructure * s);
   void (*compliment) (GstCaps * caps);
   const gchar *caps;
   gboolean in_stream_headers;
@@ -80,9 +83,9 @@ struct _GstDroidCodecType
 GstDroidCodecType types[] = {
   /* decoders */
   {GST_DROID_CODEC_DECODER, "video/mpeg", GST_DROID_CODEC_TYPE_MPEG4VIDEO_DEC,
-        mpeg4v, NULL,
+        is_mpeg4v, NULL,
       "video/mpeg, mpegversion=4", FALSE},
-  {GST_DROID_CODEC_DECODER, "video/x-h264", GST_DROID_CODEC_TYPE_AVC_DEC, h264,
+  {GST_DROID_CODEC_DECODER, "video/x-h264", GST_DROID_CODEC_TYPE_AVC_DEC, h264_dec,
       NULL, "video/x-h264, alignment=au, stream-format=byte-stream", FALSE},
   {GST_DROID_CODEC_DECODER, "video/x-h263", GST_DROID_CODEC_TYPE_H263_DEC, NULL,
       NULL, "video/x-h263", FALSE},
@@ -91,7 +94,7 @@ GstDroidCodecType types[] = {
 
   /* encoders */
   {GST_DROID_CODEC_ENCODER, "video/mpeg", GST_DROID_CODEC_TYPE_MPEG4VIDEO_ENC,
-        mpeg4v,
+        is_mpeg4v,
       NULL, "video/mpeg, mpegversion=4, systemstream=false", FALSE},
   {GST_DROID_CODEC_ENCODER, "video/x-h264", GST_DROID_CODEC_TYPE_AVC_ENC,
         h264_enc, h264_compliment,
@@ -99,7 +102,7 @@ GstDroidCodecType types[] = {
 };
 
 const gchar *
-gst_droid_codec_type_from_caps (GstCaps * caps, GstDroidCodecTypeType type)
+gst_droid_codec_type_from_caps (GstCaps * caps, GstDroidCodecCodecType type)
 {
   int x = 0;
   int len = G_N_ELEMENTS (types);
@@ -122,7 +125,7 @@ gst_droid_codec_type_from_caps (GstCaps * caps, GstDroidCodecTypeType type)
 }
 
 GstCaps *
-gst_droid_codec_type_all_caps (GstDroidCodecTypeType type)
+gst_droid_codec_type_all_caps (GstDroidCodecCodecType type)
 {
   GstCaps *caps = gst_caps_new_empty ();
   int x = 0;
@@ -148,7 +151,7 @@ gst_droid_codec_type_all_caps (GstDroidCodecTypeType type)
   return caps;
 }
 
-GstDroidCodecTypeType
+GstDroidCodecCodecType
 gst_droid_codec_type_get_type (const gchar * type)
 {
   int x = 0;
