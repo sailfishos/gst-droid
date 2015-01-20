@@ -383,7 +383,8 @@ gst_droidcamsrc_dev_frame_available(void *user)
     return;
   }
 
-  mem = gst_wrapped_memory_allocator_memory_new (dev->allocator);
+  /* TODO: size */
+  mem = gst_wrapped_memory_allocator_memory_new (dev->allocator, 0);
 
   cb.ref = (void (*)(void *))gst_memory_ref;
   cb.unref = (void (*)(void *))gst_memory_unref;
