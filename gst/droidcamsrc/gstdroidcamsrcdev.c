@@ -33,6 +33,8 @@
 #endif /* GST_USE_UNSTABLE_API */
 #include <gst/interfaces/photography.h>
 #include "gstdroidcamsrcexif.h"
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
 #define GST_CAT_DEFAULT gst_droid_camsrc_debug
@@ -822,7 +824,7 @@ gst_droidcamsrc_dev_release_preview_frame (DroidMediaBuffer *buffer,
   GST_DEBUG_OBJECT (src, "release preview frame");
 
   // TODO:
-  droid_media_buffer_release (buffer, NULL, NULL);
+  droid_media_buffer_release (buffer, EGL_NO_DISPLAY, EGL_NO_SYNC_KHR);
 }
 
 void
