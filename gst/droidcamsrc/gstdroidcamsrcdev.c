@@ -323,7 +323,8 @@ gst_droidcamsrc_dev_data_timestamp_callback (void *user,
 
   buffer = gst_buffer_new ();
   mem = gst_wrapped_memory_allocator_wrap (dev->allocator,
-      addr, (GFunc) gst_droidcamsrc_dev_release_recording_frame, video_data);
+      addr, droid_media_camera_recording_frame_get_size (data),
+     (GFunc) gst_droidcamsrc_dev_release_recording_frame, video_data);
   gst_buffer_insert_memory (buffer, 0, mem);
 
   GST_BUFFER_OFFSET (buffer) = dev->vid->video_frames;
@@ -373,6 +374,7 @@ gst_droidcamsrc_dev_frame_available(void *user)
   GstVideoCropMeta *crop_meta;
   DroidMediaRect rect;
   guint width, height;
+  GstBuffer *buff;
 
   GST_DEBUG_OBJECT (src, "frame available");
 
@@ -397,7 +399,7 @@ gst_droidcamsrc_dev_frame_available(void *user)
   gst_wrapped_memory_allocator_memory_set_data (mem, buffer,
 	(GFunc)gst_droidcamsrc_dev_release_preview_frame, dev);
 
-  GstBuffer *buff = gst_buffer_new ();
+  buff = gst_buffer_new ();
 
   gst_buffer_insert_memory (buff, 0, mem);
   gst_droidcamsrc_timestamp (src, buff);
