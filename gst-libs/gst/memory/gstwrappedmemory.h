@@ -34,8 +34,8 @@ GstAllocator * gst_wrapped_memory_allocator_new (void);
 
 gboolean       gst_is_wrapped_memory_memory (GstMemory * mem);
 GstMemory    * gst_wrapped_memory_allocator_wrap (GstAllocator * allocator,
-						  void *data, GFunc cb, gpointer user_data);
-GstMemory    * gst_wrapped_memory_allocator_memory_new (GstAllocator * allocator);
+						  void *data, gsize size, GFunc cb, gpointer user_data);
+GstMemory    * gst_wrapped_memory_allocator_memory_new (GstAllocator * allocator, gsize size);
 void           gst_wrapped_memory_allocator_memory_set_data(GstMemory *mem, gpointer data,
 							    GFunc cb, gpointer user_data);
 void         * gst_wrapped_memory_get_data (GstMemory * mem);

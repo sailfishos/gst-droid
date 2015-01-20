@@ -122,9 +122,9 @@ wrapped_memory_allocator_class_init (GstWrappedMemoryAllocatorClass * klass)
 
 GstMemory    *
 gst_wrapped_memory_allocator_wrap (GstAllocator * allocator,
-				   void *data, GFunc cb, gpointer user_data)
+				   void *data, gsize size, GFunc cb, gpointer user_data)
 {
-  GstMemory *mem = gst_wrapped_memory_allocator_memory_new (allocator);
+  GstMemory *mem = gst_wrapped_memory_allocator_memory_new (allocator, size);
 
   gst_wrapped_memory_allocator_memory_set_data (mem, data, cb, user_data);
 
@@ -132,7 +132,7 @@ gst_wrapped_memory_allocator_wrap (GstAllocator * allocator,
 }
 
 GstMemory *
-gst_wrapped_memory_allocator_memory_new (GstAllocator * allocator)
+gst_wrapped_memory_allocator_memory_new (GstAllocator * allocator, gsize size)
 {
   GstWrappedMemory *mem;
 
@@ -144,7 +144,7 @@ gst_wrapped_memory_allocator_memory_new (GstAllocator * allocator)
 
   gst_memory_init (GST_MEMORY_CAST (mem),
       GST_MEMORY_FLAG_NO_SHARE | GST_MEMORY_FLAG_READONLY, allocator, NULL,
-      0, -1, 0, 0);
+      size, 0, 0, size);
 
   GST_DEBUG_OBJECT (allocator, "alloc %p", mem);
 
@@ -209,9 +209,12 @@ gst_wrapped_memory_map (GstMemory * mem, gsize maxsize, GstMapFlags flags)
     return NULL;
   }
 
+  /* TODO: */
+  /*
   if (maxsize != 0) {
     return NULL;
   }
+  */
 
   return m->data;
 }
