@@ -143,13 +143,14 @@ gst_droiddec_error (GstDroidDec * dec, int err)
     goto out;
   }
 
+  GST_VIDEO_DECODER_STREAM_LOCK (dec);
+  dec->has_error = TRUE;
+  GST_VIDEO_DECODER_STREAM_UNLOCK (dec);
+
   GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, NULL, ("error 0x%x from android codec", -err));
-  /* TODO: proper error handling */
 
 out:
   g_mutex_unlock (&dec->eos_lock);
-
-  // TODO:
 }
 
 static gboolean
@@ -260,6 +261,7 @@ gst_droiddec_start (GstVideoDecoder * decoder)
   GST_DEBUG_OBJECT (dec, "start");
 
   dec->eos = FALSE;
+  dec->has_error = FALSE;
 
   return TRUE;
 }
@@ -416,17 +418,16 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     goto error;
   }
 
+  if (dec->has_error) {
+    GST_INFO_OBJECT (dec, "not handling frame in error state");
+    goto error;
+  }
+
   if (gst_droiddec_do_handle_frame (decoder, frame)) {
     return GST_FLOW_OK;
   }
 
 #if 0
-
-  if (gst_droid_codec_has_error (dec->comp)) {
-    GST_ERROR_OBJECT (dec, "not handling frame while omx is in error state");
-    goto error;
-  }
-
   /* if we have been flushed then we need to start accepting data again */
   if (!gst_droid_codec_is_running (dec->comp)) {
     if (GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame)) {
@@ -604,6 +605,7 @@ gst_droiddec_init (GstDroidDec * dec)
 {
   dec->codec = NULL;
   dec->eos = FALSE;
+  dec->has_error = FALSE;
 
   g_mutex_init (&dec->eos_lock);
   g_cond_init (&dec->eos_cond);
