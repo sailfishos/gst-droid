@@ -75,6 +75,7 @@ struct _GstDroidCodecType
 {
   GstDroidCodecCodecType type;
   const gchar *media_type;
+  const gchar *droid_type;
   const gchar *codec_type;
 
   gboolean (*verify) (GstStructure * s);
@@ -85,21 +86,23 @@ struct _GstDroidCodecType
 
 GstDroidCodecType types[] = {
   /* decoders */
-  {GST_DROID_CODEC_DECODER, "video/mpeg", GST_DROID_CODEC_TYPE_MPEG4VIDEO_DEC,
+  {GST_DROID_CODEC_DECODER, "video/mpeg", "video/mp4v-es", GST_DROID_CODEC_TYPE_MPEG4VIDEO_DEC,
         is_mpeg4v, NULL,
       "video/mpeg, mpegversion=4", FALSE},
-  {GST_DROID_CODEC_DECODER, "video/x-h264", GST_DROID_CODEC_TYPE_AVC_DEC, h264_dec,
+  {GST_DROID_CODEC_DECODER, "video/x-h264", "video/avc", GST_DROID_CODEC_TYPE_AVC_DEC, h264_dec,
       NULL, "video/x-h264, alignment=au, stream-format=byte-stream", FALSE},
-  {GST_DROID_CODEC_DECODER, "video/x-h263", GST_DROID_CODEC_TYPE_H263_DEC, NULL,
+  {GST_DROID_CODEC_DECODER, "video/x-h263", "video/3gpp", GST_DROID_CODEC_TYPE_H263_DEC, NULL,
       NULL, "video/x-h263", FALSE},
-  {GST_DROID_CODEC_DECODER, "video/x-divx", GST_DROID_CODEC_TYPE_DIVX_DEC, NULL,
+#if 0
+  {GST_DROID_CODEC_DECODER, "video/x-divx", "", GST_DROID_CODEC_TYPE_DIVX_DEC, NULL,
       NULL, "video/x-divx", FALSE},
+#endif
 
   /* encoders */
-  {GST_DROID_CODEC_ENCODER, "video/mpeg", GST_DROID_CODEC_TYPE_MPEG4VIDEO_ENC,
+  {GST_DROID_CODEC_ENCODER, "video/mpeg", "video/mp4v-es", GST_DROID_CODEC_TYPE_MPEG4VIDEO_ENC,
         is_mpeg4v,
       NULL, "video/mpeg, mpegversion=4, systemstream=false", FALSE},
-  {GST_DROID_CODEC_ENCODER, "video/x-h264", GST_DROID_CODEC_TYPE_AVC_ENC,
+  {GST_DROID_CODEC_ENCODER, "video/x-h264", "video/avc", GST_DROID_CODEC_TYPE_AVC_ENC,
         h264_enc, h264_compliment,
       "video/x-h264, alignment=au, stream-format=byte-stream", TRUE},
 };
@@ -120,7 +123,7 @@ gst_droid_codec_type_from_caps (GstCaps * caps, GstDroidCodecCodecType type)
     gboolean is_equal = g_strcmp0 (types[x].media_type, name) == 0;
     if ((is_equal && !types[x].verify) || (is_equal && types[x].verify
             && types[x].verify (s))) {
-      return types[x].codec_type;
+      return types[x].droid_type;
     }
   }
 
@@ -192,7 +195,7 @@ gst_droid_codec_type_compliment_caps (const gchar * type, GstCaps * caps)
   int len = G_N_ELEMENTS (types);
 
   for (x = 0; x < len; x++) {
-    if (!g_strcmp0 (type, types[x].codec_type)) {
+    if (!g_strcmp0 (type, types[x].droid_type)) {
       if (types[x].compliment) {
         types[x].compliment (caps);
       }
@@ -209,7 +212,7 @@ gst_droid_codec_type_in_stream_headers (const gchar * type, gboolean * result)
   int len = G_N_ELEMENTS (types);
 
   for (x = 0; x < len; x++) {
-    if (!g_strcmp0 (type, types[x].codec_type)) {
+    if (!g_strcmp0 (type, types[x].droid_type)) {
       *result = types[x].in_stream_headers;
       return TRUE;
     }
