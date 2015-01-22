@@ -52,16 +52,20 @@ enum
 #define GST_DROID_ENC_TARGET_BITRATE_DEFAULT 192000
 
 static void
-gst_droidenc_signal_eos (GstDroidEnc * enc)
+gst_droidenc_signal_eos (void *data)
 {
+  GstDroidEnc * enc = (GstDroidEnc *) data;
+
   GST_DEBUG_OBJECT (enc, "codec signaled EOS");
 
   // TODO:
 }
 
 static void
-gst_droidenc_error (GstDroidEnc * enc, int err)
+gst_droidenc_error (void *data, int err)
 {
+  GstDroidEnc * enc = (GstDroidEnc *) data;
+
   GST_DEBUG_OBJECT (enc, "codec error");
 
   GST_ELEMENT_ERROR (enc, LIBRARY, FAILED, NULL, ("error 0x%x from android codec", -err));
@@ -70,24 +74,18 @@ gst_droidenc_error (GstDroidEnc * enc, int err)
 }
 
 static void
-gst_droidenc_buffers_released(void *user)
-{
-  /* TODO: Not sure what to do here really */
-  // TODO: remove this unused function
-}
-
-static void
-gst_droidenc_data_available(GstDroidEnc *enc, DroidMediaCodecData *data)
+gst_droidenc_data_available(void *data, DroidMediaCodecData *encoded)
 {
   GstVideoCodecFrame *frame;
+  GstDroidEnc * enc = (GstDroidEnc *) data;
 
   GST_DEBUG_OBJECT (enc, "data available");
 
-  if (data->codec_config) {
+  if (encoded->codec_config) {
     GstBuffer *codec_data =
-      gst_buffer_new_allocate (NULL, data->size, NULL);
+      gst_buffer_new_allocate (NULL, encoded->size, NULL);
     GST_INFO_OBJECT (enc, "received codec_data");
-    gst_buffer_fill (codec_data, 0, data->data, data->size);
+    gst_buffer_fill (codec_data, 0, encoded->data, encoded->size);
 
     GST_BUFFER_OFFSET (codec_data) = 0;
     GST_BUFFER_OFFSET_END (codec_data) = 0;
@@ -117,12 +115,12 @@ gst_droidenc_data_available(GstDroidEnc *enc, DroidMediaCodecData *data)
   //  frame->pts = data->ts;
 
   frame->output_buffer = gst_video_encoder_allocate_output_buffer (GST_VIDEO_ENCODER (enc),
-								   data->size);
-  gst_buffer_fill (frame->output_buffer, 0, data->data, data->size);
+								   encoded->size);
+  gst_buffer_fill (frame->output_buffer, 0, encoded->data, encoded->size);
 
-  GST_BUFFER_TIMESTAMP (frame->output_buffer) = data->ts;
+  GST_BUFFER_TIMESTAMP (frame->output_buffer) = encoded->ts;
 
-  if (data->sync) {
+  if (encoded->sync) {
     GST_VIDEO_CODEC_FRAME_SET_SYNC_POINT(frame);
   }
 
@@ -795,31 +793,6 @@ gst_droidenc_init (GstDroidEnc * enc)
   enc->target_bitrate = GST_DROID_ENC_TARGET_BITRATE_DEFAULT;
 }
 
-static GstStateChangeReturn
-gst_droidenc_change_state (GstElement * element, GstStateChange transition)
-{
-  GstStateChangeReturn ret;
-  GstDroidEnc *enc;
-  GstVideoEncoder *encoder;
-
-  encoder = GST_VIDEO_ENCODER (element);
-  enc = GST_DROIDENC (element);
-
-  GST_DEBUG_OBJECT (enc, "change state from %s to %s",
-      gst_element_state_get_name (GST_STATE_TRANSITION_CURRENT (transition)),
-      gst_element_state_get_name (GST_STATE_TRANSITION_NEXT (transition)));
-
-  if (transition == GST_STATE_CHANGE_PAUSED_TO_READY) {
-    GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
-    //    gst_droidenc_stop_loop (encoder);
-    GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
-  }
-
-  ret = GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
-
-  return ret;
-}
-
 static GstCaps *
 gst_droidenc_getcaps (GstVideoEncoder * encoder, GstCaps * filter)
 {
@@ -881,8 +854,7 @@ gst_droidenc_class_init (GstDroidEncClass * klass)
   gobject_class->finalize = gst_droidenc_finalize;
   gobject_class->set_property = gst_droidenc_set_property;
   gobject_class->get_property = gst_droidenc_get_property;
-  gstelement_class->change_state =
-      GST_DEBUG_FUNCPTR (gst_droidenc_change_state);
+
   gstvideoencoder_class->open = GST_DEBUG_FUNCPTR (gst_droidenc_open);
   gstvideoencoder_class->close = GST_DEBUG_FUNCPTR (gst_droidenc_close);
   gstvideoencoder_class->start = GST_DEBUG_FUNCPTR (gst_droidenc_start);

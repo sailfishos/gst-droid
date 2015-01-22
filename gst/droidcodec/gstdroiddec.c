@@ -53,9 +53,9 @@ gst_droiddec_release_frame (DroidMediaBuffer *buffer)
 }
 
 static void
-gst_droiddec_buffers_released(void *user)
+gst_droiddec_buffers_released(G_GNUC_UNUSED void *user)
 {
-  /* TODO: Not sure what to do here really */
+  GST_FIXME ("Not sure what to do here really");
 }
 
 static void
@@ -115,8 +115,10 @@ gst_droiddec_frame_available(void *user)
 }
 
 static void
-gst_droiddec_signal_eos (GstDroidDec * dec)
+gst_droiddec_signal_eos (void *data)
 {
+  GstDroidDec *dec = (GstDroidDec *) data;
+
   GST_DEBUG_OBJECT (dec, "codec signaled EOS");
 
   /* TODO: Is it possible that we get EOS when we are not expecting it */
@@ -131,8 +133,10 @@ gst_droiddec_signal_eos (GstDroidDec * dec)
 }
 
 static void
-gst_droiddec_error (GstDroidDec * dec, int err)
+gst_droiddec_error (void *data, int err)
 {
+  GstDroidDec *dec = (GstDroidDec *) data;
+
   GST_DEBUG_OBJECT (dec, "codec error");
 
   g_mutex_lock (&dec->eos_lock);
@@ -409,9 +413,6 @@ static GstFlowReturn
 gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     GstVideoCodecFrame * frame)
 {
-  gsize width, height;
-  int hal_fmt;
-  GstStructure *config;
   GstDroidDec *dec = GST_DROIDDEC (decoder);
 
   GST_DEBUG_OBJECT (dec, "handle frame");
@@ -537,8 +538,6 @@ error:
 static gboolean
 gst_droiddec_decide_allocation (GstVideoDecoder * decoder, GstQuery * query)
 {
-  gsize size;
-  GstStructure *conf;
   GstDroidDec *dec = GST_DROIDDEC (decoder);
 
   GST_DEBUG_OBJECT (dec, "decide allocation %" GST_PTR_FORMAT, query);
@@ -616,23 +615,6 @@ gst_droiddec_init (GstDroidDec * dec)
   dec->allocator = gst_wrapped_memory_allocator_new ();
   dec->in_state = NULL;
   dec->out_state = NULL;
-}
-
-static GstStateChangeReturn
-gst_droiddec_change_state (GstElement * element, GstStateChange transition)
-{
-  GstStateChangeReturn ret;
-  GstDroidDec *dec;
-  GstVideoDecoder *decoder;
-
-  decoder = GST_VIDEO_DECODER (element);
-  dec = GST_DROIDDEC (element);
-
-  GST_DEBUG_OBJECT (dec, "change state");
-
-  ret = GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
-
-  return ret;
 }
 
 static gboolean
@@ -718,8 +700,7 @@ gst_droiddec_class_init (GstDroidDecClass * klass)
       gst_static_pad_template_get (&gst_droiddec_src_template_factory));
 
   gobject_class->finalize = gst_droiddec_finalize;
-  gstelement_class->change_state =
-      GST_DEBUG_FUNCPTR (gst_droiddec_change_state);
+
   gstvideodecoder_class->open = GST_DEBUG_FUNCPTR (gst_droiddec_open);
   gstvideodecoder_class->close = GST_DEBUG_FUNCPTR (gst_droiddec_close);
   gstvideodecoder_class->start = GST_DEBUG_FUNCPTR (gst_droiddec_start);

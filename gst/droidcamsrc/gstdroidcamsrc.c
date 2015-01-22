@@ -549,7 +549,7 @@ gst_droidcamsrc_handle_roi_event (GstDroidCamSrc * src,
   guint width, height, count;
   guint w, h, top, left, prio;
   const GValue *regions, *region;
-  int x, len;
+  guint x, len;
   GList *rects = NULL;
   gchar **array;
   gchar *param;
@@ -1694,7 +1694,8 @@ gst_droidcamsrc_apply_quirk (GstDroidCamSrc * src, GstDroidCamSrcQuirk * quirk,
     return;
   }
 
-  if (src->dev->info->direction == quirk->direction || quirk->direction == -1) {
+  if (src->dev->info->direction == quirk->direction
+      || quirk->direction == -1) {
     if (!state || src->mode == MODE_VIDEO) {
       /* disable */
       GST_DEBUG_OBJECT (src, "disabling %s", name);

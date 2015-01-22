@@ -201,7 +201,7 @@ gst_droidcamsrc_photography_set_autofocus (GstPhotography * photo, gboolean on)
 }
 
 void
-gst_droidcamsrc_photography_register (gpointer g_iface, gpointer iface_data)
+gst_droidcamsrc_photography_register (G_GNUC_UNUSED gpointer g_iface, gpointer iface_data)
 {
   GstPhotographyInterface *iface = (GstPhotographyInterface *) g_iface;
   iface->get_ev_compensation = gst_droidcamsrc_photography_get_ev_compensation;
@@ -269,7 +269,7 @@ gst_droidcamsrc_photography_add_overrides (GObjectClass * klass)
 
 gboolean
 gst_droidcamsrc_photography_get_property (GstDroidCamSrc * src, guint prop_id,
-    GValue * value, GParamSpec * pspec)
+    GValue * value, G_GNUC_UNUSED GParamSpec * pspec)
 {
   switch (prop_id) {
     case PROP_WB_MODE:
@@ -481,7 +481,7 @@ gst_droidcamsrc_photography_get_property (GstDroidCamSrc * src, guint prop_id,
 
 gboolean
 gst_droidcamsrc_photography_set_property (GstDroidCamSrc * src, guint prop_id,
-    const GValue * value, GParamSpec * pspec)
+    const GValue * value, G_GNUC_UNUSED GParamSpec * pspec)
 {
   switch (prop_id) {
     case PROP_WB_MODE:

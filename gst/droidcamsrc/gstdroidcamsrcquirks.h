@@ -34,7 +34,7 @@ struct _GstDroidCamSrcQuirk
   gchar *prop;
   gchar *on;
   gchar *off;
-  int direction;
+  gint direction;
 };
 
 struct _GstDroidCamSrcQuirks

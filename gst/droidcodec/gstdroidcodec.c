@@ -39,18 +39,20 @@ typedef struct
 } DroidBufferCallbackMapInfo;
 
 static void
-gst_droid_codec_release_buffer (DroidBufferCallbackMapInfo *data)
+gst_droid_codec_release_buffer (void *data)
 {
+  DroidBufferCallbackMapInfo *info = (DroidBufferCallbackMapInfo *) data;
+
   GST_DEBUG ("release buffer");
-  gst_buffer_unmap (data->buffer, &data->info);
-  gst_buffer_unref (data->buffer);
+  gst_buffer_unmap (info->buffer, &info->info);
+  gst_buffer_unref (info->buffer);
 
   /* We need to release the input buffer */
-  gst_buffer_unref (data->frame->input_buffer);
-  data->frame->input_buffer = NULL;
+  gst_buffer_unref (info->frame->input_buffer);
+  info->frame->input_buffer = NULL;
 
-  gst_video_codec_frame_unref (data->frame);
-  g_slice_free(DroidBufferCallbackMapInfo, data);
+  gst_video_codec_frame_unref (info->frame);
+  g_slice_free(DroidBufferCallbackMapInfo, info);
 }
 
 gboolean

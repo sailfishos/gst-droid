@@ -355,11 +355,11 @@ unlock_and_out:
 }
 
 static void
-gst_droidcamsrc_dev_buffers_released(void *user)
+gst_droidcamsrc_dev_buffers_released(G_GNUC_UNUSED void *user)
 {
-  //  GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
+  GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
 
-  // TODO: Not sure what to do here really
+  GST_FIXME_OBJECT (dev, "Not sure what to do here really");
 }
 
 static void
