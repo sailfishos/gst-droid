@@ -789,13 +789,7 @@ gst_droidenc_flush (GstVideoEncoder * encoder)
 static void
 gst_droidenc_init (GstDroidEnc * enc)
 {
-  enc->codec = gst_droid_codec_get ();
   enc->codec = NULL;
-
-#if 0
-  enc->comp = NULL;
-#endif
-
   enc->in_state = NULL;
   enc->out_state = NULL;
   enc->target_bitrate = GST_DROID_ENC_TARGET_BITRATE_DEFAULT;
