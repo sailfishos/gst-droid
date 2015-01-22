@@ -22,6 +22,9 @@
 #include "gstdroidcodectype.h"
 #include "plugin.h"
 
+GST_DEBUG_CATEGORY_EXTERN (gst_droid_codec_debug);
+#define GST_CAT_DEFAULT gst_droid_codec_debug
+
 typedef struct _GstDroidCodecType GstDroidCodecType;
 
 static gboolean
@@ -137,6 +140,8 @@ gst_droid_codec_type_all_caps (GstDroidCodecCodecType type)
     }
 
     gchar *file = gst_droid_codec_type_get_path (types[x].codec_type);
+
+    GST_LOG ("Checking file %s", file);
 
     if (g_file_test (file, G_FILE_TEST_IS_REGULAR | G_FILE_TEST_EXISTS)) {
       GstStructure *s = gst_structure_new_from_string (types[x].caps);
