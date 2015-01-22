@@ -564,7 +564,7 @@ gst_droidenc_stop (GstVideoEncoder * encoder)
 static gboolean
 gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
 {
-  const gchar *type;
+  DroidMediaCodecEncoderMetaData md;
   GstDroidEnc *enc = GST_DROIDENC (encoder);
   GstCaps *caps = NULL;
 
@@ -587,25 +587,27 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
   caps = gst_caps_truncate (caps);
 
   /* try to get our codec */
-  type = gst_droid_codec_type_from_caps (caps, GST_DROID_CODEC_ENCODER);
+  md.parent.type = gst_droid_codec_type_from_caps (caps, GST_DROID_CODEC_ENCODER);
 
-  if (!type) {
-    GST_DEBUG_OBJECT (enc, "failed to get any encoder");
+  if (!md.parent.type) {
+    GST_ELEMENT_ERROR (enc, LIBRARY, FAILED, (NULL),
+        ("Unknown codec type for caps %" GST_PTR_FORMAT, state->caps));
+
     /* TODO: in_state */
     gst_caps_unref (caps);
     return FALSE;
   }
 
-  if (!gst_droid_codec_type_in_stream_headers (type, &enc->in_stream_headers)) {
-    GST_ERROR_OBJECT (enc,
-        "cannot determine header requirements for encoder %s", type);
+  if (!gst_droid_codec_type_in_stream_headers (md.parent.type, &enc->in_stream_headers)) {
+    GST_ELEMENT_ERROR (enc, LIBRARY, FAILED, (NULL),
+        ("cannot determine header requirements for encoder %s", md.parent.type));
     /* TODO: in_state */
     gst_caps_unref (caps);
     return FALSE;
   }
 
   enc->out_state =
-      gst_droidenc_configure_state (encoder, &state->info, caps, type);
+      gst_droidenc_configure_state (encoder, &state->info, caps, md.parent.type);
 
 #if 0
   enc->comp =
@@ -643,8 +645,6 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
 
 #endif
 
-  DroidMediaCodecEncoderMetaData md;
-  md.parent.type = "video/mp4v-es"; // TODO: type;
   md.parent.width = state->info.width;
   md.parent.height = state->info.height;
   md.parent.fps = state->info.fps_n / state->info.fps_d; // TODO: bad

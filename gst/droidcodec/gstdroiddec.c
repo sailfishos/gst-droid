@@ -287,9 +287,12 @@ gst_droiddec_stop (GstVideoDecoder * decoder)
 static gboolean
 gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 {
-  const gchar *type;
+  DroidMediaCodecDecoderMetaData md;
+
   GstDroidDec *dec = GST_DROIDDEC (decoder);
-  // TODO: destroying the decoder here will cause stagefright to call abort.
+  /* destroying the droidmedia codec here will cause stagefright to call abort.
+   * That is why we create it after we are sure that everything is correct
+   */
 
   GST_DEBUG_OBJECT (dec, "set format %" GST_PTR_FORMAT, state->caps);
 
@@ -298,14 +301,14 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     return FALSE;
   }
 
-  type = gst_droid_codec_type_from_caps (state->caps, GST_DROID_CODEC_DECODER);
-  if (!type) {
-    // TODO: error
+
+  md.parent.type = gst_droid_codec_type_from_caps (state->caps, GST_DROID_CODEC_DECODER);
+  if (!md.parent.type) {
+    GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, (NULL),
+        ("Unknown codec type for caps %" GST_PTR_FORMAT, state->caps));
     return FALSE;
   }
 
-  DroidMediaCodecDecoderMetaData md;
-  md.parent.type = "video/mp4v-es"; // TODO: type;
   md.parent.width = state->info.width;
   md.parent.height = state->info.height;
   md.parent.fps = state->info.fps_n / state->info.fps_d; // TODO: bad
