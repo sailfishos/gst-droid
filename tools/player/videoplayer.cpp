@@ -282,21 +282,21 @@ bool VideoPlayer::setState(const VideoPlayer::State& state) {
       QString string = m_url.toString();
       QByteArray array = string.toUtf8();
       g_object_set(m_bin, "uri", array.constData(), NULL);
-    }
 
-    int flags = 0x00000001 | 0x00000002 | 0x00000010 | 0x00000020 |  0x00000200;
-    if (!setPaused (flags)) {
-      flags |= 0x00000040;
-
+      int flags = 0x00000001 | 0x00000002 | 0x00000010 | 0x00000020 |  0x00000200;
       if (!setPaused (flags)) {
-	qmlInfo(this) << "error setting pipeline to PAUSED";
-	return false;
+          flags |= 0x00000040;
+
+          if (!setPaused (flags)) {
+              qmlInfo(this) << "error setting pipeline to PAUSED";
+              return false;
+          }
       }
     }
 
     if (gst_element_set_state(m_bin, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
-      qmlInfo(this) << "error setting pipeline to PLAYING";
-      return false;
+        qmlInfo(this) << "error setting pipeline to PLAYING";
+        return false;
     }
 
     m_state = state;
