@@ -212,6 +212,34 @@ gst_droiddec_configure_state (GstVideoDecoder * decoder, gsize width,
   return out;
 }
 
+static gboolean
+gst_droiddec_stop (GstVideoDecoder * decoder)
+{
+  GstDroidDec *dec = GST_DROIDDEC (decoder);
+
+  GST_DEBUG_OBJECT (dec, "stop");
+
+  if (dec->codec) {
+    droid_media_codec_stop (dec->codec);
+    droid_media_codec_destroy (dec->codec);
+    dec->codec = NULL;
+  }
+
+  if (dec->in_state) {
+    gst_video_codec_state_unref (dec->in_state);
+    dec->in_state = NULL;
+  }
+
+  if (dec->out_state) {
+    gst_video_codec_state_unref (dec->out_state);
+    dec->out_state = NULL;
+  }
+
+  dec->eos = FALSE;
+
+  return TRUE;
+}
+
 static void
 gst_droiddec_finalize (GObject * object)
 {
@@ -219,10 +247,7 @@ gst_droiddec_finalize (GObject * object)
 
   GST_DEBUG_OBJECT (dec, "finalize");
 
-  // TODO: destroy codec
-  //  gst_mini_object_unref (GST_MINI_OBJECT (dec->codec));
-
-  dec->codec = NULL;
+  gst_droiddec_stop (GST_VIDEO_DECODER (dec));
 
   gst_object_unref (dec->allocator);
   dec->allocator = NULL;
@@ -271,30 +296,13 @@ gst_droiddec_start (GstVideoDecoder * decoder)
 }
 
 static gboolean
-gst_droiddec_stop (GstVideoDecoder * decoder)
-{
-  GstDroidDec *dec = GST_DROIDDEC (decoder);
-
-  GST_DEBUG_OBJECT (dec, "stop");
-
-  if (dec->codec) {
-    droid_media_codec_stop (dec->codec);
-    droid_media_codec_destroy (dec->codec);
-    dec->codec = NULL;
-  }
-
-  dec->eos = FALSE;
-
-  return TRUE;
-}
-
-static gboolean
 gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 {
   DroidMediaCodecDecoderMetaData md;
 
   GstDroidDec *dec = GST_DROIDDEC (decoder);
-  /* destroying the droidmedia codec here will cause stagefright to call abort.
+  /*
+   * destroying the droidmedia codec here will cause stagefright to call abort.
    * That is why we create it after we are sure that everything is correct
    */
 
@@ -304,7 +312,6 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     // TODO:
     return FALSE;
   }
-
 
   md.parent.type = gst_droid_codec_type_from_caps (state->caps, GST_DROID_CODEC_DECODER);
   if (!md.parent.type) {
@@ -342,9 +349,6 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     dec->in_state = NULL;
     dec->out_state = NULL;
 
-    //    droid_media_codec_destroy (dec->codec);
-    //    dec->codec = NULL;
-
     return FALSE;
   }
 
@@ -356,6 +360,13 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 
   if (!dec->codec) {
     GST_ELEMENT_ERROR(dec, LIBRARY, SETTINGS, NULL, ("Failed to create decoder"));
+
+    gst_video_codec_state_unref (dec->in_state);
+    gst_video_codec_state_unref (dec->out_state);
+
+    dec->in_state = NULL;
+    dec->out_state = NULL;
+
     return FALSE;
   }
 
@@ -377,6 +388,13 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     // TODO: error
     droid_media_codec_destroy (dec->codec);
     dec->codec = NULL;
+
+    gst_video_codec_state_unref (dec->in_state);
+    gst_video_codec_state_unref (dec->out_state);
+
+    dec->in_state = NULL;
+    dec->out_state = NULL;
+
     return FALSE;
   }
 
