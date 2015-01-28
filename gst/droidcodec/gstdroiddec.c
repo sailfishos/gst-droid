@@ -309,7 +309,8 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   GST_DEBUG_OBJECT (dec, "set format %" GST_PTR_FORMAT, state->caps);
 
   if (dec->codec) {
-    // TODO:
+    GST_FIXME_OBJECT (dec, "What to do here?");
+    GST_ERROR_OBJECT (dec, "codec already configured");
     return FALSE;
   }
 
