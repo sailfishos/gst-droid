@@ -25,6 +25,7 @@
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_codec_debug);
 #define GST_CAT_DEFAULT gst_droid_codec_debug
 
+#define CAPS_FRAGMENT " , width = (int) [1, MAX], height = (int)[1, MAX], framerate = (fraction)[1/MAX, MAX]"
 typedef struct _GstDroidCodecType GstDroidCodecType;
 
 static gboolean
@@ -86,18 +87,18 @@ struct _GstDroidCodecType
 GstDroidCodecType types[] = {
   /* decoders */
   {GST_DROID_CODEC_DECODER, "video/mpeg", "video/mp4v-es", is_mpeg4v, NULL,
-      "video/mpeg, mpegversion=4", FALSE},
+      "video/mpeg, mpegversion=4"CAPS_FRAGMENT, FALSE},
   {GST_DROID_CODEC_DECODER, "video/x-h264", "video/avc", h264_dec,
-      NULL, "video/x-h264, alignment=au, stream-format=byte-stream", FALSE},
+      NULL, "video/x-h264, alignment=au, stream-format=byte-stream"CAPS_FRAGMENT, FALSE},
   {GST_DROID_CODEC_DECODER, "video/x-h263", "video/3gpp", NULL,
-      NULL, "video/x-h263", FALSE},
+      NULL, "video/x-h263"CAPS_FRAGMENT, FALSE},
 
   /* encoders */
   {GST_DROID_CODEC_ENCODER, "video/mpeg", "video/mp4v-es", is_mpeg4v,
-      NULL, "video/mpeg, mpegversion=4, systemstream=false", FALSE},
+      NULL, "video/mpeg, mpegversion=4, systemstream=false"CAPS_FRAGMENT, FALSE},
   {GST_DROID_CODEC_ENCODER, "video/x-h264", "video/avc",
         h264_enc, h264_compliment,
-      "video/x-h264, alignment=au, stream-format=byte-stream", TRUE},
+      "video/x-h264, alignment=au, stream-format=byte-stream"CAPS_FRAGMENT, TRUE},
 };
 
 const gchar *
