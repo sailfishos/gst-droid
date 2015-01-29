@@ -76,7 +76,6 @@ struct _GstDroidCodecType
   GstDroidCodecCodecType type;
   const gchar *media_type;
   const gchar *droid_type;
-  const gchar *codec_type;
 
   gboolean (*verify) (GstStructure * s);
   void (*compliment) (GstCaps * caps);
@@ -86,23 +85,17 @@ struct _GstDroidCodecType
 
 GstDroidCodecType types[] = {
   /* decoders */
-  {GST_DROID_CODEC_DECODER, "video/mpeg", "video/mp4v-es", GST_DROID_CODEC_TYPE_MPEG4VIDEO_DEC,
-        is_mpeg4v, NULL,
+  {GST_DROID_CODEC_DECODER, "video/mpeg", "video/mp4v-es", is_mpeg4v, NULL,
       "video/mpeg, mpegversion=4", FALSE},
-  {GST_DROID_CODEC_DECODER, "video/x-h264", "video/avc", GST_DROID_CODEC_TYPE_AVC_DEC, h264_dec,
+  {GST_DROID_CODEC_DECODER, "video/x-h264", "video/avc", h264_dec,
       NULL, "video/x-h264, alignment=au, stream-format=byte-stream", FALSE},
-  {GST_DROID_CODEC_DECODER, "video/x-h263", "video/3gpp", GST_DROID_CODEC_TYPE_H263_DEC, NULL,
+  {GST_DROID_CODEC_DECODER, "video/x-h263", "video/3gpp", NULL,
       NULL, "video/x-h263", FALSE},
-#if 0
-  {GST_DROID_CODEC_DECODER, "video/x-divx", "", GST_DROID_CODEC_TYPE_DIVX_DEC, NULL,
-      NULL, "video/x-divx", FALSE},
-#endif
 
   /* encoders */
-  {GST_DROID_CODEC_ENCODER, "video/mpeg", "video/mp4v-es", GST_DROID_CODEC_TYPE_MPEG4VIDEO_ENC,
-        is_mpeg4v,
+  {GST_DROID_CODEC_ENCODER, "video/mpeg", "video/mp4v-es", is_mpeg4v,
       NULL, "video/mpeg, mpegversion=4, systemstream=false", FALSE},
-  {GST_DROID_CODEC_ENCODER, "video/x-h264", "video/avc", GST_DROID_CODEC_TYPE_AVC_ENC,
+  {GST_DROID_CODEC_ENCODER, "video/x-h264", "video/avc",
         h264_enc, h264_compliment,
       "video/x-h264, alignment=au, stream-format=byte-stream", TRUE},
 };
@@ -142,50 +135,13 @@ gst_droid_codec_type_all_caps (GstDroidCodecCodecType type)
       continue;
     }
 
-    gchar *file = gst_droid_codec_type_get_path (types[x].codec_type);
-
-    GST_LOG ("Checking file %s", file);
-
-    if (g_file_test (file, G_FILE_TEST_IS_REGULAR | G_FILE_TEST_EXISTS)) {
-      GstStructure *s = gst_structure_new_from_string (types[x].caps);
-      caps = gst_caps_merge_structure (caps, s);
-    }
-
-    g_free (file);
+    GstStructure *s = gst_structure_new_from_string (types[x].caps);
+    caps = gst_caps_merge_structure (caps, s);
   }
 
   GST_INFO ("caps %" GST_PTR_FORMAT, caps);
 
   return caps;
-}
-
-GstDroidCodecCodecType
-gst_droid_codec_type_get_type (const gchar * type)
-{
-  int x = 0;
-  int len = G_N_ELEMENTS (types);
-
-  for (x = 0; x < len; x++) {
-    if (!g_strcmp0 (type, types[x].codec_type)) {
-      return types[x].type;
-    }
-  }
-
-  /* should not happen */
-  return -1;
-}
-
-gchar *
-gst_droid_codec_type_get_path (const gchar * type)
-{
-  gchar *file_name = g_strdup_printf ("%s.conf", type);
-  gchar *file =
-      g_build_path ("/", SYSCONFDIR, "gst-droid", "droidcodec.d", file_name,
-      NULL);
-
-  g_free (file_name);
-
-  return file;
 }
 
 void
