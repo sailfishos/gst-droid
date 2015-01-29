@@ -44,6 +44,10 @@ GST_STATIC_PAD_TEMPLATE (GST_VIDEO_DECODER_SRC_NAME,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
         (GST_CAPS_FEATURE_MEMORY_DROID_HANDLE, "{ENCODED, YV12}")));
 
+static GstVideoCodecState *
+gst_droiddec_configure_state (GstVideoDecoder * decoder, gsize width,
+			      gsize height);
+
 static void
 gst_droiddec_release_frame (DroidMediaBuffer *buffer)
 {
@@ -154,6 +158,36 @@ gst_droiddec_error (void *data, int err)
 
 out:
   g_mutex_unlock (&dec->eos_lock);
+}
+
+static int
+gst_droiddec_size_changed(void *data, int32_t width, int32_t height)
+{
+  GstDroidDec *dec = (GstDroidDec *) data;
+  GstVideoDecoder *decoder = GST_VIDEO_DECODER (dec);
+  int err = 0;
+
+  GST_INFO_OBJECT (dec, "size changed: w=%d, h=%d", width, height);
+
+  GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+
+  if (dec->out_state) {
+    gst_video_codec_state_unref (dec->out_state);
+  }
+
+  dec->out_state =
+    gst_droiddec_configure_state (decoder, width, height);
+
+  if (!gst_video_decoder_negotiate (decoder)) {
+    GST_ERROR_OBJECT (dec, "Failed to negotiate");
+    err = 1;
+    goto out;
+  }
+
+out:
+  GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
+
+  return err;
 }
 
 static gboolean
@@ -373,6 +407,7 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     DroidMediaCodecCallbacks cb;
     cb.signal_eos = gst_droiddec_signal_eos;
     cb.error = gst_droiddec_error;
+    cb.size_changed = gst_droiddec_size_changed;
     droid_media_codec_set_callbacks (dec->codec, &cb, dec);
   }
 
