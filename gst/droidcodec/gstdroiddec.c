@@ -99,8 +99,7 @@ gst_droiddec_frame_available(void *user)
 
   frame = gst_video_decoder_get_oldest_frame (GST_VIDEO_DECODER (dec));
 
-  if (!frame) {
-    // TODO:
+  if (G_UNLIKELY(!frame)) {
     GST_WARNING_OBJECT (dec, "buffer without frame");
     gst_buffer_unref (buff);
     return;
@@ -172,11 +171,11 @@ gst_droiddec_do_handle_frame (GstVideoDecoder * decoder,
    * to call get_oldest_frame() which acquires the stream lock the base class
    * is holding before calling us
    */
-  // TODO: Check that we are still in a sane state
+  /* TODO: Check that we are still in a sane state */
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
   if (!gst_droid_codec_consume_frame (dec->codec, frame, frame->dts)) {
     GST_VIDEO_DECODER_STREAM_LOCK (decoder);
-    // TODO: error
+    /* TODO: error */
     return FALSE;
   }
 
@@ -323,7 +322,7 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 
   md.parent.width = state->info.width;
   md.parent.height = state->info.height;
-  md.parent.fps = state->info.fps_n / state->info.fps_d; // TODO: bad
+  md.parent.fps = state->info.fps_n / state->info.fps_d;
   md.parent.flags = DROID_MEDIA_CODEC_HW_ONLY;
   md.codec_data_size = 0;
 
@@ -331,7 +330,6 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     md.codec_data_size = gst_buffer_get_size (state->codec_data);
     md.codec_data = g_malloc(md.codec_data_size);
 
-    // TODO: error checking
     gst_buffer_extract (state->codec_data, 0, md.codec_data, md.codec_data_size);
   }
 
@@ -342,7 +340,7 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
       state->info.height);
 
   if (!gst_video_decoder_negotiate (decoder)) {
-    // TODO: error
+    GST_ERROR_OBJECT (dec, "Failed to negotiate");
 
     gst_video_codec_state_unref (dec->in_state);
     gst_video_codec_state_unref (dec->out_state);
@@ -386,7 +384,8 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   }
 
   if (!droid_media_codec_start (dec->codec)) {
-    // TODO: error
+    GST_ELEMENT_ERROR (dec, LIBRARY, INIT, (NULL), ("Failed to create a corresponding decoder"));
+
     droid_media_codec_destroy (dec->codec);
     dec->codec = NULL;
 

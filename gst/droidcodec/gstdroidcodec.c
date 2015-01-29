@@ -74,10 +74,10 @@ gst_droid_codec_consume_frame (DroidMediaCodec * codec,
     return FALSE;
   }
 
-  data.size = info.size;
-  data.data = info.data;
+  data.data.size = info.size;
+  data.data.data = info.data;
 
-  GST_LOG ("Consuming frame of size %d", data.size);
+  GST_LOG ("Consuming frame of size %d", data.data.size);
 
   buffer_data = g_slice_new (DroidBufferCallbackMapInfo);
 

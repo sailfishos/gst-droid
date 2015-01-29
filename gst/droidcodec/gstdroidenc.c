@@ -83,9 +83,9 @@ gst_droidenc_data_available(void *data, DroidMediaCodecData *encoded)
 
   if (encoded->codec_config) {
     GstBuffer *codec_data =
-      gst_buffer_new_allocate (NULL, encoded->size, NULL);
+      gst_buffer_new_allocate (NULL, encoded->data.size, NULL);
     GST_INFO_OBJECT (enc, "received codec_data");
-    gst_buffer_fill (codec_data, 0, encoded->data, encoded->size);
+    gst_buffer_fill (codec_data, 0, encoded->data.data, encoded->data.size);
 
     GST_BUFFER_OFFSET (codec_data) = 0;
     GST_BUFFER_OFFSET_END (codec_data) = 0;
@@ -115,8 +115,8 @@ gst_droidenc_data_available(void *data, DroidMediaCodecData *encoded)
   //  frame->pts = data->ts;
 
   frame->output_buffer = gst_video_encoder_allocate_output_buffer (GST_VIDEO_ENCODER (enc),
-								   encoded->size);
-  gst_buffer_fill (frame->output_buffer, 0, encoded->data, encoded->size);
+								   encoded->data.size);
+  gst_buffer_fill (frame->output_buffer, 0, encoded->data.data, encoded->data.size);
 
   GST_BUFFER_TIMESTAMP (frame->output_buffer) = encoded->ts;
 
