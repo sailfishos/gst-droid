@@ -152,7 +152,7 @@ gst_droid_codec_type_compliment_caps (const gchar * type, GstCaps * caps)
   int len = G_N_ELEMENTS (types);
 
   for (x = 0; x < len; x++) {
-    if (!g_strcmp0 (type, types[x].droid_type)) {
+    if (types[x].type == GST_DROID_CODEC_ENCODER && !g_strcmp0 (type, types[x].droid_type)) {
       if (types[x].compliment) {
         types[x].compliment (caps);
       }
