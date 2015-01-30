@@ -94,3 +94,114 @@ gst_droid_codec_consume_frame (DroidMediaCodec * codec,
 
   return TRUE;
 }
+
+/* codecs */
+#define CAPS_FRAGMENT " , width = (int) [1, MAX], height = (int)[1, MAX], framerate = (fraction)[1/MAX, MAX]"
+
+static gboolean
+is_mpeg4v (const GstStructure * s)
+{
+  gint val;
+
+  return gst_structure_get_int (s, "mpegversion", &val) && val == 4;
+}
+
+static gboolean
+is_h264_dec (const GstStructure * s)
+{
+  const char *alignment = gst_structure_get_string (s, "alignment");
+  const char *format = gst_structure_get_string (s, "stream-format");
+
+  /* Enforce alignment and format */
+  return alignment && format && !g_strcmp0 (alignment, "au")
+      && !g_strcmp0 (format, "byte-stream");
+}
+
+static gboolean
+is_h264_enc (const GstStructure * s)
+{
+  const char *alignment = gst_structure_get_string (s, "alignment");
+  const char *format = gst_structure_get_string (s, "stream-format");
+
+  /* We can accept caps without alignment or format and will add them later on */
+  if (alignment && g_strcmp0 (alignment, "au")) {
+    return FALSE;
+  }
+
+  if (format && g_strcmp0 (format, "byte-stream")) {
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+static void
+h264_compliment (GstCaps * caps)
+{
+  gst_caps_set_simple (caps, "alignment", G_TYPE_STRING, "au",
+      "stream-format", G_TYPE_STRING, "byte-stream", NULL);
+}
+
+static GstDroidCodec codecs[] = {
+  /* decoders */
+  {GST_DROID_CODEC_DECODER, "video/mpeg", "video/mp4v-es", is_mpeg4v, NULL,
+      "video/mpeg, mpegversion=4"CAPS_FRAGMENT, FALSE},
+  {GST_DROID_CODEC_DECODER, "video/x-h264", "video/avc", is_h264_dec,
+      NULL, "video/x-h264, alignment=au, stream-format=byte-stream"CAPS_FRAGMENT, FALSE},
+  {GST_DROID_CODEC_DECODER, "video/x-h263", "video/3gpp", NULL,
+      NULL, "video/x-h263"CAPS_FRAGMENT, FALSE},
+
+  /* encoders */
+  {GST_DROID_CODEC_ENCODER, "video/mpeg", "video/mp4v-es", is_mpeg4v,
+      NULL, "video/mpeg, mpegversion=4, systemstream=false"CAPS_FRAGMENT, FALSE},
+  {GST_DROID_CODEC_ENCODER, "video/x-h264", "video/avc",
+        is_h264_enc, h264_compliment,
+      "video/x-h264, alignment=au, stream-format=byte-stream"CAPS_FRAGMENT, TRUE},
+};
+
+GstDroidCodec *
+gst_droid_codec_get_from_caps (GstCaps * caps, GstDroidCodecType type)
+{
+  int x = 0;
+  int len = G_N_ELEMENTS (codecs);
+  GstStructure *s = gst_caps_get_structure (caps, 0);
+  const gchar *name = gst_structure_get_name (s);
+
+  for (x = 0; x < len; x++) {
+    if (codecs[x].type != type) {
+      continue;
+    }
+
+    gboolean is_equal = g_strcmp0 (codecs[x].mime, name) == 0;
+    if (!is_equal) {
+      continue;
+    }
+
+    if (!codecs[x].verify || codecs[x].verify (s)) {
+      return &codecs[x];
+    }
+  }
+
+  return NULL;
+}
+
+GstCaps *
+gst_droid_codec_get_all_caps (GstDroidCodecType type)
+{
+  GstCaps *caps = gst_caps_new_empty ();
+  int x = 0;
+  int len = G_N_ELEMENTS (codecs);
+
+  for (x = 0; x < len; x++) {
+    if (codecs[x].type != type) {
+      continue;
+    }
+
+    GstStructure *s = gst_structure_new_from_string (codecs[x].caps);
+    caps = gst_caps_merge_structure (caps, s);
+  }
+
+  GST_INFO ("caps %" GST_PTR_FORMAT, caps);
+
+  return caps;
+}

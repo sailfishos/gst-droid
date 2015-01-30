@@ -25,7 +25,6 @@
 
 #include "gstdroiddec.h"
 #include "gst/memory/gstgralloc.h"
-#include "gstdroidcodectype.h"
 #include "plugin.h"
 #include <gst/memory/gstwrappedmemory.h>
 #include <EGL/egl.h>
@@ -347,13 +346,14 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     return FALSE;
   }
 
-  md.parent.type = gst_droid_codec_type_from_caps (state->caps, GST_DROID_CODEC_DECODER);
-  if (!md.parent.type) {
+  dec->codec_type = gst_droid_codec_get_from_caps (state->caps, GST_DROID_CODEC_DECODER);
+  if (!dec->codec_type) {
     GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, (NULL),
         ("Unknown codec type for caps %" GST_PTR_FORMAT, state->caps));
     return FALSE;
   }
 
+  md.parent.type = dec->codec_type->droid;
   md.parent.width = state->info.width;
   md.parent.height = state->info.height;
   md.parent.fps = state->info.fps_n / state->info.fps_d;
@@ -562,6 +562,7 @@ static void
 gst_droiddec_init (GstDroidDec * dec)
 {
   dec->codec = NULL;
+  dec->codec_type = NULL;
   dec->eos = FALSE;
   dec->has_error = FALSE;
 
@@ -647,7 +648,7 @@ gst_droiddec_class_init (GstDroidDecClass * klass)
       "Video decoder", "Decoder/Video/Device",
       "Android HAL decoder", "Mohammed Sameer <msameer@foolab.org>");
 
-  caps = gst_droid_codec_type_all_caps (GST_DROID_CODEC_DECODER);
+  caps = gst_droid_codec_get_all_caps (GST_DROID_CODEC_DECODER);
   tpl = gst_pad_template_new (GST_VIDEO_DECODER_SINK_NAME,
       GST_PAD_SINK, GST_PAD_ALWAYS, caps);
   gst_element_class_add_pad_template (gstelement_class, tpl);

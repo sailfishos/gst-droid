@@ -47,7 +47,7 @@ struct _GstDroidDec
   GstVideoDecoder parent;
   DroidMediaCodec *codec;
   GstAllocator *allocator;
-
+  GstDroidCodec *codec_type;
   gboolean eos;
   GMutex eos_lock;
   GCond eos_cond;

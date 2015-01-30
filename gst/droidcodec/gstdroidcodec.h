@@ -28,17 +28,23 @@
 
 G_BEGIN_DECLS
 
-#define GST_TYPE_DROID_CODEC (gst_droid_codec_get_type())
+typedef enum {
+  GST_DROID_CODEC_DECODER,
+  GST_DROID_CODEC_ENCODER,
+} GstDroidCodecType;
 
-typedef struct _GstDroidCodec GstDroidCodec;
+typedef struct {
+  GstDroidCodecType type;
+  const gchar *mime;
+  const gchar *droid;
+  gboolean (*verify) (const GstStructure * s);
+  void (*compliment)(GstCaps * caps);
+  const gchar *caps;
+  gboolean in_stream_headers;
+} GstDroidCodec;
 
-struct _GstDroidCodec
-{
-  GstMiniObject parent;
-};
-
-GstDroidCodec *gst_droid_codec_get (void);
-
+GstDroidCodec *gst_droid_codec_get_from_caps (GstCaps * caps, GstDroidCodecType type);
+GstCaps *gst_droid_codec_get_all_caps (GstDroidCodecType type);
 gboolean gst_droid_codec_consume_frame (DroidMediaCodec * codec, GstVideoCodecFrame * frame, GstClockTime ts);
 
 G_END_DECLS

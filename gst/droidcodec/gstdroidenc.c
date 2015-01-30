@@ -26,7 +26,6 @@
 #include "gstdroidenc.h"
 #include "gst/memory/gstwrappedmemory.h"
 #include "gst/memory/gstgralloc.h"
-#include "gstdroidcodectype.h"
 #include "plugin.h"
 #include <string.h>
 
@@ -93,7 +92,7 @@ gst_droidenc_data_available(void *data, DroidMediaCodecData *encoded)
     GST_BUFFER_DURATION (codec_data) = GST_CLOCK_TIME_NONE;
     GST_BUFFER_FLAG_SET (codec_data, GST_BUFFER_FLAG_HEADER);
 
-    if (enc->in_stream_headers) {
+    if (enc->codec_type->in_stream_headers) {
       GstVideoEncoder *encoder = GST_VIDEO_ENCODER (enc);
       GList *headers = NULL;
       headers = g_list_append (headers, codec_data);
@@ -287,7 +286,7 @@ gst_droidenc_stop_loop (GstVideoEncoder * encoder)
 
 static GstVideoCodecState *
 gst_droidenc_configure_state (GstVideoEncoder * encoder,
-    GstVideoInfo * info, GstCaps * caps, const gchar * type)
+    GstVideoInfo * info, GstCaps * caps)
 {
   GstVideoCodecState *out = NULL;
   GstDroidEnc *enc = GST_DROIDENC (encoder);
@@ -303,7 +302,7 @@ gst_droidenc_configure_state (GstVideoEncoder * encoder,
 
   caps = gst_caps_fixate (caps);
 
-  gst_droid_codec_type_compliment_caps (type, caps);
+  enc->codec_type->compliment (caps);
 
   out = gst_video_encoder_set_output_state (GST_VIDEO_ENCODER (enc),
       caps, enc->in_state);
@@ -585,9 +584,8 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
   caps = gst_caps_truncate (caps);
 
   /* try to get our codec */
-  md.parent.type = gst_droid_codec_type_from_caps (caps, GST_DROID_CODEC_ENCODER);
-
-  if (!md.parent.type) {
+  enc->codec_type = gst_droid_codec_get_from_caps (caps, GST_DROID_CODEC_ENCODER);
+  if (!enc->codec_type) {
     GST_ELEMENT_ERROR (enc, LIBRARY, FAILED, (NULL),
         ("Unknown codec type for caps %" GST_PTR_FORMAT, state->caps));
 
@@ -596,16 +594,10 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
     return FALSE;
   }
 
-  if (!gst_droid_codec_type_in_stream_headers (md.parent.type, &enc->in_stream_headers)) {
-    GST_ELEMENT_ERROR (enc, LIBRARY, FAILED, (NULL),
-        ("cannot determine header requirements for encoder %s", md.parent.type));
-    /* TODO: in_state */
-    gst_caps_unref (caps);
-    return FALSE;
-  }
+  md.parent.type = enc->codec_type->droid;
 
   enc->out_state =
-      gst_droidenc_configure_state (encoder, &state->info, caps, md.parent.type);
+      gst_droidenc_configure_state (encoder, &state->info, caps);
 
 #if 0
   enc->comp =
@@ -787,6 +779,7 @@ static void
 gst_droidenc_init (GstDroidEnc * enc)
 {
   enc->codec = NULL;
+  enc->codec_type = NULL;
   enc->in_state = NULL;
   enc->out_state = NULL;
   enc->target_bitrate = GST_DROID_ENC_TARGET_BITRATE_DEFAULT;
@@ -865,7 +858,7 @@ gst_droidenc_class_init (GstDroidEncClass * klass)
       "Video encoder", "Encoder/Video/Device",
       "Android HAL encoder", "Mohammed Sameer <msameer@foolab.org>");
 
-  caps = gst_droid_codec_type_all_caps (GST_DROID_CODEC_ENCODER);
+  caps = gst_droid_codec_get_all_caps (GST_DROID_CODEC_ENCODER);
 
   tpl = gst_pad_template_new (GST_VIDEO_ENCODER_SRC_NAME,
       GST_PAD_SRC, GST_PAD_ALWAYS, caps);
