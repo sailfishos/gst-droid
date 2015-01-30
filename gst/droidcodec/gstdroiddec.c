@@ -360,13 +360,6 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   md.parent.flags = DROID_MEDIA_CODEC_HW_ONLY;
   md.codec_data_size = 0;
 
-  if (state->codec_data) {
-    md.codec_data_size = gst_buffer_get_size (state->codec_data);
-    md.codec_data = g_malloc(md.codec_data_size);
-
-    gst_buffer_extract (state->codec_data, 0, md.codec_data, md.codec_data_size);
-  }
-
   dec->in_state = gst_video_codec_state_ref (state);
 
   dec->out_state =
@@ -383,6 +376,13 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     dec->out_state = NULL;
 
     return FALSE;
+  }
+
+  if (state->codec_data) {
+    md.codec_data_size = gst_buffer_get_size (state->codec_data);
+    md.codec_data = g_malloc(md.codec_data_size);
+
+    gst_buffer_extract (state->codec_data, 0, md.codec_data, md.codec_data_size);
   }
 
   dec->codec = droid_media_codec_create_decoder(&md);
