@@ -486,7 +486,7 @@ gst_droidenc_finalize (GObject * object)
 
   GST_DEBUG_OBJECT (enc, "finalize");
 
-  gst_mini_object_unref (GST_MINI_OBJECT (enc->codec));
+  //  gst_mini_object_unref (GST_MINI_OBJECT (enc->codec));
   enc->codec = NULL;
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
@@ -668,7 +668,6 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
     droid_media_codec_set_callbacks (enc->codec, &cb, enc);
   }
 
-
   {
     DroidMediaCodecDataCallbacks cb;
     cb.data_available = gst_droidenc_data_available;
@@ -798,11 +797,31 @@ gst_droidenc_getcaps (GstVideoEncoder * encoder, GstCaps * filter)
 {
   GstDroidEnc *enc;
   GstCaps *caps;
-  //  GstCaps *ret;
+  GstCaps *ret;
 
   enc = GST_DROIDENC (encoder);
 
   GST_DEBUG_OBJECT (enc, "getcaps with filter %" GST_PTR_FORMAT, filter);
+
+#if 0
+  /*
+   * TODO: Seems _proxy_getcaps() is not working for us. It might be related to the feature we use
+   * If it's the case then file a bug upstream, try to fix it and then enable this.
+   */
+  if (enc->out_state && enc->out_state->caps) {
+    caps = gst_caps_copy (enc->out_state->caps);
+  } else {
+    caps = gst_pad_get_pad_template_caps (GST_VIDEO_ENCODER_SINK_PAD (encoder));
+  }
+
+  GST_DEBUG_OBJECT (enc, "our caps %" GST_PTR_FORMAT, caps);
+
+  ret = gst_video_encoder_proxy_getcaps (encoder, caps, filter);
+
+  GST_DEBUG_OBJECT (enc, "returning %" GST_PTR_FORMAT, ret);
+
+  gst_caps_unref (caps);
+#endif
 
   if (enc->out_state && enc->out_state->caps) {
     caps = gst_caps_copy (enc->out_state->caps);
@@ -812,17 +831,21 @@ gst_droidenc_getcaps (GstVideoEncoder * encoder, GstCaps * filter)
 
   GST_DEBUG_OBJECT (enc, "our caps %" GST_PTR_FORMAT, caps);
 
-#if 0
-  ret = gst_video_encoder_proxy_getcaps (encoder, caps, filter);
+  if (caps && filter) {
+    ret = gst_caps_intersect_full (caps, filter, GST_CAPS_INTERSECT_FIRST);
+  } else if (caps) {
+    ret = gst_caps_ref (caps);
+  } else {
+    ret = NULL;
+  }
 
-  GST_DEBUG_OBJECT (enc, "returning %" GST_PTR_FORMAT, ret);
+  if (caps) {
+    gst_caps_unref (caps);
+  }
 
-  gst_caps_unref (caps);
+  GST_DEBUG_OBJECT (enc, "returning caps %" GST_PTR_FORMAT, ret);
 
   return ret;
-#endif
-  // TODO:
-  return caps;
 }
 
 static void
