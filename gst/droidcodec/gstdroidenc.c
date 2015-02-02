@@ -111,8 +111,6 @@ gst_droidenc_data_available(void *data, DroidMediaCodecData *encoded)
     GST_WARNING_OBJECT (enc, "buffer without frame");
     return;
   }
-  // TODO:
-  //  frame->pts = data->ts;
 
   frame->output_buffer = gst_video_encoder_allocate_output_buffer (GST_VIDEO_ENCODER (enc),
 								   encoded->data.size);
@@ -126,60 +124,6 @@ gst_droidenc_data_available(void *data, DroidMediaCodecData *encoded)
   }
 
   gst_video_encoder_finish_frame (GST_VIDEO_ENCODER (enc), frame);
-
-#if 0
-  GstDroidDec *dec = (GstDroidDec *) user;
-  DroidMediaBuffer *buffer;
-  DroidMediaBufferCallbacks cb;
-  GstMemory *mem;
-  guint width, height;
-
-  
-
-  GST_DEBUG_OBJECT (dec, "frame available");
-
-  mem = gst_wrapped_memory_allocator_memory_new (dec->allocator);
-
-  cb.ref = (void (*)(void *))gst_memory_ref;
-  cb.unref = (void (*)(void *))gst_memory_unref;
-  cb.data = mem;
-
-  buffer = droid_media_codec_acquire_buffer(dec->codec, &cb);
-  if (!buffer) {
-    GST_ERROR_OBJECT (dec, "failed to acquire buffer from droidmedia");
-    gst_memory_unref (mem);
-    return;
-  }
-
-  gst_wrapped_memory_allocator_memory_set_data (mem, buffer,
-	(GFunc)gst_droiddec_release_frame, NULL);
-
-  GstBuffer *buff = gst_buffer_new ();
-
-  gst_buffer_insert_memory (buff, 0, mem);
-
-  width = droid_media_buffer_get_width(buffer);
-  height = droid_media_buffer_get_height(buffer);
-
-  gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE, GST_VIDEO_FORMAT_ENCODED,
-			     width, height);
-
-  frame = gst_video_decoder_get_oldest_frame (GST_VIDEO_DECODER (dec));
-
-  if (!frame) {
-    // TODO:
-    GST_WARNING_OBJECT (dec, "buffer without frame");
-    gst_buffer_unref (buff);
-    return;
-  }
-
-  frame->output_buffer = buff;
-
-  /* We get the timestamp in ns already */
-  frame->pts = droid_media_buffer_get_timestamp (buffer);
-
-  gst_video_decoder_finish_frame (GST_VIDEO_DECODER (dec), frame);
-#endif
 }
 
 static gboolean
