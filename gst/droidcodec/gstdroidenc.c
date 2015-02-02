@@ -118,7 +118,8 @@ gst_droidenc_data_available(void *data, DroidMediaCodecData *encoded)
 								   encoded->data.size);
   gst_buffer_fill (frame->output_buffer, 0, encoded->data.data, encoded->data.size);
 
-  GST_BUFFER_TIMESTAMP (frame->output_buffer) = encoded->ts;
+  GST_BUFFER_PTS (frame->output_buffer) = encoded->ts;
+  GST_BUFFER_DTS (frame->output_buffer) = encoded->decoding_ts;
 
   if (encoded->sync) {
     GST_VIDEO_CODEC_FRAME_SET_SYNC_POINT(frame);
