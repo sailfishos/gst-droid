@@ -88,7 +88,8 @@ gst_droidenc_data_available(void *data, DroidMediaCodecData *encoded)
 
     GST_BUFFER_OFFSET (codec_data) = 0;
     GST_BUFFER_OFFSET_END (codec_data) = 0;
-    GST_BUFFER_TIMESTAMP (codec_data) = GST_CLOCK_TIME_NONE;
+    GST_BUFFER_PTS (codec_data) = GST_CLOCK_TIME_NONE;
+    GST_BUFFER_DTS (codec_data) = GST_CLOCK_TIME_NONE;
     GST_BUFFER_DURATION (codec_data) = GST_CLOCK_TIME_NONE;
     GST_BUFFER_FLAG_SET (codec_data, GST_BUFFER_FLAG_HEADER);
 
