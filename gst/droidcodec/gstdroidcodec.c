@@ -25,6 +25,12 @@
 
 #include "gstdroidcodec.h"
 #include "plugin.h"
+#include <glib.h>
+#include <gst/base/gstbytewriter.h>
+#ifndef GST_USE_UNSTABLE_API
+#define GST_USE_UNSTABLE_API
+#endif /* GST_USE_UNSTABLE_API */
+#include <gst/codecparsers/gsth264parser.h>
 
 GST_DEFINE_MINI_OBJECT_TYPE (GstDroidCodec, gst_droid_codec);
 
@@ -128,7 +134,7 @@ is_h264_enc (const GstStructure * s)
     return FALSE;
   }
 
-  if (format && g_strcmp0 (format, "byte-stream")) {
+  if (format && g_strcmp0 (format, "avc")) {
     return FALSE;
   }
 
@@ -139,24 +145,159 @@ static void
 h264_compliment (GstCaps * caps)
 {
   gst_caps_set_simple (caps, "alignment", G_TYPE_STRING, "au",
-      "stream-format", G_TYPE_STRING, "byte-stream", NULL);
+      "stream-format", G_TYPE_STRING, "avc", NULL);
+}
+
+static gboolean
+construct_normal_codec_data (gpointer data, gsize size, GstBuffer **buffer)
+{
+  GstBuffer *codec_data = gst_buffer_new_allocate (NULL, size, NULL);
+
+  gst_buffer_fill (codec_data, 0, data, size);
+
+  GST_BUFFER_OFFSET (codec_data) = 0;
+  GST_BUFFER_OFFSET_END (codec_data) = 0;
+  GST_BUFFER_PTS (codec_data) = GST_CLOCK_TIME_NONE;
+  GST_BUFFER_DTS (codec_data) = GST_CLOCK_TIME_NONE;
+  GST_BUFFER_DURATION (codec_data) = GST_CLOCK_TIME_NONE;
+  GST_BUFFER_FLAG_SET (codec_data, GST_BUFFER_FLAG_HEADER);
+
+  *buffer = codec_data;
+
+  return TRUE;
+}
+
+static gboolean
+construct_h264_codec_data (gpointer data, gsize size, GstBuffer **buffer)
+{
+  GstH264NalParser *parser = gst_h264_nal_parser_new ();
+  gsize offset = 0;
+  gboolean ret = FALSE;
+  GSList *sps = NULL, *pps = NULL;
+  gsize sps_size = 0, pps_size = 0;
+  guint8 num_sps = 0, num_pps = 0;
+  GstByteWriter *writer = NULL;
+  guint8 profile_idc = 0, profile_comp = 0, level_idc = 0;
+  gboolean idc_found = FALSE;
+  GstH264NalUnit nal;
+  GstH264ParserResult res;
+  int x;
+
+  res = gst_h264_parser_identify_nalu (parser, data, offset, size, &nal);
+
+  while (res == GST_H264_PARSER_OK || res == GST_H264_PARSER_NO_NAL_END) {
+    GstBuffer *buffer = gst_buffer_new_allocate (NULL, nal.size, NULL);
+    gst_buffer_fill (buffer, 0, nal.data + nal.offset, nal.size);
+
+    offset += (nal.size + nal.offset);
+
+    if (nal.type == GST_H264_NAL_SPS) {
+      if (nal.size >= 4 && !idc_found) {
+	idc_found = TRUE;
+
+	profile_idc = nal.data[1];
+	profile_comp = nal.data[2];
+	level_idc = nal.data[3];
+      }
+
+      sps = g_slist_append (sps, buffer);
+      sps_size += (nal.size + 2);
+    } else if (nal.type == GST_H264_NAL_PPS) {
+      pps = g_slist_append (pps, buffer);
+      pps_size += (nal.size + 2);
+    } else {
+      gst_buffer_unref (buffer);
+    }
+
+    if (gst_h264_parser_parse_nal (parser, &nal) != GST_H264_PARSER_OK) {
+      goto out;
+    }
+
+    res = gst_h264_parser_identify_nalu (parser, data, offset, size, &nal);
+  }
+
+  if (!idc_found) {
+    goto out;
+  }
+
+  num_sps = g_slist_length (sps);
+  if (num_sps < 1 || num_sps >= GST_H264_MAX_SPS_COUNT) {
+    goto out;
+  }
+
+  num_pps = g_slist_length (pps);
+  if (num_pps < 1 || num_pps >= GST_H264_MAX_PPS_COUNT) {
+    goto out;
+  }
+
+  /* TODO: We should check that the parameters are similar if we have more than 1 SPS */
+  writer = gst_byte_writer_new_with_size (sps_size + pps_size + 7, FALSE);
+  gst_byte_writer_put_uint8 (writer, 1); /* AVC decoder configuration version 1 */
+  gst_byte_writer_put_uint8 (writer, profile_idc); /* profile idc */
+  gst_byte_writer_put_uint8 (writer, profile_comp); /* profile compatibility */
+  gst_byte_writer_put_uint8 (writer, level_idc); /* level idc */
+  gst_byte_writer_put_uint8 (writer, (0xfc | (4 - 1))); /* nal length size - 1 */
+  gst_byte_writer_put_uint8 (writer, 0xe0 | num_sps);/* number of sps */
+
+  /* SPS */
+  for (x = 0; x < num_sps; x++) {
+    GstBuffer *buf = g_slist_nth_data (sps, x);
+    GstMapInfo info;
+    gst_buffer_map (buf, &info, GST_MAP_READ);
+    gst_byte_writer_put_uint8 (writer, info.size >> 8);
+    gst_byte_writer_put_uint8 (writer, info.size & 0xff);
+    gst_byte_writer_put_data (writer, info.data, info.size);
+    gst_buffer_unmap (buf, &info);
+  }
+
+  gst_byte_writer_put_uint8 (writer, num_pps);/* number of pps */
+
+  /* PPS */
+  for (x = 0; x < num_pps; x++) {
+    GstBuffer *buf = g_slist_nth_data (pps, x);
+    GstMapInfo info;
+    gst_buffer_map (buf, &info, GST_MAP_READ);
+    gst_byte_writer_put_uint8 (writer, info.size >> 8);
+    gst_byte_writer_put_uint8 (writer, info.size & 0xff);
+    gst_byte_writer_put_data (writer, info.data, info.size);
+    gst_buffer_unmap (buf, &info);
+  }
+
+  *buffer = gst_byte_writer_free_and_get_buffer (writer);
+  writer = NULL;
+  ret = TRUE;
+
+out:
+  if (sps) {
+    g_slist_free_full (sps, (GDestroyNotify)gst_buffer_unref);
+  }
+
+  if (pps) {
+    g_slist_free_full (pps, (GDestroyNotify)gst_buffer_unref);
+  }
+
+  if (parser) {
+    gst_h264_nal_parser_free (parser);
+  }
+
+  return ret;
 }
 
 static GstDroidCodec codecs[] = {
   /* decoders */
   {GST_DROID_CODEC_DECODER, "video/mpeg", "video/mp4v-es", is_mpeg4v, NULL,
-      "video/mpeg, mpegversion=4"CAPS_FRAGMENT, FALSE},
+      "video/mpeg, mpegversion=4"CAPS_FRAGMENT, NULL},
   {GST_DROID_CODEC_DECODER, "video/x-h264", "video/avc", is_h264_dec,
-      NULL, "video/x-h264, alignment=au, stream-format=byte-stream"CAPS_FRAGMENT, FALSE},
+      NULL, "video/x-h264, alignment=au, stream-format=byte-stream"CAPS_FRAGMENT, NULL},
   {GST_DROID_CODEC_DECODER, "video/x-h263", "video/3gpp", NULL,
-      NULL, "video/x-h263"CAPS_FRAGMENT, FALSE},
+      NULL, "video/x-h263"CAPS_FRAGMENT, NULL},
 
   /* encoders */
   {GST_DROID_CODEC_ENCODER, "video/mpeg", "video/mp4v-es", is_mpeg4v,
-      NULL, "video/mpeg, mpegversion=4, systemstream=false"CAPS_FRAGMENT, FALSE},
+      NULL, "video/mpeg, mpegversion=4, systemstream=false"CAPS_FRAGMENT, construct_normal_codec_data},
   {GST_DROID_CODEC_ENCODER, "video/x-h264", "video/avc",
         is_h264_enc, h264_compliment,
-      "video/x-h264, alignment=au, stream-format=byte-stream"CAPS_FRAGMENT, TRUE},
+      "video/x-h264, alignment=au, stream-format=avc"CAPS_FRAGMENT, construct_h264_codec_data},
 };
 
 GstDroidCodec *

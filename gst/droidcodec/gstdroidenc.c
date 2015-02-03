@@ -81,24 +81,21 @@ gst_droidenc_data_available(void *data, DroidMediaCodecData *encoded)
   GST_DEBUG_OBJECT (enc, "data available");
 
   if (encoded->codec_config) {
-    GstBuffer *codec_data =
-      gst_buffer_new_allocate (NULL, encoded->data.size, NULL);
+    GstBuffer *codec_data = NULL;
+
+    g_assert (enc->codec_type->construct_codec_data);
+
     GST_INFO_OBJECT (enc, "received codec_data");
-    gst_buffer_fill (codec_data, 0, encoded->data.data, encoded->data.size);
 
-    GST_BUFFER_OFFSET (codec_data) = 0;
-    GST_BUFFER_OFFSET_END (codec_data) = 0;
-    GST_BUFFER_PTS (codec_data) = GST_CLOCK_TIME_NONE;
-    GST_BUFFER_DTS (codec_data) = GST_CLOCK_TIME_NONE;
-    GST_BUFFER_DURATION (codec_data) = GST_CLOCK_TIME_NONE;
-    GST_BUFFER_FLAG_SET (codec_data, GST_BUFFER_FLAG_HEADER);
+    if (!enc->codec_type->construct_codec_data (encoded->data.data,
+						encoded->data.size, &codec_data)) {
 
-    if (enc->codec_type->in_stream_headers) {
-      GstVideoEncoder *encoder = GST_VIDEO_ENCODER (enc);
-      GList *headers = NULL;
-      headers = g_list_append (headers, codec_data);
-      gst_video_encoder_set_headers (encoder, headers);
-    } else {
+      GST_ELEMENT_ERROR (enc, STREAM, FORMAT, (NULL),
+			 ("Failed to construct codec_data. Expect corrupted stream"));
+    }
+
+    if (codec_data) {
+      /* encoder is allowed to return a NULL codec_data */
       gst_buffer_replace (&enc->out_state->codec_data, codec_data);
     }
 

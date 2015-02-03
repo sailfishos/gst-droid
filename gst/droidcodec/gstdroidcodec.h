@@ -40,7 +40,7 @@ typedef struct {
   gboolean (*verify) (const GstStructure * s);
   void (*compliment)(GstCaps * caps);
   const gchar *caps;
-  gboolean in_stream_headers;
+  gboolean (*construct_codec_data) (gpointer data, gsize size, GstBuffer **buffer);
 } GstDroidCodec;
 
 GstDroidCodec *gst_droid_codec_get_from_caps (GstCaps * caps, GstDroidCodecType type);
