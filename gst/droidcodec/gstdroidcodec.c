@@ -198,6 +198,15 @@ construct_h264_codec_data (gpointer data, gsize size, GstBuffer **buffer)
 	profile_idc = nal.data[1];
 	profile_comp = nal.data[2];
 	level_idc = nal.data[3];
+      } else if (nal.size >= 4) {
+	if (profile_idc != nal.data[1] || profile_comp != nal.data[2] ||
+	    level_idc != nal.data[3]) {
+	  GST_ERROR ("Inconsistency in SPS");
+	  goto out;
+	}
+      } else {
+	GST_ERROR ("malformed SPS");
+	goto out;
       }
 
       sps = g_slist_append (sps, buffer);
@@ -230,7 +239,8 @@ construct_h264_codec_data (gpointer data, gsize size, GstBuffer **buffer)
     goto out;
   }
 
-  /* TODO: We should check that the parameters are similar if we have more than 1 SPS */
+  GST_INFO ("SPS found: %d, PPS found: %d", num_sps, num_pps);
+
   writer = gst_byte_writer_new_with_size (sps_size + pps_size + 7, FALSE);
   gst_byte_writer_put_uint8 (writer, 1); /* AVC decoder configuration version 1 */
   gst_byte_writer_put_uint8 (writer, profile_idc); /* profile idc */
