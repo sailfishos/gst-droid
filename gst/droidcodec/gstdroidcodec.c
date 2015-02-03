@@ -209,33 +209,41 @@ construct_h264_codec_data (gpointer data, gsize size, GstBuffer **buffer)
 	goto out;
       }
 
+      GST_MEMDUMP ("Found SPS", nal.data + nal.offset, nal.size);
+
       sps = g_slist_append (sps, buffer);
       sps_size += (nal.size + 2);
     } else if (nal.type == GST_H264_NAL_PPS) {
+      GST_MEMDUMP ("Found PPS", nal.data + nal.offset, nal.size);
       pps = g_slist_append (pps, buffer);
       pps_size += (nal.size + 2);
     } else {
+      GST_LOG ("NAL is neither SPS nor PPS");
       gst_buffer_unref (buffer);
     }
 
     if (gst_h264_parser_parse_nal (parser, &nal) != GST_H264_PARSER_OK) {
+      GST_ERROR ("malformed NAL");
       goto out;
     }
 
     res = gst_h264_parser_identify_nalu (parser, data, offset, size, &nal);
   }
 
-  if (!idc_found) {
+  if (G_UNLIKELY (!idc_found)) {
+    GST_ERROR ("missing codec parameters");
     goto out;
   }
 
   num_sps = g_slist_length (sps);
-  if (num_sps < 1 || num_sps >= GST_H264_MAX_SPS_COUNT) {
+  if (G_UNLIKELY (num_sps < 1 || num_sps >= GST_H264_MAX_SPS_COUNT)) {
+    GST_ERROR ("No SPS found");
     goto out;
   }
 
   num_pps = g_slist_length (pps);
-  if (num_pps < 1 || num_pps >= GST_H264_MAX_PPS_COUNT) {
+  if (G_UNLIKELY (num_pps < 1 || num_pps >= GST_H264_MAX_PPS_COUNT)) {
+    GST_ERROR ("No PPS found");
     goto out;
   }
 
