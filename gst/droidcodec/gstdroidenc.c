@@ -76,6 +76,7 @@ static void
 gst_droidenc_data_available(void *data, DroidMediaCodecData *encoded)
 {
   GstVideoCodecFrame *frame;
+  DroidMediaData out;
   GstDroidEnc * enc = (GstDroidEnc *) data;
 
   GST_DEBUG_OBJECT (enc, "data available");
@@ -104,14 +105,23 @@ gst_droidenc_data_available(void *data, DroidMediaCodecData *encoded)
 
   frame = gst_video_encoder_get_oldest_frame (GST_VIDEO_ENCODER (enc));
   if (!frame) {
-    // TODO:
+    /* TODO: */
     GST_WARNING_OBJECT (enc, "buffer without frame");
     return;
   }
 
-  frame->output_buffer = gst_video_encoder_allocate_output_buffer (GST_VIDEO_ENCODER (enc),
-								   encoded->data.size);
-  gst_buffer_fill (frame->output_buffer, 0, encoded->data.data, encoded->data.size);
+  if (enc->codec_type->process_data) {
+    if (!enc->codec_type->process_data (&(encoded->data), &out)) {
+      /* TODO: error */
+      GST_WARNING_OBJECT (enc, "failed to process data");
+    } else {
+      frame->output_buffer = gst_buffer_new_wrapped (out.data, out.size);
+    }
+  } else {
+    frame->output_buffer = gst_video_encoder_allocate_output_buffer (GST_VIDEO_ENCODER (enc),
+								     encoded->data.size);
+    gst_buffer_fill (frame->output_buffer, 0, encoded->data.data, encoded->data.size);
+  }
 
   GST_BUFFER_PTS (frame->output_buffer) = encoded->ts;
   GST_BUFFER_DTS (frame->output_buffer) = encoded->decoding_ts;

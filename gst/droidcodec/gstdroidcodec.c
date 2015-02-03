@@ -283,21 +283,51 @@ out:
   return ret;
 }
 
+static gboolean
+construct_h264_data (DroidMediaData *in, DroidMediaData *out)
+{
+  guint32 size;
+  guint8 *data;
+
+  if (in->size >= 4 && memcmp (in->data, "\x00\x00\x00\x01", 4) == 0) {
+    /* We will replace the first 4 bytes with the NAL size */
+    out->size = in->size;
+    data = in->data + 4;
+  } else {
+    /* We don't have the NAL prefix so we add 4 bytes for the NAL size */
+    out->size = in->size + 4;
+    data = in->data;
+  }
+
+  size = GUINT32_TO_BE (out->size - 4);
+  out->data = g_malloc (out->size);
+  if (!out->data) {
+    return FALSE;
+  }
+
+  memcpy (out->data, &size, sizeof (size));
+  memcpy (out->data + 4, data, out->size - 4);
+
+  return TRUE;
+}
+
 static GstDroidCodec codecs[] = {
   /* decoders */
   {GST_DROID_CODEC_DECODER, "video/mpeg", "video/mp4v-es", is_mpeg4v, NULL,
-      "video/mpeg, mpegversion=4"CAPS_FRAGMENT, NULL},
+   "video/mpeg, mpegversion=4"CAPS_FRAGMENT, NULL, NULL},
   {GST_DROID_CODEC_DECODER, "video/x-h264", "video/avc", is_h264_dec,
-      NULL, "video/x-h264, alignment=au, stream-format=byte-stream"CAPS_FRAGMENT, NULL},
+   NULL, "video/x-h264, alignment=au, stream-format=byte-stream"CAPS_FRAGMENT, NULL, NULL},
   {GST_DROID_CODEC_DECODER, "video/x-h263", "video/3gpp", NULL,
-      NULL, "video/x-h263"CAPS_FRAGMENT, NULL},
+   NULL, "video/x-h263"CAPS_FRAGMENT, NULL, NULL},
 
   /* encoders */
   {GST_DROID_CODEC_ENCODER, "video/mpeg", "video/mp4v-es", is_mpeg4v,
-      NULL, "video/mpeg, mpegversion=4, systemstream=false"CAPS_FRAGMENT, construct_normal_codec_data},
+      NULL, "video/mpeg, mpegversion=4, systemstream=false"CAPS_FRAGMENT,
+   construct_normal_codec_data, NULL},
   {GST_DROID_CODEC_ENCODER, "video/x-h264", "video/avc",
         is_h264_enc, h264_compliment,
-      "video/x-h264, alignment=au, stream-format=avc"CAPS_FRAGMENT, construct_h264_codec_data},
+   "video/x-h264, alignment=au, stream-format=avc"CAPS_FRAGMENT,
+   construct_h264_codec_data, construct_h264_data},
 };
 
 GstDroidCodec *
