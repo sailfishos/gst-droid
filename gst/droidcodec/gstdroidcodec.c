@@ -344,8 +344,10 @@ construct_mpeg4_esds (GstBuffer *data, DroidMediaData *out)
     return FALSE;
   }
 
-  writer = gst_byte_writer_new_with_size (info.size + 29, FALSE);
+  writer = gst_byte_writer_new_with_size (info.size + 29 - 4, FALSE);
+#if 0 /* stagefright ESDS parser does not like us when we have the first 4 bytes */
   gst_byte_writer_put_uint32_be (writer, 0); /* version and flags */
+#endif
   gst_byte_writer_put_uint8 (writer, 0x03); /* ES descriptor type tag */
   gst_byte_writer_put_uint8 (writer, 23 + info.size); /* size */
   gst_byte_writer_put_uint16_be (writer, 0); /* ES ID */
