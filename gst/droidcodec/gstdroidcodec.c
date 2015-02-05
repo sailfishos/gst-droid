@@ -329,23 +329,79 @@ construct_h264_data (DroidMediaData *in, DroidMediaData *out)
   return TRUE;
 }
 
+static gboolean
+construct_mpeg4_esds (GstBuffer *data, DroidMediaData *out)
+{
+  /*
+   * If there are things which I hate the most, this function will be among them
+   * http://xhelmboyx.tripod.com/formats/mp4-layout.txt
+   */
+  GstMapInfo info;
+  GstByteWriter *writer = NULL;
+
+  if (!gst_buffer_map (data, &info, GST_MAP_READ)) {
+    GST_ERROR ("failed to map buffer");
+    return FALSE;
+  }
+
+  writer = gst_byte_writer_new_with_size (info.size + 29, FALSE);
+  gst_byte_writer_put_uint32_be (writer, 0); /* version and flags */
+  gst_byte_writer_put_uint8 (writer, 0x03); /* ES descriptor type tag */
+  gst_byte_writer_put_uint8 (writer, 23 + info.size); /* size */
+  gst_byte_writer_put_uint16_be (writer, 0); /* ES ID */
+  gst_byte_writer_put_uint8 (writer, 0x1f); /* priority */
+  gst_byte_writer_put_uint8 (writer, 0x04); /* decoder config descriptor type tag */
+  gst_byte_writer_put_uint8 (writer, 15 + info.size);
+  gst_byte_writer_put_uint8 (writer, 0x20); /* object type: MPEG4 video */
+  gst_byte_writer_put_uint8 (writer, 0x11); /* stream type: visual stream */
+
+  /* buffer size db, average bit rate and max bit rate values are taken from stagefright MPEG4Writer */
+  gst_byte_writer_put_uint8 (writer, 0x01); /* buffer size db: 1/3 */
+  gst_byte_writer_put_uint8 (writer, 0x77); /* buffer size db: 2/3 */
+  gst_byte_writer_put_uint8 (writer, 0x00); /* buffer size db: 3/3 */
+  gst_byte_writer_put_uint8 (writer, 0x00); /* max bit rate: 1/4 */
+  gst_byte_writer_put_uint8 (writer, 0x03); /* max bit rate: 2/4 */
+  gst_byte_writer_put_uint8 (writer, 0xe8); /* max bit rate: 3/4 */
+  gst_byte_writer_put_uint8 (writer, 0x00); /* max bit rate: 4/4 */
+
+  gst_byte_writer_put_uint8 (writer, 0x00); /* average bit rate: 1/4 */
+  gst_byte_writer_put_uint8 (writer, 0x03); /* average bit rate: 2/4 */
+  gst_byte_writer_put_uint8 (writer, 0xe8); /* average bit rate: 3/4 */
+  gst_byte_writer_put_uint8 (writer, 0x00); /* average bit rate: 4/4 */
+
+  gst_byte_writer_put_uint8 (writer, 0x05); /* decoder specific descriptor type tag */
+  gst_byte_writer_put_uint8 (writer, info.size); /* size */
+  gst_byte_writer_put_data (writer, info.data, info.size);     /* codec data */
+
+  gst_byte_writer_put_uint8 (writer, 0x06); /* SL config descriptor type tag */
+  gst_byte_writer_put_uint8 (writer, 0x01); /* descriptor type length */
+  gst_byte_writer_put_uint8 (writer, 0x02); /* SL value */
+
+  out->size = gst_byte_writer_get_size (writer);
+  out->data = gst_byte_writer_free_and_get_data (writer);
+
+  gst_buffer_unmap (data, &info);
+
+  return TRUE;
+}
+
 static GstDroidCodec codecs[] = {
   /* decoders */
   {GST_DROID_CODEC_DECODER, "video/mpeg", "video/mp4v-es", is_mpeg4v, NULL,
-   "video/mpeg, mpegversion=4"CAPS_FRAGMENT, NULL, NULL},
+   "video/mpeg, mpegversion=4"CAPS_FRAGMENT, NULL, NULL, construct_mpeg4_esds},
   {GST_DROID_CODEC_DECODER, "video/x-h264", "video/avc", is_h264_dec,
-   NULL, "video/x-h264, alignment=au, stream-format=byte-stream"CAPS_FRAGMENT, NULL, NULL},
+   NULL, "video/x-h264, alignment=au, stream-format=byte-stream"CAPS_FRAGMENT, NULL, NULL, NULL},
   {GST_DROID_CODEC_DECODER, "video/x-h263", "video/3gpp", NULL,
-   NULL, "video/x-h263"CAPS_FRAGMENT, NULL, NULL},
+   NULL, "video/x-h263"CAPS_FRAGMENT, NULL, NULL, NULL},
 
   /* encoders */
   {GST_DROID_CODEC_ENCODER, "video/mpeg", "video/mp4v-es", is_mpeg4v,
       NULL, "video/mpeg, mpegversion=4, systemstream=false"CAPS_FRAGMENT,
-   construct_normal_codec_data, NULL},
+   construct_normal_codec_data, NULL, NULL},
   {GST_DROID_CODEC_ENCODER, "video/x-h264", "video/avc",
         is_h264_enc, h264_compliment,
    "video/x-h264, alignment=au, stream-format=avc"CAPS_FRAGMENT,
-   construct_h264_codec_data, construct_h264_data},
+   construct_h264_codec_data, construct_h264_data, NULL},
 };
 
 GstDroidCodec *

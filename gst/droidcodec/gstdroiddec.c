@@ -358,7 +358,7 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   md.parent.height = state->info.height;
   md.parent.fps = state->info.fps_n / state->info.fps_d;
   md.parent.flags = DROID_MEDIA_CODEC_HW_ONLY;
-  md.codec_data_size = 0;
+  md.codec_data.size = 0;
 
   dec->in_state = gst_video_codec_state_ref (state);
 
@@ -379,16 +379,26 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   }
 
   if (state->codec_data) {
-    md.codec_data_size = gst_buffer_get_size (state->codec_data);
-    md.codec_data = g_malloc(md.codec_data_size);
+    g_assert (dec->codec_type->construct_decoder_codec_data);
 
-    gst_buffer_extract (state->codec_data, 0, md.codec_data, md.codec_data_size);
+    if (!dec->codec_type->construct_decoder_codec_data (state->codec_data, &md.codec_data)) {
+      GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
+			 ("Failed to construct codec_data."));
+
+      gst_video_codec_state_unref (dec->in_state);
+      gst_video_codec_state_unref (dec->out_state);
+
+      dec->in_state = NULL;
+      dec->out_state = NULL;
+
+      return FALSE;
+    }
   }
 
   dec->codec = droid_media_codec_create_decoder(&md);
 
-  if (md.codec_data_size > 0) {
-    g_free (md.codec_data);
+  if (md.codec_data.size > 0) {
+    g_free (md.codec_data.data);
   }
 
   if (!dec->codec) {
