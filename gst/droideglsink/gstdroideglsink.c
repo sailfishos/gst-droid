@@ -2,6 +2,7 @@
  * gst-droid
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2015 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -177,7 +178,7 @@ gst_droideglsink_start (GstBaseSink * bsink)
   sink->eglClientWaitSyncKHR = NULL;
   sink->eglDestroySyncKHR = NULL;
 
-  sink->alloc = gst_gralloc_allocator_new ();
+  sink->gralloc_allocator = gst_gralloc_allocator_new ();
 
   return TRUE;
 }
@@ -217,8 +218,8 @@ gst_droideglsink_stop (GstBaseSink * bsink)
     sink->last_buffer = NULL;
   }
 
-  gst_object_unref (sink->alloc);
-  sink->alloc = NULL;
+  gst_object_unref (sink->gralloc_allocator);
+  sink->gralloc_allocator = NULL;
 
   return TRUE;
 }
@@ -348,7 +349,7 @@ gst_droideglsink_init (GstDroidEglSink * sink)
   sink->dpy = EGL_NO_DISPLAY;
   sink->image = EGL_NO_IMAGE_KHR;
   sink->sync = NULL;
-  sink->alloc = NULL;
+  sink->gralloc_allocator = NULL;
   g_mutex_init (&sink->lock);
   sink->eglCreateImageKHR = NULL;
   sink->eglDestroyImageKHR = NULL;
@@ -394,7 +395,7 @@ gst_droideglsink_class_init (GstDroidEglSinkClass * klass)
 }
 
 static GstMemory *
-gst_droideglsink_get_gralloc_memory (GstDroidEglSink * sink, GstBuffer * buffer)
+gst_droideglsink_get_droid_media_buffer_memory (GstDroidEglSink * sink, GstBuffer * buffer)
 {
   int x, num;
 
@@ -424,8 +425,6 @@ gst_droideglsink_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
   GstMemory *mem = NULL;
   GstCaps *caps = NULL;
 
-  // TODO: use a buffer pool for that.
-
   GST_DEBUG_OBJECT (sink, "copy buffer");
 
   if (!gst_pad_has_current_caps (GST_BASE_SINK_PAD (sink))) {
@@ -447,7 +446,7 @@ gst_droideglsink_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
     goto free_and_out;
   }
 
-  mem = gst_gralloc_allocator_wrap (sink->alloc, format.width, format.height,
+  mem = gst_gralloc_allocator_wrap (sink->gralloc_allocator, format.width, format.height,
       GST_GRALLOC_USAGE_HW_TEXTURE, info.data, info.size,
       GST_VIDEO_FORMAT_INFO_FORMAT (format.finfo));
 
@@ -458,6 +457,7 @@ gst_droideglsink_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
   gst_buffer_append_memory (buff, mem);
   gst_buffer_unmap (buffer, &info);
   gst_caps_unref (caps);
+
   return buff;
 
 free_and_out:
@@ -545,7 +545,9 @@ gst_droidcamsrc_acquire_frame (NemoGstVideoTexture * iface)
     goto unlock_and_out;
   }
 
-  mem = gst_droideglsink_get_gralloc_memory (sink, sink->last_buffer);
+  mem =
+    gst_droideglsink_get_droid_media_buffer_memory (sink, sink->last_buffer);
+
   if (mem) {
     sink->acquired_buffer = gst_buffer_ref (sink->last_buffer);
   } else {
@@ -600,11 +602,23 @@ gst_droidcamsrc_bind_frame (NemoGstVideoTexture * iface, EGLImageKHR * image)
   /* Now we are ready */
 
   /* We can safely use peek here because we have an extra ref to the buffer */
-  mem = gst_droideglsink_get_gralloc_memory (sink, sink->acquired_buffer);
-  sink->image =
+  mem = gst_droideglsink_get_droid_media_buffer_memory (sink, sink->acquired_buffer);
+  if (mem) {
+    sink->image =
       sink->eglCreateImageKHR (sink->dpy, EGL_NO_CONTEXT,
-      EGL_NATIVE_BUFFER_ANDROID,
-      (EGLClientBuffer) gst_droid_media_buffer_memory_get_buffer (mem), eglImgAttrs);
+          EGL_NATIVE_BUFFER_ANDROID,
+          (EGLClientBuffer) gst_droid_media_buffer_memory_get_buffer (mem), eglImgAttrs);
+  } else {
+    /* It's the buffer we have created */
+    mem = gst_buffer_peek_memory (sink->acquired_buffer, 0);
+    g_assert (mem);
+    g_assert (gst_is_gralloc_memory (mem));
+
+    sink->image =
+      sink->eglCreateImageKHR (sink->dpy, EGL_NO_CONTEXT,
+          EGL_NATIVE_BUFFER_ANDROID,
+          (EGLClientBuffer) gst_memory_get_native_buffer (mem), eglImgAttrs);
+  }
 
   /* Buffer will not go anywhere so we should be safe to unlock. */
   g_mutex_unlock (&sink->lock);

@@ -219,11 +219,16 @@ gst_gralloc_allocator_alloc (GstAllocator * allocator, gint width, gint height,
 
 GstMemory *
 gst_gralloc_allocator_wrap (GstAllocator * allocator, gint width, gint height,
-    int usage, guint8 * data, gsize size, int hal_format)
+    int usage, guint8 * data, gsize size, GstVideoFormat fmt)
 {
   GstGrallocAllocator *alloc;
   int err;
   void *addr = NULL;
+
+  if (fmt != GST_VIDEO_FORMAT_YV12) {
+    GST_ERROR_OBJECT (allocator, "only GST_VIDEO_FORMAT_YV12 is supported");
+    return NULL;
+  }
 
   if (!GST_IS_GRALLOC_ALLOCATOR (allocator)) {
     return NULL;
@@ -232,7 +237,7 @@ gst_gralloc_allocator_wrap (GstAllocator * allocator, gint width, gint height,
   alloc = GST_GRALLOC_ALLOCATOR (allocator);
 
   GstMemory *mem = gst_gralloc_allocator_alloc (allocator, width, height,
-      hal_format, usage);
+      HAL_PIXEL_FORMAT_YV12, usage);
 
   if (!mem) {
     return NULL;
