@@ -2,6 +2,7 @@
  * gst-droid
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2015 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -26,8 +27,8 @@
 #include "plugin.h"
 #include "gstdroidcamsrc.h"
 #include <gst/video/video.h>
-#include <gst/memory/gstgralloc.h>
-#include <gst/memory/gstwrappedmemory.h>
+#include "gst/memory/gstdroidmediabuffer.h"
+#include "gst/memory/gstwrappedmemory.h"
 #include "gstdroidcamsrcphotography.h"
 #ifndef GST_USE_UNSTABLE_API
 #define GST_USE_UNSTABLE_API
@@ -47,7 +48,7 @@ GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_VIEWFINDER_PAD_NAME,
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
-        (GST_CAPS_FEATURE_MEMORY_DROID_HANDLE, "{ENCODED, YV12}")));
+        (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER, "{ENCODED, YV12}")));
 
 static GstStaticPadTemplate img_src_template_factory =
 GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_IMAGE_PAD_NAME,

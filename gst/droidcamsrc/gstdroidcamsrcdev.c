@@ -2,6 +2,7 @@
  * gst-droid
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2015 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -26,7 +27,8 @@
 #include "gstdroidcamsrcdev.h"
 #include <stdlib.h>
 #include "gstdroidcamsrc.h"
-#include <gst/memory/gstwrappedmemory.h>
+#include "gst/memory/gstdroidmediabuffer.h"
+#include "gst/memory/gstwrappedmemory.h"
 #include <unistd.h>
 #ifndef GST_USE_UNSTABLE_API
 #define GST_USE_UNSTABLE_API
@@ -322,7 +324,7 @@ gst_droidcamsrc_dev_data_timestamp_callback (void *user,
   video_data->data = data;
 
   buffer = gst_buffer_new ();
-  mem = gst_wrapped_memory_allocator_wrap (dev->allocator,
+  mem = gst_wrapped_memory_allocator_wrap (dev->wrap_allocator,
       addr, droid_media_camera_recording_frame_get_size (data),
      (GFunc) gst_droidcamsrc_dev_release_recording_frame, video_data);
   gst_buffer_insert_memory (buffer, 0, mem);
@@ -369,7 +371,6 @@ gst_droidcamsrc_dev_frame_available(void *user)
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
   GstDroidCamSrcPad *pad = dev->vfsrc;
   DroidMediaBuffer *buffer;
-  DroidMediaBufferCallbacks cb;
   GstMemory *mem;
   GstVideoCropMeta *crop_meta;
   DroidMediaRect rect;
@@ -384,21 +385,15 @@ gst_droidcamsrc_dev_frame_available(void *user)
   }
 
   /* TODO: size */
-  mem = gst_wrapped_memory_allocator_memory_new (dev->allocator, 0);
+  mem = gst_droid_media_buffer_allocator_alloc (dev->media_allocator, dev->cam,
+						(DroidMediaBufferAcquire) droid_media_camera_acquire_buffer);
 
-  cb.ref = (void (*)(void *))gst_memory_ref;
-  cb.unref = (void (*)(void *))gst_memory_unref;
-  cb.data = mem;
-
-  buffer = droid_media_camera_acquire_buffer(dev->cam, &cb);
-  if (!buffer) {
+  if (!mem) {
     GST_ERROR_OBJECT (src, "failed to acquire buffer from droidmedia");
-    gst_memory_unref (mem);
     return;
   }
 
-  gst_wrapped_memory_allocator_memory_set_data (mem, buffer,
-	(GFunc)gst_droidcamsrc_dev_release_preview_frame, dev);
+  buffer = gst_droid_media_buffer_memory_get_buffer (mem);
 
   buff = gst_buffer_new ();
 
@@ -450,7 +445,8 @@ gst_droidcamsrc_dev_new (GstDroidCamSrcPad * vfsrc,
 
   g_mutex_init (&dev->vid->lock);
 
-  dev->allocator = gst_wrapped_memory_allocator_new ();
+  dev->wrap_allocator = gst_wrapped_memory_allocator_new ();
+  dev->media_allocator = gst_droid_media_buffer_allocator_new ();
   dev->vfsrc = vfsrc;
   dev->imgsrc = imgsrc;
   dev->vidsrc = vidsrc;
@@ -523,8 +519,11 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
 
   dev->cam = NULL;
   dev->info = NULL;
-  gst_object_unref (dev->allocator);
-  dev->allocator = NULL;
+  gst_object_unref (dev->wrap_allocator);
+  dev->wrap_allocator = NULL;
+
+  gst_object_unref (dev->media_allocator);
+  dev->media_allocator = NULL;
 
   g_mutex_clear (&dev->vid->lock);
 
@@ -816,18 +815,6 @@ gst_droidcamsrc_dev_release_recording_frame (void *data,
 
   g_slice_free(GstDroidCamSrcDevVideoData, video_data);
   g_rec_mutex_unlock (dev->lock);
-}
-
-static void
-gst_droidcamsrc_dev_release_preview_frame (DroidMediaBuffer *buffer,
-    GstDroidCamSrcDev *dev)
-{
-  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
-
-  GST_DEBUG_OBJECT (src, "release preview frame");
-
-  // TODO:
-  droid_media_buffer_release (buffer, EGL_NO_DISPLAY, EGL_NO_SYNC_KHR);
 }
 
 void

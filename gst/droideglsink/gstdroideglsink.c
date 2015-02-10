@@ -27,7 +27,7 @@
 #include <gst/video/video.h>
 #include <gst/interfaces/nemovideotexture.h>
 #include "gst/memory/gstgralloc.h"
-#include "gst/memory/gstwrappedmemory.h"
+#include "gst/memory/gstdroidmediabuffer.h"
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_eglsink_debug);
 #define GST_CAT_DEFAULT gst_droid_eglsink_debug
@@ -46,8 +46,7 @@ static GstStaticPadTemplate gst_droideglsink_sink_template_factory =
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE ("YV12") "; "
         GST_VIDEO_CAPS_MAKE_WITH_FEATURES
-        (GST_CAPS_FEATURE_MEMORY_DROID_HANDLE, "{ENCODED, YV12}")));
-// TODO: get the formats from gralloc instead of hardcoding them.
+        (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER, "{ENCODED, YV12}")));
 
 enum
 {
@@ -408,7 +407,7 @@ gst_droideglsink_get_gralloc_memory (GstDroidEglSink * sink, GstBuffer * buffer)
   for (x = 0; x < num; x++) {
     GstMemory *mem = gst_buffer_peek_memory (buffer, x);
 
-    if (mem && gst_memory_is_type (mem, GST_ALLOCATOR_WRAPPED_MEMORY)) {
+    if (mem && gst_memory_is_type (mem, GST_ALLOCATOR_DROID_MEDIA_BUFFER)) {
       return mem;
     }
   }
@@ -605,7 +604,7 @@ gst_droidcamsrc_bind_frame (NemoGstVideoTexture * iface, EGLImageKHR * image)
   sink->image =
       sink->eglCreateImageKHR (sink->dpy, EGL_NO_CONTEXT,
       EGL_NATIVE_BUFFER_ANDROID,
-      (EGLClientBuffer) gst_wrapped_memory_get_data (mem), eglImgAttrs);
+      (EGLClientBuffer) gst_droid_media_buffer_memory_get_buffer (mem), eglImgAttrs);
 
   /* Buffer will not go anywhere so we should be safe to unlock. */
   g_mutex_unlock (&sink->lock);

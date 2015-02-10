@@ -2,6 +2,7 @@
  * gst-droid
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2015 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -24,9 +25,8 @@
 #endif
 
 #include "gstdroiddec.h"
-#include "gst/memory/gstgralloc.h"
+#include "gst/memory/gstdroidmediabuffer.h"
 #include "plugin.h"
-#include <gst/memory/gstwrappedmemory.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
@@ -41,19 +41,11 @@ GST_STATIC_PAD_TEMPLATE (GST_VIDEO_DECODER_SRC_NAME,
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
-        (GST_CAPS_FEATURE_MEMORY_DROID_HANDLE, "{ENCODED, YV12}")));
+        (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER, "{ENCODED, YV12}")));
 
 static GstVideoCodecState *
 gst_droiddec_configure_state (GstVideoDecoder * decoder, gsize width,
 			      gsize height);
-
-static void
-gst_droiddec_release_frame (DroidMediaBuffer *buffer)
-{
-  GST_DEBUG ("release frame");
-
-  droid_media_buffer_release (buffer, EGL_NO_DISPLAY, EGL_NO_SYNC_KHR);
-}
 
 static void
 gst_droiddec_buffers_released(G_GNUC_UNUSED void *user)
@@ -65,32 +57,25 @@ static void
 gst_droiddec_frame_available(void *user)
 {
   GstDroidDec *dec = (GstDroidDec *) user;
-  DroidMediaBuffer *buffer;
-  DroidMediaBufferCallbacks cb;
   GstMemory *mem;
   guint width, height;
   GstVideoCodecFrame *frame;
+  DroidMediaBuffer *buffer;
+  GstBuffer *buff;
 
   GST_DEBUG_OBJECT (dec, "frame available");
 
-  /* TODO: size */
-  mem = gst_wrapped_memory_allocator_memory_new (dec->allocator, 0);
+  mem = gst_droid_media_buffer_allocator_alloc (dec->allocator, dec->codec,
+						(DroidMediaBufferAcquire) droid_media_codec_acquire_buffer);
 
-  cb.ref = (void (*)(void *))gst_memory_ref;
-  cb.unref = (void (*)(void *))gst_memory_unref;
-  cb.data = mem;
-
-  buffer = droid_media_codec_acquire_buffer(dec->codec, &cb);
-  if (!buffer) {
+  if (!mem) {
     GST_ERROR_OBJECT (dec, "failed to acquire buffer from droidmedia");
-    gst_memory_unref (mem);
     return;
   }
 
-  gst_wrapped_memory_allocator_memory_set_data (mem, buffer,
-	(GFunc)gst_droiddec_release_frame, NULL);
+  buffer = gst_droid_media_buffer_memory_get_buffer (mem);
 
-  GstBuffer *buff = gst_buffer_new ();
+  buff = gst_buffer_new ();
 
   gst_buffer_insert_memory (buff, 0, mem);
 
@@ -236,7 +221,7 @@ gst_droiddec_configure_state (GstVideoDecoder * decoder, gsize width,
     out->caps = gst_video_info_to_caps (&out->info);
   }
 
-  feature = gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_HANDLE, NULL);
+  feature = gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER, NULL);
   gst_caps_set_features (out->caps, 0, feature);
 
   GST_DEBUG_OBJECT (dec, "output caps %" GST_PTR_FORMAT, out->caps);
@@ -579,7 +564,7 @@ gst_droiddec_init (GstDroidDec * dec)
   g_mutex_init (&dec->eos_lock);
   g_cond_init (&dec->eos_cond);
 
-  dec->allocator = gst_wrapped_memory_allocator_new ();
+  dec->allocator = gst_droid_media_buffer_allocator_new ();
   dec->in_state = NULL;
   dec->out_state = NULL;
 }

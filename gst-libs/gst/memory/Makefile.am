@@ -15,8 +15,10 @@ noinst_HEADERS =
 
 libgstdroidmemory_@GST_API_VERSION@_la_SOURCES = \
 	gstgralloc.c \
-	gstwrappedmemory.c
+	gstwrappedmemory.c \
+	gstdroidmediabuffer.c
 
 libgstdroidmemory_@GST_API_VERSION@_la_include_HEADERS = \
 	gstgralloc.h \
-	gstwrappedmemory.h
+	gstwrappedmemory.h \
+	gstdroidmediabuffer.h

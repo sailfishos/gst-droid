@@ -2,6 +2,7 @@
  * gst-droid
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2015 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -25,7 +26,7 @@
 
 #include "gstdroidcamsrcparams.h"
 #include <stdlib.h>
-#include "gst/memory/gstgralloc.h"
+#include "gst/memory/gstdroidmediabuffer.h"
 #include "plugin.h"
 #include <gst/memory/gstwrappedmemory.h>
 
@@ -277,7 +278,7 @@ gst_droidcamsrc_params_get_viewfinder_caps (GstDroidCamSrcParams * params)
 
   g_mutex_lock (&params->lock);
   caps = gst_droidcamsrc_params_get_caps_locked (params, "preview-size-values",
-      "video/x-raw", GST_CAPS_FEATURE_MEMORY_DROID_HANDLE, "ENCODED");
+      "video/x-raw", GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER, "ENCODED");
   g_mutex_unlock (&params->lock);
 
   return caps;
