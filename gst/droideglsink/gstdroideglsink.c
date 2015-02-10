@@ -446,9 +446,9 @@ gst_droideglsink_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
     goto free_and_out;
   }
 
-  mem = gst_gralloc_allocator_wrap (sink->gralloc_allocator, format.width, format.height,
-      GST_GRALLOC_USAGE_HW_TEXTURE, info.data, info.size,
-      GST_VIDEO_FORMAT_INFO_FORMAT (format.finfo));
+  mem = gst_gralloc_allocator_wrap (sink->gralloc_allocator, format,
+				    info.data, info.size);
+
 
   if (!mem) {
     goto free_and_out;

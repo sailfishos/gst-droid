@@ -1,3 +1,3 @@
-SUBDIRS = gst-libs gst tests data
+SUBDIRS = gst-libs gst data
 
 EXTRA_DIST = autogen.sh

@@ -2,6 +2,7 @@
  * gst-droid
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2015 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -56,8 +57,12 @@ typedef struct
 
 } GstGrallocMemory;
 
+#define _do_init \
+  GST_DEBUG_CATEGORY_INIT (droid_memory_debug, "droidmemory", 0, \
+      "droid memory allocator");
+
 #define gralloc_mem_allocator_parent_class parent_class
-G_DEFINE_TYPE (GstGrallocAllocator, gralloc_mem_allocator, GST_TYPE_ALLOCATOR);
+G_DEFINE_TYPE_WITH_CODE (GstGrallocAllocator, gralloc_mem_allocator, GST_TYPE_ALLOCATOR, _do_init);
 
 #define GST_TYPE_GRALLOC_ALLOCATOR    (gralloc_mem_allocator_get_type())
 #define GST_IS_GRALLOC_ALLOCATOR(obj) (G_TYPE_CHECK_INSTANCE_TYPE ((obj), GST_TYPE_GRALLOC_ALLOCATOR))
@@ -67,6 +72,8 @@ static gboolean gst_gralloc_mem_is_span (GstMemory * mem1, GstMemory * mem2,
     gsize * offset);
 static void gst_gralloc_allocator_free (GstAllocator * allocator,
     GstMemory * mem);
+static GstMemory * gst_gralloc_allocator_alloc (GstAllocator * allocator, gint width, gint height,
+    int format, int usage);
 
 static void
 incRef (struct android_native_base_t *base)
@@ -92,9 +99,6 @@ decRef (struct android_native_base_t *base)
 GstAllocator *
 gst_gralloc_allocator_new (void)
 {
-  GST_DEBUG_CATEGORY_INIT (droid_memory_debug, "droidmemory", 0,
-      "droid memory allocator");
-
   return g_object_new (GST_TYPE_GRALLOC_ALLOCATOR, NULL);
 }
 
@@ -218,14 +222,14 @@ gst_gralloc_allocator_alloc (GstAllocator * allocator, gint width, gint height,
 }
 
 GstMemory *
-gst_gralloc_allocator_wrap (GstAllocator * allocator, gint width, gint height,
-    int usage, guint8 * data, gsize size, GstVideoFormat fmt)
+gst_gralloc_allocator_wrap (GstAllocator * allocator, GstVideoInfo info,
+    guint8 * data, gsize size)
 {
   GstGrallocAllocator *alloc;
   int err;
   void *addr = NULL;
 
-  if (fmt != GST_VIDEO_FORMAT_YV12) {
+  if (GST_VIDEO_FORMAT_INFO_FORMAT (info.finfo) != GST_VIDEO_FORMAT_YV12) {
     GST_ERROR_OBJECT (allocator, "only GST_VIDEO_FORMAT_YV12 is supported");
     return NULL;
   }
@@ -236,8 +240,8 @@ gst_gralloc_allocator_wrap (GstAllocator * allocator, gint width, gint height,
 
   alloc = GST_GRALLOC_ALLOCATOR (allocator);
 
-  GstMemory *mem = gst_gralloc_allocator_alloc (allocator, width, height,
-      HAL_PIXEL_FORMAT_YV12, usage);
+  GstMemory *mem = gst_gralloc_allocator_alloc (allocator, info.width, info.height,
+      HAL_PIXEL_FORMAT_YV12, GRALLOC_USAGE_HW_TEXTURE);
 
   if (!mem) {
     return NULL;
@@ -247,8 +251,8 @@ gst_gralloc_allocator_wrap (GstAllocator * allocator, gint width, gint height,
   err =
       alloc->gralloc->lock (alloc->gralloc,
       ((GstGrallocMemory *) mem)->buff.handle,
-      GST_GRALLOC_USAGE_SW_READ_NEVER | GST_GRALLOC_USAGE_SW_WRITE_RARELY, 0, 0,
-      width, height, &addr);
+      GRALLOC_USAGE_SW_READ_NEVER | GRALLOC_USAGE_SW_WRITE_RARELY, 0, 0,
+      info.width, info.height, &addr);
   if (err != 0) {
     gst_memory_unref (mem);
     GST_ERROR ("failed to lock the buffer: %d", err);
