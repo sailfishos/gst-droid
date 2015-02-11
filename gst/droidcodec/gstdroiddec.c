@@ -162,12 +162,6 @@ gst_droiddec_size_changed(void *data, int32_t width, int32_t height)
   dec->out_state =
     gst_droiddec_configure_state (decoder, width, height);
 
-  if (!gst_video_decoder_negotiate (decoder)) {
-    GST_ERROR_OBJECT (dec, "Failed to negotiate");
-    err = 1;
-    goto out;
-  }
-
 out:
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
 
@@ -351,18 +345,6 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
       gst_droiddec_configure_state (decoder, state->info.width,
       state->info.height);
 
-  if (!gst_video_decoder_negotiate (decoder)) {
-    GST_ERROR_OBJECT (dec, "Failed to negotiate");
-
-    gst_video_codec_state_unref (dec->in_state);
-    gst_video_codec_state_unref (dec->out_state);
-
-    dec->in_state = NULL;
-    dec->out_state = NULL;
-
-    return FALSE;
-  }
-
   if (state->codec_data) {
     g_assert (dec->codec_type->construct_decoder_codec_data);
 
@@ -487,55 +469,6 @@ error:
 }
 
 static gboolean
-gst_droiddec_decide_allocation (GstVideoDecoder * decoder, GstQuery * query)
-{
-  GstDroidDec *dec = GST_DROIDDEC (decoder);
-
-  GST_DEBUG_OBJECT (dec, "decide allocation %" GST_PTR_FORMAT, query);
-
-  {
-    // TODO: Cleanup this
-    GstBufferPool *pool = gst_buffer_pool_new ();
-    GstStructure *s = gst_buffer_pool_get_config (pool);
-    GstCaps *caps = gst_caps_new_simple ("video/x-raw",
-					 "width", G_TYPE_INT, 10,
-					 "height", G_TYPE_INT, 10,
-					 "format", G_TYPE_STRING, gst_video_format_to_string (GST_VIDEO_FORMAT_I420),
-					 NULL);
-    gst_buffer_pool_config_set_allocator (s, gst_allocator_find (GST_ALLOCATOR_SYSMEM), NULL);
-    gst_buffer_pool_config_set_params (s, caps, 10, 1, 1);
-    gst_buffer_pool_set_config (pool, s);
-
-    if (gst_query_get_n_allocation_pools (query) > 0) {
-      gst_query_set_nth_allocation_pool (query, 0, pool, 10, 10, 10);
-  } else {
-      gst_query_add_allocation_pool (query, pool, 10, 10, 10);
-  }
-  }
-
-#if 0
-  conf = gst_buffer_pool_get_config (dec->comp->out_port->buffers);
-
-  if (!gst_buffer_pool_config_get_params (conf, NULL, &size, NULL, NULL)) {
-    GST_ERROR_OBJECT (dec, "failed to get buffer pool configuration");
-    gst_structure_free (conf);
-    return FALSE;
-  }
-
-  gst_structure_free (conf);
-
-  if (gst_query_get_n_allocation_pools (query) > 0) {
-    gst_query_set_nth_allocation_pool (query, 0, dec->comp->out_port->buffers,
-        size, size, size);
-  } else {
-    gst_query_add_allocation_pool (query, dec->comp->out_port->buffers, size,
-        size, size);
-  }
-#endif
-  return TRUE;
-}
-
-static gboolean
 gst_droiddec_flush (GstVideoDecoder * decoder)
 {
   GstDroidDec *dec = GST_DROIDDEC (decoder);
@@ -567,63 +500,6 @@ gst_droiddec_init (GstDroidDec * dec)
   dec->allocator = gst_droid_media_buffer_allocator_new ();
   dec->in_state = NULL;
   dec->out_state = NULL;
-}
-
-static gboolean
-gst_droiddec_negotiate (GstVideoDecoder * decoder)
-{
-  GstDroidDec *dec;
-  GstPad *pad;
-  GstCaps *caps = NULL;
-  gboolean ret = FALSE;
-
-  /* TODO: something is wrong here.
-   * If I don't implement a _negotiate function then I never get an error from downstream
-   * elements.
-   * If I don't query the peer caps then I don't get an error but downstream does not
-   * like the caps.
-   */
-  dec = GST_DROIDDEC (decoder);
-  pad = GST_VIDEO_DECODER_SRC_PAD (decoder);
-
-  GST_DEBUG_OBJECT (dec, "negotiate with caps %" GST_PTR_FORMAT,
-      dec->out_state->caps);
-
-  if (!GST_VIDEO_DECODER_CLASS (parent_class)->negotiate (decoder)) {
-    return FALSE;
-  }
-
-  GST_DEBUG_OBJECT (dec, "peer caps %"GST_PTR_FORMAT, gst_pad_peer_query_caps (pad, NULL));
-  /* We don't negotiate. We either use our caps or fail */
-  caps = gst_pad_peer_query_caps (pad, dec->out_state->caps);
-
-  GST_DEBUG_OBJECT (dec, "intersection %" GST_PTR_FORMAT, caps);
-
-  if (gst_caps_is_empty (caps)) {
-    goto error;
-  }
-
-  if (!gst_caps_is_equal (caps, dec->out_state->caps)) {
-    goto error;
-  }
-
-  if (!gst_pad_set_caps (pad, caps)) {
-    goto error;
-  }
-
-  ret = TRUE;
-  goto out;
-
-error:
-  GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
-      ("failed to negotiate output format"));
-
-out:
-  if (caps) {
-    gst_caps_unref (caps);
-  }
-
-  return ret;
 }
 
 static void
@@ -662,8 +538,5 @@ gst_droiddec_class_init (GstDroidDecClass * klass)
   gstvideodecoder_class->finish = GST_DEBUG_FUNCPTR (gst_droiddec_finish);
   gstvideodecoder_class->handle_frame =
       GST_DEBUG_FUNCPTR (gst_droiddec_handle_frame);
-  gstvideodecoder_class->decide_allocation =
-      GST_DEBUG_FUNCPTR (gst_droiddec_decide_allocation);
   gstvideodecoder_class->flush = GST_DEBUG_FUNCPTR (gst_droiddec_flush);
-  gstvideodecoder_class->negotiate = GST_DEBUG_FUNCPTR (gst_droiddec_negotiate);
 }
