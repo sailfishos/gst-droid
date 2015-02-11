@@ -413,7 +413,7 @@ gst_droidcamsrc_dev_frame_available(void *user)
   width = droid_media_buffer_get_width(buffer);
   height = droid_media_buffer_get_height(buffer);
 
-  gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE, GST_VIDEO_FORMAT_ENCODED,
+  gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE, GST_VIDEO_FORMAT_YV12,
 			     width, height);
 
   GST_LOG_OBJECT (src, "preview info: w=%d, h=%d, crop: x=%d, y=%d, w=%d, h=%d", width, height, crop_meta->x,

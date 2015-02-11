@@ -41,7 +41,7 @@ GST_STATIC_PAD_TEMPLATE (GST_VIDEO_DECODER_SRC_NAME,
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
-        (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER, "{ENCODED, YV12}")));
+        (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER, "{YV12}")));
 
 static GstVideoCodecState *
 gst_droiddec_configure_state (GstVideoDecoder * decoder, gsize width,
@@ -82,7 +82,7 @@ gst_droiddec_frame_available(void *user)
   width = droid_media_buffer_get_width(buffer);
   height = droid_media_buffer_get_height(buffer);
 
-  gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE, GST_VIDEO_FORMAT_ENCODED,
+  gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE, GST_VIDEO_FORMAT_YV12,
 			     width, height);
 
   frame = gst_video_decoder_get_oldest_frame (GST_VIDEO_DECODER (dec));
@@ -214,7 +214,7 @@ gst_droiddec_configure_state (GstVideoDecoder * decoder, gsize width,
       width, height);
 
   out = gst_video_decoder_set_output_state (GST_VIDEO_DECODER (dec),
-      GST_VIDEO_FORMAT_ENCODED, width, height, dec->in_state);
+      GST_VIDEO_FORMAT_YV12, width, height, dec->in_state);
 
   if (!out->caps) {
     /* we will add our caps */
