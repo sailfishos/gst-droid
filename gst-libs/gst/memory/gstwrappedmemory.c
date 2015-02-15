@@ -1,7 +1,7 @@
 /*
  * gst-droid
  *
- * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2014-2015 Mohammed Sameer <msameer@foolab.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -59,17 +59,14 @@ G_DEFINE_TYPE (GstWrappedMemoryAllocator, wrapped_memory_allocator,
 #define GST_IS_WRAPPED_MEMORY_ALLOCATOR(obj) (G_TYPE_CHECK_INSTANCE_TYPE ((obj), GST_TYPE_WRAPPED_MEMORY_ALLOCATOR))
 #define GST_WRAPPED_MEMORY_ALLOCATOR(obj)    (G_TYPE_CHECK_INSTANCE_CAST((obj),GST_TYPE_WRAPPED_MEMORY_ALLOCATOR,GstWrappedMemoryAllocator))
 
-static gboolean gst_wrapped_memory_is_span (GstMemory * mem1, GstMemory * mem2,
-    gsize * offset);
-static GstMemory *gst_wrapped_memory_copy (GstMemory * mem, gssize offset,
-    gssize size);
 static void gst_wrapped_memory_allocator_free (GstAllocator * allocator,
     GstMemory * mem);
-static GstMemory *gst_wrapped_memory_share (GstMemory * mem, gssize offset,
-    gssize size);
 static gpointer gst_wrapped_memory_map (GstMemory * mem, gsize maxsize,
     GstMapFlags flags);
 static void gst_wrapped_memory_unmap (GstMemory * mem);
+static GstMemory *gst_wrapped_memory_allocator_memory_new (GstAllocator * allocator, gsize size);
+static void gst_wrapped_memory_allocator_memory_set_data(GstMemory *mem, gpointer data,
+							 GFunc cb, gpointer user_data);
 
 GstAllocator *
 gst_wrapped_memory_allocator_new (void)
@@ -91,9 +88,6 @@ wrapped_memory_allocator_init (GstWrappedMemoryAllocator * allocator)
 
   alloc->mem_map = gst_wrapped_memory_map;
   alloc->mem_unmap = gst_wrapped_memory_unmap;
-  alloc->mem_copy = gst_wrapped_memory_copy;
-  alloc->mem_share = gst_wrapped_memory_share;
-  alloc->mem_is_span = gst_wrapped_memory_is_span;
 
   GST_OBJECT_FLAG_SET (allocator, GST_ALLOCATOR_FLAG_CUSTOM_ALLOC);
 }
@@ -182,27 +176,6 @@ gst_is_wrapped_memory_memory (GstMemory * mem)
   return gst_memory_is_type (mem, GST_ALLOCATOR_WRAPPED_MEMORY);
 }
 
-static gboolean
-gst_wrapped_memory_is_span (G_GNUC_UNUSED GstMemory * mem1, G_GNUC_UNUSED GstMemory * mem2,
-			    G_GNUC_UNUSED gsize * offset)
-{
-  return FALSE;
-}
-
-static GstMemory *
-gst_wrapped_memory_copy (G_GNUC_UNUSED GstMemory * mem, G_GNUC_UNUSED gssize offset,
-			 G_GNUC_UNUSED gssize size)
-{
-  return NULL;
-}
-
-static GstMemory *
-gst_wrapped_memory_share (G_GNUC_UNUSED GstMemory * mem, G_GNUC_UNUSED gssize offset,
-			  G_GNUC_UNUSED gssize size)
-{
-  return NULL;
-}
-
 static gpointer
 gst_wrapped_memory_map (GstMemory * mem, G_GNUC_UNUSED gsize maxsize, GstMapFlags flags)
 {
@@ -211,13 +184,6 @@ gst_wrapped_memory_map (GstMemory * mem, G_GNUC_UNUSED gsize maxsize, GstMapFlag
   if (flags & GST_MAP_WRITE) {
     return NULL;
   }
-
-  /* TODO: */
-  /*
-  if (maxsize != 0) {
-    return NULL;
-  }
-  */
 
   return m->data;
 }

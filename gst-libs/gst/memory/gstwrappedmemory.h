@@ -1,7 +1,7 @@
 /*
  * gst-droid
  *
- * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2014-2015 Mohammed Sameer <msameer@foolab.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -34,11 +34,8 @@ GstAllocator * gst_wrapped_memory_allocator_new (void);
 
 gboolean       gst_is_wrapped_memory_memory (GstMemory * mem);
 GstMemory    * gst_wrapped_memory_allocator_wrap (GstAllocator * allocator,
-						  void *data, gsize size, GFunc cb, gpointer user_data);
-GstMemory    * gst_wrapped_memory_allocator_memory_new (GstAllocator * allocator, gsize size);
-void           gst_wrapped_memory_allocator_memory_set_data(GstMemory *mem, gpointer data,
-							    GFunc cb, gpointer user_data);
-void         * gst_wrapped_memory_get_data (GstMemory * mem);
+						  void *data, gsize size, GFunc cb,
+						  gpointer user_data);
 
 G_END_DECLS
 
