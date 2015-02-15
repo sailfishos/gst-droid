@@ -65,8 +65,7 @@ gst_droiddec_frame_available(void *user)
 
   GST_DEBUG_OBJECT (dec, "frame available");
 
-  mem = gst_droid_media_buffer_allocator_alloc (dec->allocator, dec->codec,
-						(DroidMediaBufferAcquire) droid_media_codec_acquire_buffer);
+  mem = gst_droid_media_buffer_allocator_alloc (dec->allocator, dec->queue);
 
   if (!mem) {
     GST_ERROR_OBJECT (dec, "failed to acquire buffer from droidmedia");
@@ -162,7 +161,6 @@ gst_droiddec_size_changed(void *data, int32_t width, int32_t height)
   dec->out_state =
     gst_droiddec_configure_state (decoder, width, height);
 
-out:
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
 
   return err;
@@ -234,6 +232,7 @@ gst_droiddec_stop (GstVideoDecoder * decoder)
     droid_media_codec_stop (dec->codec);
     droid_media_codec_destroy (dec->codec);
     dec->codec = NULL;
+    dec->queue = NULL;
   }
 
   if (dec->in_state) {
@@ -380,6 +379,8 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     return FALSE;
   }
 
+  dec->queue = droid_media_codec_get_buffer_queue (dec->codec);
+
   {
     DroidMediaCodecCallbacks cb;
     cb.signal_eos = gst_droiddec_signal_eos;
@@ -389,10 +390,10 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   }
 
   {
-    DroidMediaRenderingCallbacks cb;
+    DroidMediaBufferQueueCallbacks cb;
     cb.buffers_released = gst_droiddec_buffers_released;
     cb.frame_available = gst_droiddec_frame_available;
-    droid_media_codec_set_rendering_callbacks (dec->codec, &cb, dec);
+    droid_media_buffer_queue_set_callbacks (dec->queue, &cb, dec);
   }
 
   if (!droid_media_codec_start (dec->codec)) {
@@ -400,6 +401,7 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 
     droid_media_codec_destroy (dec->codec);
     dec->codec = NULL;
+    dec->queue = NULL;
 
     gst_video_codec_state_unref (dec->in_state);
     gst_video_codec_state_unref (dec->out_state);
@@ -490,6 +492,7 @@ static void
 gst_droiddec_init (GstDroidDec * dec)
 {
   dec->codec = NULL;
+  dec->queue = NULL;
   dec->codec_type = NULL;
   dec->eos = FALSE;
   dec->has_error = FALSE;

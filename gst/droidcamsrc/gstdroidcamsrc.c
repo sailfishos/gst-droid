@@ -107,7 +107,7 @@ gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
 
   pad->pad = gst_pad_new_from_static_template (tpl, name);
 
-  // TODO: I don't think this is needed
+  /* TODO: I don't think this is needed */
   gst_pad_use_fixed_caps (pad->pad);
   gst_pad_set_element_private (pad->pad, pad);
 
@@ -352,7 +352,7 @@ gst_droidcamsrc_fill_info (GstDroidCamSrc * src, GstDroidCamSrcCamInfo * target,
       target->num = x;
       target->direction =
           facing ==
-          CAMERA_FACING_FRONT ? NEMO_GST_META_DEVICE_DIRECTION_FRONT :
+          DROID_MEDIA_CAMERA_FACING_FRONT ? NEMO_GST_META_DEVICE_DIRECTION_FRONT :
           NEMO_GST_META_DEVICE_DIRECTION_BACK;
       target->orientation = info.orientation / 90;
 
@@ -387,13 +387,13 @@ gst_droid_cam_src_get_hw (GstDroidCamSrc * src)
   src->info[0].num = src->info[1].num = -1;
 
   back_found =
-      gst_droidcamsrc_fill_info (src, &src->info[0], CAMERA_FACING_BACK);
+      gst_droidcamsrc_fill_info (src, &src->info[0], DROID_MEDIA_CAMERA_FACING_BACK);
   if (!back_found) {
     GST_WARNING_OBJECT (src, "cannot find back camera");
   }
 
   front_found =
-      gst_droidcamsrc_fill_info (src, &src->info[1], CAMERA_FACING_FRONT);
+      gst_droidcamsrc_fill_info (src, &src->info[1], DROID_MEDIA_CAMERA_FACING_FRONT);
   if (!front_found) {
     GST_WARNING_OBJECT (src, "cannot find front camera");
   }
@@ -513,7 +513,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 
   switch (transition) {
     case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
-      // TODO: stop recording if we are recording
+      /* TODO: stop recording if we are recording */
       gst_droidcamsrc_dev_stop (src->dev);
       src->captures = 0;
 
@@ -977,7 +977,7 @@ out:
   ret = gst_pad_push (data->pad, buffer);
 
   if (ret != GST_FLOW_OK) {
-    // TODO:
+    /* TODO: */
     GST_ERROR_OBJECT (src, "error %s pushing buffer through pad %s",
         gst_flow_get_name (ret), GST_PAD_NAME (data->pad));
   }
@@ -1007,7 +1007,7 @@ gst_droidcamsrc_pad_activate_mode (GstPad * pad, GstObject * parent,
   }
 
   if (active) {
-    // TODO: review locking for the remaining 2 pads
+    /* TODO: review locking for the remaining 2 pads */
     /* No need for locking here since the task is not running */
     data->running = TRUE;
     data->open_stream = TRUE;
@@ -1094,7 +1094,7 @@ gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent, GstEvent * event)
     case GST_EVENT_CAPS:
     case GST_EVENT_LATENCY:
       ret = TRUE;
-      // TODO:
+      /* TODO: */
       break;
 
     case GST_EVENT_RECONFIGURE:
@@ -1121,7 +1121,7 @@ gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent, GstEvent * event)
     case GST_EVENT_FLUSH_START:
     case GST_EVENT_FLUSH_STOP:
       ret = TRUE;
-      // TODO: what do we do here?
+      /* TODO: what do we do here? */
       break;
   }
 
@@ -1194,7 +1194,7 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
       break;
 
     case GST_QUERY_LATENCY:
-      // TODO: this assummes 7 buffers @ 30 FPS. Query from either bufferpool or camera params
+      /* TODO: this assummes 7 buffers @ 30 FPS. Query from either bufferpool or camera params */
       gst_query_set_latency (query, TRUE, 33, 33 * 7);
       ret = TRUE;
       break;
@@ -1625,7 +1625,7 @@ gst_droidcamsrc_timestamp (GstDroidCamSrc * src, GstBuffer * buffer)
 
   gst_object_unref (clock);
 
-  // TODO: duration
+  /* TODO: duration */
   GST_BUFFER_DTS (buffer) = ts;
   GST_BUFFER_PTS (buffer) = ts;
 }
@@ -1766,7 +1766,7 @@ gst_droidcamsrc_update_ev_compensation_bounds (GstDroidCamSrc * src)
       gst_droidcamsrc_params_get_float (src->dev->params,
       "exposure-compensation-step");
 
-  // TODO: hmm, not sure this works.
+  /* TODO: hmm, not sure this works. */
   if (step <= 0.0) {
     GST_WARNING_OBJECT (src, "failed to get exposure-compensation-step");
     return;

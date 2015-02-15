@@ -175,7 +175,7 @@ construct_h264_codec_data (gpointer data, gsize size, GstBuffer **buffer)
   gboolean ret = FALSE;
   GSList *sps = NULL, *pps = NULL;
   gsize sps_size = 0, pps_size = 0;
-  guint8 num_sps = 0, num_pps = 0;
+  gint num_sps = 0, num_pps = 0;
   GstByteWriter *writer = NULL;
   guint8 profile_idc = 0, profile_comp = 0, level_idc = 0;
   gboolean idc_found = FALSE;

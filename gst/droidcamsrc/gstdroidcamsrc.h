@@ -26,7 +26,6 @@
 #include "gstdroidcamsrcdev.h"
 #include "gstdroidcamsrcenums.h"
 #include "gstdroidcamsrcquirks.h"
-#include <hardware/camera.h>
 #include <gst/meta/nemometa.h>
 #ifndef GST_USE_UNSTABLE_API
 #define GST_USE_UNSTABLE_API

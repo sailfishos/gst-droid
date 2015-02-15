@@ -91,7 +91,6 @@ droid_media_buffer_allocator_init (GstDroidMediaBufferAllocator * allocator)
 static void
 droid_media_buffer_allocator_class_init (GstDroidMediaBufferAllocatorClass * klass)
 {
-  GObjectClass *gobject_class = (GObjectClass *) klass;
   GstAllocatorClass *allocator_class = (GstAllocatorClass *) klass;
 
   allocator_class->alloc = NULL;
@@ -100,8 +99,7 @@ droid_media_buffer_allocator_class_init (GstDroidMediaBufferAllocatorClass * kla
 
 GstMemory *
 gst_droid_media_buffer_allocator_alloc (GstAllocator * allocator,
-					gpointer handle,
-					DroidMediaBufferAcquire acquire_func)
+					DroidMediaBufferQueue *queue)
 {
   GstDroidMediaBufferMemory *mem;
   DroidMediaBuffer *buffer;
@@ -118,7 +116,7 @@ gst_droid_media_buffer_allocator_alloc (GstAllocator * allocator,
   cb.unref = (void (*)(void *))gst_memory_unref;
   cb.data = mem;
 
-  buffer = acquire_func (handle, &cb);
+  buffer = droid_media_buffer_queue_acquire_buffer (queue, &cb);
   if (!buffer) {
     GST_ERROR_OBJECT (allocator, "failed to acquire media buffer");
     g_slice_free (GstDroidMediaBufferMemory, mem);

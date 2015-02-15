@@ -183,25 +183,28 @@ gst_is_wrapped_memory_memory (GstMemory * mem)
 }
 
 static gboolean
-gst_wrapped_memory_is_span (GstMemory * mem1, GstMemory * mem2, gsize * offset)
+gst_wrapped_memory_is_span (G_GNUC_UNUSED GstMemory * mem1, G_GNUC_UNUSED GstMemory * mem2,
+			    G_GNUC_UNUSED gsize * offset)
 {
   return FALSE;
 }
 
 static GstMemory *
-gst_wrapped_memory_copy (GstMemory * mem, gssize offset, gssize size)
+gst_wrapped_memory_copy (G_GNUC_UNUSED GstMemory * mem, G_GNUC_UNUSED gssize offset,
+			 G_GNUC_UNUSED gssize size)
 {
   return NULL;
 }
 
 static GstMemory *
-gst_wrapped_memory_share (GstMemory * mem, gssize offset, gssize size)
+gst_wrapped_memory_share (G_GNUC_UNUSED GstMemory * mem, G_GNUC_UNUSED gssize offset,
+			  G_GNUC_UNUSED gssize size)
 {
   return NULL;
 }
 
 static gpointer
-gst_wrapped_memory_map (GstMemory * mem, gsize maxsize, GstMapFlags flags)
+gst_wrapped_memory_map (GstMemory * mem, G_GNUC_UNUSED gsize maxsize, GstMapFlags flags)
 {
   GstWrappedMemory *m = (GstWrappedMemory *) mem;
 
@@ -220,7 +223,7 @@ gst_wrapped_memory_map (GstMemory * mem, gsize maxsize, GstMapFlags flags)
 }
 
 static void
-gst_wrapped_memory_unmap (GstMemory * mem)
+gst_wrapped_memory_unmap (G_GNUC_UNUSED GstMemory * mem)
 {
   /* nothing */
 }

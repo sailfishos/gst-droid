@@ -46,6 +46,7 @@ struct _GstDroidDec
 {
   GstVideoDecoder parent;
   DroidMediaCodec *codec;
+  DroidMediaBufferQueue *queue;
   GstAllocator *allocator;
   GstDroidCodec *codec_type;
   gboolean eos;

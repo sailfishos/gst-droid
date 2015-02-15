@@ -28,15 +28,12 @@
 
 G_BEGIN_DECLS
 
-typedef DroidMediaBuffer *(* DroidMediaBufferAcquire)(gpointer handle, DroidMediaBufferCallbacks *cb);
-
 #define GST_ALLOCATOR_DROID_MEDIA_BUFFER                    "droidmediabuffer"
 #define GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER          "memory:DroidMediaBuffer"
 
 GstAllocator * gst_droid_media_buffer_allocator_new (void);
 GstMemory    * gst_droid_media_buffer_allocator_alloc (GstAllocator * allocator,
-                                                       gpointer handle,
-                                                       DroidMediaBufferAcquire acquire_func);
+                                                       DroidMediaBufferQueue *queue);
 
 DroidMediaBuffer * gst_droid_media_buffer_memory_get_buffer (GstMemory * mem);
 gboolean       gst_is_droid_media_buffer_memory (GstMemory * mem);

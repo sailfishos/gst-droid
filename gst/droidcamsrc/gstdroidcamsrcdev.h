@@ -24,7 +24,6 @@
 #define __GST_DROID_CAM_SRC_DEV_H__
 
 #include <gst/gst.h>
-#include <hardware/camera.h>
 #include "gstdroidcamsrcparams.h"
 #include "droidmediacamera.h"
 
@@ -39,6 +38,7 @@ typedef struct _GstDroidCamSrcPad GstDroidCamSrcPad;
 struct _GstDroidCamSrcDev
 {
   DroidMediaCamera *cam;
+  DroidMediaBufferQueue *queue;
   GstDroidCamSrcParams *params;
   GstDroidCamSrcPad *vfsrc;
   GstDroidCamSrcPad *imgsrc;
