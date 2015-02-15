@@ -134,6 +134,43 @@ gst_droid_media_buffer_allocator_alloc (GstAllocator * allocator,
   return GST_MEMORY_CAST (mem);
 }
 
+GstMemory *
+gst_droid_media_buffer_allocator_alloc_from_data (GstAllocator * allocator,
+						  gsize w, gsize h, DroidMediaData * data)
+{
+  GstDroidMediaBufferMemory *mem;
+  DroidMediaBuffer *buffer;
+  DroidMediaBufferCallbacks cb;
+
+  if (!GST_IS_DROID_MEDIA_BUFFER_ALLOCATOR (allocator)) {
+    GST_WARNING_OBJECT (allocator, "allocator is not the correct allocator for droidmediabuffer");
+    return NULL;
+  }
+
+  mem = g_slice_new0 (GstDroidMediaBufferMemory);
+
+  cb.ref = (void (*)(void *))gst_memory_ref;
+  cb.unref = (void (*)(void *))gst_memory_unref;
+  cb.data = mem;
+
+  buffer = droid_media_buffer_create_from_yv12_data (w, h, data, &cb);
+  if (!buffer) {
+    GST_ERROR_OBJECT (allocator, "failed to acquire media buffer");
+    g_slice_free (GstDroidMediaBufferMemory, mem);
+    return NULL;
+  }
+
+  mem->buffer = buffer;
+
+  gst_memory_init (GST_MEMORY_CAST (mem),
+      GST_MEMORY_FLAG_NO_SHARE | GST_MEMORY_FLAG_NOT_MAPPABLE, allocator, NULL,
+      0, 0, 0, 0);
+
+  GST_DEBUG_OBJECT (allocator, "alloc %p", mem);
+
+  return GST_MEMORY_CAST (mem);
+}
+
 gboolean
 gst_is_droid_media_buffer_memory (GstMemory * mem)
 {

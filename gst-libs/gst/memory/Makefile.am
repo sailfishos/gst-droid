@@ -14,11 +14,9 @@ libgstdroidmemory_@GST_API_VERSION@_la_LIBADD = $(GST_LIBS) $(DROID_LIBS) $(HARD
 noinst_HEADERS =
 
 libgstdroidmemory_@GST_API_VERSION@_la_SOURCES = \
-	gstgralloc.c \
 	gstwrappedmemory.c \
 	gstdroidmediabuffer.c
 
 libgstdroidmemory_@GST_API_VERSION@_la_include_HEADERS = \
-	gstgralloc.h \
 	gstwrappedmemory.h \
 	gstdroidmediabuffer.h

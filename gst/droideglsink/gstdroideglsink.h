@@ -58,7 +58,7 @@ struct _GstDroidEglSink
   EGLSyncKHR sync;
   GMutex lock;
 
-  GstAllocator *gralloc_allocator;
+  GstAllocator *allocator;
 
   PFNEGLCREATEIMAGEKHRPROC eglCreateImageKHR;
   PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageKHR;
