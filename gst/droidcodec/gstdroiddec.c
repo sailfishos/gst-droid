@@ -62,6 +62,8 @@ gst_droiddec_frame_available(void *user)
   GstVideoCodecFrame *frame;
   DroidMediaBuffer *buffer;
   GstBuffer *buff;
+  DroidMediaRect rect;
+  GstVideoCropMeta *crop_meta;
 
   GST_DEBUG_OBJECT (dec, "frame available");
 
@@ -77,6 +79,13 @@ gst_droiddec_frame_available(void *user)
   buff = gst_buffer_new ();
 
   gst_buffer_insert_memory (buff, 0, mem);
+
+  rect = droid_media_buffer_get_crop_rect (buffer);
+  crop_meta = gst_buffer_add_video_crop_meta (buff);
+  crop_meta->x = rect.left;
+  crop_meta->y = rect.top;
+  crop_meta->width = rect.right - rect.left;
+  crop_meta->height = rect.bottom - rect.top;
 
   width = droid_media_buffer_get_width(buffer);
   height = droid_media_buffer_get_height(buffer);
