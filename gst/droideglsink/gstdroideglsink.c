@@ -169,7 +169,6 @@ gst_droideglsink_start (GstBaseSink * bsink)
   sink->fps_n = 0;
   sink->fps_d = 1;
 
-  sink->dpy = EGL_NO_DISPLAY;
   sink->image = EGL_NO_IMAGE_KHR;
   sink->sync = NULL;
   sink->eglCreateImageKHR = NULL;
@@ -219,6 +218,8 @@ gst_droideglsink_stop (GstBaseSink * bsink)
 
   gst_object_unref (sink->allocator);
   sink->allocator = NULL;
+
+  sink->dpy = EGL_NO_DISPLAY;
 
   return TRUE;
 }
