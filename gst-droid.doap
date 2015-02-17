@@ -1,0 +1,1 @@
+<Project><name>GStreamer droid Plug-ins</name><shortname>gst-droid</shortname><description>GStreamer droid plug-in contains elements using the Android HAL libraries.</description><programming-language>C</programming-language><license rdf:resource="http://usefulinc.com/doap/licenses/lgpl"/></Project>

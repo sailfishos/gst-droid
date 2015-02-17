@@ -175,6 +175,8 @@ AC_DEFINE_UNQUOTED(GST_API_VERSION, "$GST_API_VERSION",
    [GStreamer API Version])
 
 AC_CONFIG_FILES([Makefile
+		common/Makefile
+		common/m4/Makefile
 		gst-libs/Makefile
 		gst-libs/gst/Makefile
 		gst-libs/gst/memory/Makefile
