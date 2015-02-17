@@ -24,5 +24,6 @@ libgstdroid_la_LIBADD = $(GST_LIBS) $(NGI_LIBS) $(EGL_LIBS) \
 libgstdroid_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 
 libgstdroid_la_SOURCES = plugin.c \
-			 plugin.h \
 			 $(top_builddir)/gst-libs/ext/droidmedia/hybris.c
+
+noinst_HEADERS = plugin.h
