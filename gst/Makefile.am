@@ -8,6 +8,7 @@ libgstdroid_la_CFLAGS = $(GST_CFLAGS) $(NGI_CFLAGS) $(EGL_CFLAGS) \
                         $(DROID_CFLAGS) $(NGM_CFLAGS)\
 	                -I$(top_builddir)/gst-libs/ \
                         -I$(top_builddir)/inc/ \
+			-I$(top_builddir)/gst-libs/ext/droidmedia/ \
                         -Idroidcamsrc/ \
                         -Idroideglsink/ \
                         -Idroidcodec/
@@ -24,4 +25,5 @@ libgstdroid_la_LIBADD = $(GST_LIBS) $(NGI_LIBS) $(EGL_LIBS) \
 libgstdroid_la_LDFLAGS = $(GST_PLUGIN_LDFLAGS)
 
 libgstdroid_la_SOURCES = plugin.c \
-			 plugin.h
+			 plugin.h \
+			 $(top_builddir)/gst-libs/ext/droidmedia/hybris.c
