@@ -7,7 +7,6 @@ libgstdroidmemory_@GST_API_VERSION@_la_includedir = \
 libgstdroidmemory_@GST_API_VERSION@_la_CFLAGS = $(GST_CFLAGS) \
 						$(DROID_CFLAGS) \
 						$(HARDWARE_CFLAGS) \
-						-I$(top_builddir)/inc/ \
 						-I$(top_builddir)/gst-libs/ext/droidmedia/
 
 libgstdroidmemory_@GST_API_VERSION@_la_LIBADD = $(GST_LIBS) $(DROID_LIBS) $(HARDWARE_LIBS)

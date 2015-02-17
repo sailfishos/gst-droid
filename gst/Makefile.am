@@ -7,7 +7,6 @@ plugin_LTLIBRARIES = libgstdroid.la
 libgstdroid_la_CFLAGS = $(GST_CFLAGS) $(NGI_CFLAGS) $(EGL_CFLAGS) \
                         $(DROID_CFLAGS) $(NGM_CFLAGS)\
 	                -I$(top_builddir)/gst-libs/ \
-                        -I$(top_builddir)/inc/ \
 			-I$(top_builddir)/gst-libs/ext/droidmedia/ \
                         -Idroidcamsrc/ \
                         -Idroideglsink/ \
