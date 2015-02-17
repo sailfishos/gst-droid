@@ -70,148 +70,272 @@ static void gst_droidcamsrc_dev_release_recording_frame (void *data,
 void gst_droidcamsrc_dev_update_params_locked (GstDroidCamSrcDev * dev);
 
 static void
-gst_droidcamsrc_dev_notify_callback (void *user, int32_t msg_type,
-    int32_t ext1, int32_t ext2)
+gst_droidcamsrc_dev_shutter_callback(void *user)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
-  GST_DEBUG_OBJECT (src, "dev notify callback");
+  GST_DEBUG_OBJECT (src, "dev shutter callback");
 
-  /* TODO: more messages */
+  g_rec_mutex_lock (dev->lock);
 
-  switch (msg_type) {
-    case CAMERA_MSG_SHUTTER:
-      g_rec_mutex_lock (dev->lock);
-      if (!dev->img->image_start_sent) {
-        gst_droidcamsrc_post_message (src,
-            gst_structure_new_empty (GST_DROIDCAMSRC_CAPTURE_START));
-        dev->img->image_start_sent = TRUE;
-      }
-      g_rec_mutex_unlock (dev->lock);
-      break;
-
-    case CAMERA_MSG_FOCUS:
-    {
-      GstStructure *s;
-      gint status;
-      if (ext1) {
-        status = GST_PHOTOGRAPHY_FOCUS_STATUS_SUCCESS;
-      } else {
-        status = GST_PHOTOGRAPHY_FOCUS_STATUS_FAIL;
-      }
-
-      s = gst_structure_new (GST_PHOTOGRAPHY_AUTOFOCUS_DONE, "status",
-          G_TYPE_INT, status, NULL);
-      gst_droidcamsrc_post_message (src, s);
-    }
-
-      break;
-
-    case CAMERA_MSG_FOCUS_MOVE:
-    {
-      /* TODO: an idea could be to query focus state when moving stops or starts */
-      /* and use that to emulate realtime reporting of CAF status */
-      GstStructure *s;
-      GST_LOG_OBJECT (src, "focus move %d", ext1);
-
-      s = gst_structure_new ("focus-move", "status", G_TYPE_INT, ext1, NULL);
-      gst_droidcamsrc_post_message (src, s);
-    }
-
-      break;
-
-    case CAMERA_MSG_ERROR:
-      GST_ELEMENT_ERROR (src, LIBRARY, FAILED, (NULL),
-          ("error from camera HAL with args 0x%x 0x%x", ext1, ext2));
-      break;
-
-    default:
-      GST_WARNING_OBJECT (src, "unknown message type 0x%x", msg_type);
-      break;
+  if (!dev->img->image_start_sent) {
+    gst_droidcamsrc_post_message (src,
+        gst_structure_new_empty (GST_DROIDCAMSRC_CAPTURE_START));
+    dev->img->image_start_sent = TRUE;
   }
+
+  g_rec_mutex_unlock (dev->lock);
 }
 
 static void
-gst_droidcamsrc_dev_data_callback (void *user, int32_t msg_type, DroidMediaData *mem)
-/* TODO:    camera_frame_metadata_t * metadata, void *user) */
+gst_droidcamsrc_dev_focus_callback(void *user, int arg)
+{
+  GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+  GstStructure *s;
+  gint status;
+
+  GST_DEBUG_OBJECT (src, "dev focus callback");
+
+  if (arg) {
+    status = GST_PHOTOGRAPHY_FOCUS_STATUS_SUCCESS;
+  } else {
+    status = GST_PHOTOGRAPHY_FOCUS_STATUS_FAIL;
+  }
+
+  s = gst_structure_new (GST_PHOTOGRAPHY_AUTOFOCUS_DONE, "status",
+      G_TYPE_INT, status, NULL);
+  gst_droidcamsrc_post_message (src, s);
+}
+
+static void
+gst_droidcamsrc_dev_focus_move_callback(void *user, int arg)
+{
+  GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+  GstStructure *s;
+
+  GST_DEBUG_OBJECT (src, "dev focus move callback");
+
+  /* TODO: an idea could be to query focus state when moving stops or starts
+   * and use that to emulate realtime reporting of CAF status */
+
+  GST_LOG_OBJECT (src, "focus move %d", arg);
+
+  s = gst_structure_new ("focus-move", "status", G_TYPE_INT, arg, NULL);
+  gst_droidcamsrc_post_message (src, s);
+}
+
+static void
+gst_droidcamsrc_dev_error_callback(void *user, int arg)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
-  GST_DEBUG_OBJECT (src, "dev data callback");
+  GST_DEBUG_OBJECT (src, "dev error callback");
 
-  switch (msg_type) {
-    case CAMERA_MSG_RAW_IMAGE:
-      /* TODO: */
-      break;
+  GST_ELEMENT_ERROR (src, LIBRARY, FAILED, (NULL),
+		     ("error 0x%x from camera HAL", arg));
+}
 
-    case CAMERA_MSG_COMPRESSED_IMAGE:
-    {
-      size_t size = mem->size;
-      void *addr = mem->data;
-      if (!addr) {
-        GST_ERROR_OBJECT (src, "invalid memory from camera hal");
-      } else {
-        GstBuffer *buffer;
-        GstTagList *tags;
-        GstEvent *event = NULL;
-        void *d = g_malloc (size);
-        memcpy (d, addr, size);
-        buffer = gst_buffer_new_wrapped (d, size);
-        if (!dev->img->image_preview_sent) {
-          gst_droidcamsrc_post_message (src,
-              gst_structure_new_empty (GST_DROIDCAMSRC_CAPTURE_END));
-          /* TODO: generate and send preview. */
-          dev->img->image_preview_sent = TRUE;
-        }
+static void
+gst_droidcamsrc_dev_zoom_callback(void *user, G_GNUC_UNUSED int value, G_GNUC_UNUSED int arg)
+{
+  GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
-        gst_droidcamsrc_timestamp (src, buffer);
+  GST_DEBUG_OBJECT (src, "dev zoom callback");
 
-        tags = gst_droidcamsrc_exif_tags_from_jpeg_data (d, size);
-        if (tags) {
-          GST_INFO_OBJECT (src, "pushing tags %" GST_PTR_FORMAT, tags);
-          event = gst_event_new_tag (tags);
-        }
+  GST_FIXME_OBJECT (src, "implement me");
+}
 
-        g_mutex_lock (&dev->imgsrc->queue_lock);
+static void
+gst_droidcamsrc_dev_raw_image_callback(void *user, G_GNUC_UNUSED DroidMediaData *mem)
+{
+  GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
-        if (event) {
-          src->imgsrc->pending_events =
-              g_list_append (src->imgsrc->pending_events, event);
-        }
+  GST_DEBUG_OBJECT (src, "dev raw image callback");
 
-        g_queue_push_tail (dev->imgsrc->queue, buffer);
-        g_cond_signal (&dev->imgsrc->cond);
-        g_mutex_unlock (&dev->imgsrc->queue_lock);
-      }
+  GST_FIXME_OBJECT (src, "implement me");
+}
 
-      /* we need to start restart the preview
-       * android demands this but GStreamer does not know about it.
-       */
-      g_rec_mutex_lock (dev->lock);
-      dev->running = FALSE;
-      g_rec_mutex_unlock (dev->lock);
+static void
+gst_droidcamsrc_dev_compressed_image_callback(void *user, DroidMediaData *mem)
+{
+  GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+  size_t size = mem->size;
+  void *data = mem->data;
+  GstBuffer *buffer;
+  GstTagList *tags;
+  GstEvent *event = NULL;
+  void *d;
 
-      gst_droidcamsrc_dev_start (dev, TRUE);
+  GST_DEBUG_OBJECT (src, "dev compressed image callback");
 
-      g_mutex_lock (&src->capture_lock);
-      --src->captures;
-      g_mutex_unlock (&src->capture_lock);
+  if (!data) {
+    GST_ERROR_OBJECT (src, "invalid memory from camera hal");
+    return;
 
-      g_object_notify (G_OBJECT (src), "ready-for-capture");
+    /* TODO: research a way to get rid of the memcpy */
+    d = g_malloc (size);
+    memcpy (d, data, size);
+    buffer = gst_buffer_new_wrapped (d, size);
+    if (!dev->img->image_preview_sent) {
+      gst_droidcamsrc_post_message (src,
+				    gst_structure_new_empty (GST_DROIDCAMSRC_CAPTURE_END));
+      /* TODO: generate and send preview if we don't get it from HAL */
+      dev->img->image_preview_sent = TRUE;
     }
-      break;
-#if 0
-    case CAMERA_MSG_PREVIEW_METADATA:
-    {
-      int i;
-      GstStructure *s;
-      int width = 0, height = 0;
-      GValue regions = G_VALUE_INIT;
 
-      GST_INFO_OBJECT (src, "camera detected %d faces",
-          metadata->number_of_faces);
+    gst_droidcamsrc_timestamp (src, buffer);
+
+    tags = gst_droidcamsrc_exif_tags_from_jpeg_data (d, size);
+    if (tags) {
+      GST_INFO_OBJECT (src, "pushing tags %" GST_PTR_FORMAT, tags);
+      event = gst_event_new_tag (tags);
+    }
+
+    g_mutex_lock (&dev->imgsrc->queue_lock);
+
+    if (event) {
+      src->imgsrc->pending_events =
+	g_list_append (src->imgsrc->pending_events, event);
+    }
+
+    g_queue_push_tail (dev->imgsrc->queue, buffer);
+    g_cond_signal (&dev->imgsrc->cond);
+    g_mutex_unlock (&dev->imgsrc->queue_lock);
+  }
+
+  /* we need to start restart the preview
+   * android demands this but GStreamer does not know about it.
+   */
+  g_rec_mutex_lock (dev->lock);
+  dev->running = FALSE;
+  g_rec_mutex_unlock (dev->lock);
+
+  gst_droidcamsrc_dev_start (dev, TRUE);
+
+  g_mutex_lock (&src->capture_lock);
+  --src->captures;
+  g_mutex_unlock (&src->capture_lock);
+
+  g_object_notify (G_OBJECT (src), "ready-for-capture");
+}
+
+static void
+gst_droidcamsrc_dev_postview_frame_callback(void *user, G_GNUC_UNUSED DroidMediaData *mem)
+{
+  GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+
+  GST_DEBUG_OBJECT (src, "dev postview frame callback");
+
+  GST_FIXME_OBJECT (src, "implement me");
+}
+
+static void
+gst_droidcamsrc_dev_raw_image_notify_callback(void *user)
+{
+  GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+
+  GST_DEBUG_OBJECT (src, "dev raw image notify callback");
+
+  GST_FIXME_OBJECT (src, "implement me");
+}
+
+static void
+gst_droidcamsrc_dev_preview_frame_callback(void *user, G_GNUC_UNUSED DroidMediaData *mem)
+{
+  GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+
+  GST_DEBUG_OBJECT (src, "dev preview frame callback");
+  GST_FIXME_OBJECT (src, "implement me");
+}
+
+static void
+gst_droidcamsrc_dev_video_frame_callback(void *user, DroidMediaCameraRecordingData *video_data)
+{
+  GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+  void *data = droid_media_camera_recording_frame_get_data (video_data);
+  GstBuffer *buffer;
+  GstMemory *mem;
+  GstDroidCamSrcDevVideoData *mem_data;
+  gboolean drop_buffer;
+
+  GST_DEBUG_OBJECT (src, "dev video frame callback");
+
+  g_mutex_lock (&dev->vid->lock);
+
+  /* TODO: not sure what to do with timestamp */
+
+  /* unlikely but just in case */
+  if (G_UNLIKELY (!data)) {
+    GST_ERROR ("invalid memory from camera HAL");
+    droid_media_camera_release_recording_frame (dev->cam, video_data);
+    goto unlock_and_out;
+  }
+
+  /* TODO: this is bad */
+  mem_data = g_slice_new0(GstDroidCamSrcDevVideoData);
+  mem_data->dev = dev;
+  mem_data->data = video_data;
+
+  buffer = gst_buffer_new ();
+  mem = gst_wrapped_memory_allocator_wrap (dev->wrap_allocator,
+      data, droid_media_camera_recording_frame_get_size (video_data),
+     (GFunc) gst_droidcamsrc_dev_release_recording_frame, mem_data);
+  gst_buffer_insert_memory (buffer, 0, mem);
+
+  GST_BUFFER_OFFSET (buffer) = dev->vid->video_frames;
+  GST_BUFFER_OFFSET_END (buffer) = ++dev->vid->video_frames;
+  gst_droidcamsrc_timestamp (src, buffer);
+
+  g_rec_mutex_lock (dev->lock);
+
+  drop_buffer = !dev->vid->running;
+  if (!drop_buffer) {
+    ++dev->vid->queued_frames;
+  }
+
+  g_rec_mutex_unlock (dev->lock);
+
+  if (drop_buffer) {
+    GST_INFO_OBJECT (src, "dropping buffer because video recording is not running");
+    gst_buffer_unref (buffer);
+  } else {
+    g_mutex_lock (&dev->vidsrc->queue_lock);
+    g_queue_push_tail (dev->vidsrc->queue, buffer);
+    g_cond_signal (&dev->vidsrc->cond);
+    g_mutex_unlock (&dev->vidsrc->queue_lock);
+  }
+
+unlock_and_out:
+  g_mutex_unlock (&dev->vid->lock);
+}
+
+static void
+gst_droidcamsrc_dev_preview_metadata_callback (void *user, const DroidMediaCameraFace *faces, size_t num_faces)
+{
+  GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+  int x;
+  GstStructure *s;
+  int width = 0, height = 0;
+  GValue regions = G_VALUE_INIT;
+
+  GST_DEBUG_OBJECT (src, "dev preview metadata callback");
+
+  GST_INFO_OBJECT (src, "camera detected %d faces", num_faces);
+
+#if 0
+
       /*
        * It should be safe to access window here
        * We cannot really take dev->lock otherwise we might deadlock
@@ -276,84 +400,7 @@ gst_droidcamsrc_dev_data_callback (void *user, int32_t msg_type, DroidMediaData 
     }
       break;
 #endif
-    case CAMERA_MSG_PREVIEW_FRAME:
-      GST_LOG_OBJECT (src, "dropping preview frame message");
-      break;
 
-    default:
-      GST_WARNING_OBJECT (src, "unknown message type 0x%x", msg_type);
-  }
-
-  /* TODO: */
-}
-
-static void
-gst_droidcamsrc_dev_data_timestamp_callback (void *user,
-    int32_t msg_type, DroidMediaCameraRecordingData *data)
-{
-  void *addr = droid_media_camera_recording_frame_get_data (data);
-  gboolean drop_buffer;
-  GstBuffer *buffer;
-  GstMemory *mem;
-  GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
-  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
-  GstDroidCamSrcDevVideoData *video_data;
-
-  g_mutex_lock (&dev->vid->lock);
-
-  /* TODO: not sure what to do with timestamp */
-
-  GST_DEBUG_OBJECT (src, "dev data timestamp callback");
-
-  /* unlikely but just in case */
-  if (msg_type != CAMERA_MSG_VIDEO_FRAME) {
-    GST_ERROR ("unknown message type 0x%x", msg_type);
-    droid_media_camera_release_recording_frame (dev->cam, data);
-    goto unlock_and_out;
-  }
-
-  if (!addr) {
-    GST_ERROR ("invalid memory from camera HAL");
-    droid_media_camera_release_recording_frame (dev->cam, data);
-    goto unlock_and_out;
-  }
-
-  /* TODO: */
-  video_data = g_slice_new0(GstDroidCamSrcDevVideoData);
-  video_data->dev = dev;
-  video_data->data = data;
-
-  buffer = gst_buffer_new ();
-  mem = gst_wrapped_memory_allocator_wrap (dev->wrap_allocator,
-      addr, droid_media_camera_recording_frame_get_size (data),
-     (GFunc) gst_droidcamsrc_dev_release_recording_frame, video_data);
-  gst_buffer_insert_memory (buffer, 0, mem);
-
-  GST_BUFFER_OFFSET (buffer) = dev->vid->video_frames;
-  GST_BUFFER_OFFSET_END (buffer) = ++dev->vid->video_frames;
-  gst_droidcamsrc_timestamp (src, buffer);
-
-  g_rec_mutex_lock (dev->lock);
-
-  drop_buffer = !dev->vid->running;
-  if (!drop_buffer) {
-    ++dev->vid->queued_frames;
-  }
-
-  g_rec_mutex_unlock (dev->lock);
-
-  if (drop_buffer) {
-    GST_INFO_OBJECT (src, "dropping buffer because video recording is not running");
-    gst_buffer_unref (buffer);
-  } else {
-    g_mutex_lock (&dev->vidsrc->queue_lock);
-    g_queue_push_tail (dev->vidsrc->queue, buffer);
-    g_cond_signal (&dev->vidsrc->cond);
-    g_mutex_unlock (&dev->vidsrc->queue_lock);
-  }
-
-unlock_and_out:
-  g_mutex_unlock (&dev->vid->lock);
 }
 
 static void
@@ -547,9 +594,18 @@ gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
   {
     DroidMediaCameraCallbacks cb;
 
-    cb.notify = gst_droidcamsrc_dev_notify_callback;
-    cb.post_data_timestamp = gst_droidcamsrc_dev_data_timestamp_callback;
-    cb.post_data = gst_droidcamsrc_dev_data_callback;
+    cb.shutter_cb = gst_droidcamsrc_dev_shutter_callback;
+    cb.focus_cb = gst_droidcamsrc_dev_focus_callback;
+    cb.focus_move_cb = gst_droidcamsrc_dev_focus_move_callback;
+    cb.error_cb = gst_droidcamsrc_dev_error_callback;
+    cb.zoom_cb = gst_droidcamsrc_dev_zoom_callback;
+    cb.raw_image_cb = gst_droidcamsrc_dev_raw_image_callback;
+    cb.compressed_image_cb = gst_droidcamsrc_dev_compressed_image_callback;
+    cb.postview_frame_cb = gst_droidcamsrc_dev_postview_frame_callback;
+    cb.raw_image_notify_cb = gst_droidcamsrc_dev_raw_image_notify_callback;
+    cb.preview_frame_cb = gst_droidcamsrc_dev_preview_frame_callback;
+    cb.video_frame_cb = gst_droidcamsrc_dev_video_frame_callback;
+    cb.preview_metadata_cb = gst_droidcamsrc_dev_preview_metadata_callback;
     droid_media_camera_set_callbacks (dev->cam, &cb, dev);
   }
 
