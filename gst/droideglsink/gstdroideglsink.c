@@ -219,8 +219,6 @@ gst_droideglsink_stop (GstBaseSink * bsink)
   gst_object_unref (sink->allocator);
   sink->allocator = NULL;
 
-  sink->dpy = EGL_NO_DISPLAY;
-
   return TRUE;
 }
 
