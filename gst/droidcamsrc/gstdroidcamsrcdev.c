@@ -178,37 +178,38 @@ gst_droidcamsrc_dev_compressed_image_callback(void *user, DroidMediaData *mem)
   if (!data) {
     GST_ERROR_OBJECT (src, "invalid memory from camera hal");
     return;
-
-    /* TODO: research a way to get rid of the memcpy */
-    d = g_malloc (size);
-    memcpy (d, data, size);
-    buffer = gst_buffer_new_wrapped (d, size);
-    if (!dev->img->image_preview_sent) {
-      gst_droidcamsrc_post_message (src,
-				    gst_structure_new_empty (GST_DROIDCAMSRC_CAPTURE_END));
-      /* TODO: generate and send preview if we don't get it from HAL */
-      dev->img->image_preview_sent = TRUE;
-    }
-
-    gst_droidcamsrc_timestamp (src, buffer);
-
-    tags = gst_droidcamsrc_exif_tags_from_jpeg_data (d, size);
-    if (tags) {
-      GST_INFO_OBJECT (src, "pushing tags %" GST_PTR_FORMAT, tags);
-      event = gst_event_new_tag (tags);
-    }
-
-    g_mutex_lock (&dev->imgsrc->queue_lock);
-
-    if (event) {
-      src->imgsrc->pending_events =
-	g_list_append (src->imgsrc->pending_events, event);
-    }
-
-    g_queue_push_tail (dev->imgsrc->queue, buffer);
-    g_cond_signal (&dev->imgsrc->cond);
-    g_mutex_unlock (&dev->imgsrc->queue_lock);
   }
+
+  /* TODO: research a way to get rid of the memcpy */
+  d = g_malloc (size);
+  memcpy (d, data, size);
+  buffer = gst_buffer_new_wrapped (d, size);
+  if (!dev->img->image_preview_sent) {
+    gst_droidcamsrc_post_message (src,
+				  gst_structure_new_empty (GST_DROIDCAMSRC_CAPTURE_END));
+    /* TODO: generate and send preview if we don't get it from HAL */
+    dev->img->image_preview_sent = TRUE;
+  }
+
+  gst_droidcamsrc_timestamp (src, buffer);
+
+  tags = gst_droidcamsrc_exif_tags_from_jpeg_data (d, size);
+  if (tags) {
+    GST_INFO_OBJECT (src, "pushing tags %" GST_PTR_FORMAT, tags);
+    event = gst_event_new_tag (tags);
+  }
+
+  g_mutex_lock (&dev->imgsrc->queue_lock);
+
+  // TODO: get the correct lock
+  if (event) {
+    src->imgsrc->pending_events =
+      g_list_append (src->imgsrc->pending_events, event);
+  }
+
+  g_queue_push_tail (dev->imgsrc->queue, buffer);
+  g_cond_signal (&dev->imgsrc->cond);
+  g_mutex_unlock (&dev->imgsrc->queue_lock);
 
   /* we need to start restart the preview
    * android demands this but GStreamer does not know about it.
