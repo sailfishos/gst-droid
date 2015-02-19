@@ -77,6 +77,7 @@ static void gst_droidcamsrc_stop_capture (GstDroidCamSrc * src);
 static void gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src);
 static void gst_droidcamsrc_update_ev_compensation_bounds (GstDroidCamSrc *
     src);
+static void gst_droidcamsrc_add_vfsrc_orientation_tag (GstDroidCamSrc * src);
 
 enum
 {
@@ -476,6 +477,9 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 
       /* now that we have camera parameters, we can update min and max ev-compensation */
       gst_droidcamsrc_update_ev_compensation_bounds (src);
+
+      /* Now add the needed orientation tag */
+      gst_droidcamsrc_add_vfsrc_orientation_tag (src);
     }
 
       break;
@@ -1815,4 +1819,29 @@ gst_droidcamsrc_update_ev_compensation_bounds (GstDroidCamSrc * src)
         CLAMP (new_val, src->min_ev_compensation, src->max_ev_compensation);
     g_object_set (src, "ev-compensation", new_val, NULL);
   }
+}
+
+static void
+gst_droidcamsrc_add_vfsrc_orientation_tag (GstDroidCamSrc * src)
+{
+  static gchar *tags[] = {
+    "rotate-0",
+    "rotate-90",
+    "rotate-180",
+    "rotate-270",
+  };
+
+  const gchar *orientation;
+  GstTagList *taglist;
+
+  GST_DEBUG_OBJECT (src, "add vfsrc orientation tag");
+
+  orientation = tags[src->dev->info->orientation];
+
+  taglist = gst_tag_list_new (GST_TAG_IMAGE_ORIENTATION, orientation, NULL);
+
+  src->vfsrc->pending_events = g_list_append (src->vfsrc->pending_events,
+					      gst_event_new_tag (taglist));
+
+  GST_INFO_OBJECT (src, "added orientation tag event with orientation %s", orientation);
 }
