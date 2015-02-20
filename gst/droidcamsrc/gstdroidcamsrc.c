@@ -856,10 +856,15 @@ gst_droidcamsrc_loop (gpointer user_data)
 
   GST_LOG_OBJECT (src, "loop %s", GST_PAD_NAME (data->pad));
 
+  g_mutex_lock (&data->lock);
+
   if (!data->running) {
     GST_DEBUG_OBJECT (src, "%s task is not running", GST_PAD_NAME (data->pad));
+    g_mutex_unlock (&data->lock);
     goto exit;
   }
+
+  g_mutex_unlock (&data->lock);
 
   /* stream start */
   if (G_UNLIKELY (data->open_stream)) {
@@ -1011,7 +1016,6 @@ gst_droidcamsrc_pad_activate_mode (GstPad * pad, GstObject * parent,
   }
 
   if (active) {
-    /* TODO: review locking for the remaining 2 pads */
     /* No need for locking here since the task is not running */
     data->running = TRUE;
     data->open_stream = TRUE;
@@ -1024,8 +1028,10 @@ gst_droidcamsrc_pad_activate_mode (GstPad * pad, GstObject * parent,
   } else {
     gboolean ret = FALSE;
 
+    g_mutex_lock (&data->lock);
     data->running = FALSE;
     g_cond_signal (&data->cond);
+    g_mutex_unlock (&data->lock);
 
     if (!gst_pad_stop_task (pad)) {
       GST_ERROR_OBJECT (src, "failed to stop pad task");
