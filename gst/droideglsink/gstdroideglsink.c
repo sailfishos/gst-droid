@@ -527,7 +527,7 @@ gst_droideglsink_populate_egl_proc (GstDroidEglSink * sink)
 
 /* interfaces */
 static gboolean
-gst_droidcamsrc_acquire_frame (NemoGstVideoTexture * iface)
+gst_droideglsink_acquire_frame (NemoGstVideoTexture * iface)
 {
   GstDroidEglSink *sink;
   gboolean ret = TRUE;
@@ -574,7 +574,7 @@ unlock_and_out:
 }
 
 static gboolean
-gst_droidcamsrc_bind_frame (NemoGstVideoTexture * iface, EGLImageKHR * image)
+gst_droideglsink_bind_frame (NemoGstVideoTexture * iface, EGLImageKHR * image)
 {
   GstDroidEglSink *sink;
   gboolean ret = FALSE;
@@ -633,7 +633,7 @@ out:
 }
 
 static void
-gst_droidcamsrc_unbind_frame (NemoGstVideoTexture * iface)
+gst_droideglsink_unbind_frame (NemoGstVideoTexture * iface)
 {
   GstDroidEglSink *sink;
 
@@ -653,7 +653,7 @@ gst_droidcamsrc_unbind_frame (NemoGstVideoTexture * iface)
 }
 
 static void
-gst_droidcamsrc_release_frame (NemoGstVideoTexture * iface, EGLSyncKHR sync)
+gst_droideglsink_release_frame (NemoGstVideoTexture * iface, EGLSyncKHR sync)
 {
   GstDroidEglSink *sink;
 
@@ -678,7 +678,7 @@ gst_droidcamsrc_release_frame (NemoGstVideoTexture * iface, EGLSyncKHR sync)
 }
 
 static gboolean
-gst_droidcamsrc_get_frame_info (NemoGstVideoTexture * iface,
+gst_droideglsink_get_frame_info (NemoGstVideoTexture * iface,
     NemoGstVideoTextureFrameInfo * info)
 {
   GstDroidEglSink *sink;
@@ -712,7 +712,7 @@ unlock_and_out:
 }
 
 static GstMeta *
-gst_droidcamsrc_get_frame_meta (NemoGstVideoTexture * iface, GType api)
+gst_droideglsink_get_frame_meta (NemoGstVideoTexture * iface, GType api)
 {
   GstDroidEglSink *sink;
   GstMeta *meta = NULL;
@@ -735,10 +735,10 @@ gst_droidcamsrc_get_frame_meta (NemoGstVideoTexture * iface, GType api)
 static void
 gst_droideglsink_video_texture_init (NemoGstVideoTextureClass * iface)
 {
-  iface->acquire_frame = gst_droidcamsrc_acquire_frame;
-  iface->bind_frame = gst_droidcamsrc_bind_frame;
-  iface->unbind_frame = gst_droidcamsrc_unbind_frame;
-  iface->release_frame = gst_droidcamsrc_release_frame;
-  iface->get_frame_info = gst_droidcamsrc_get_frame_info;
-  iface->get_frame_meta = gst_droidcamsrc_get_frame_meta;
+  iface->acquire_frame = gst_droideglsink_acquire_frame;
+  iface->bind_frame = gst_droideglsink_bind_frame;
+  iface->unbind_frame = gst_droideglsink_unbind_frame;
+  iface->release_frame = gst_droideglsink_release_frame;
+  iface->get_frame_info = gst_droideglsink_get_frame_info;
+  iface->get_frame_meta = gst_droideglsink_get_frame_meta;
 }
