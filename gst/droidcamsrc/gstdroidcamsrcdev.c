@@ -551,10 +551,6 @@ gst_droidcamsrc_dev_close (GstDroidCamSrcDev * dev)
   g_rec_mutex_lock (dev->lock);
 
   if (dev->cam) {
-    if (!droid_media_camera_unlock (dev->cam)) {
-      GST_ERROR ("error unlocking camera");
-    }
-
     droid_media_camera_disconnect (dev->cam);
     dev->cam = NULL;
     dev->queue = NULL;
