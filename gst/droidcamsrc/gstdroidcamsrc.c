@@ -117,7 +117,7 @@ gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
   gst_pad_set_event_function (pad->pad, gst_droidcamsrc_pad_event);
   gst_pad_set_query_function (pad->pad, gst_droidcamsrc_pad_query);
 
-  g_mutex_init (&pad->queue_lock);
+  g_mutex_init (&pad->lock);
   g_cond_init (&pad->cond);
   pad->queue = g_queue_new ();
   pad->running = FALSE;
@@ -138,7 +138,7 @@ static void
 gst_droidcamsrc_destroy_pad (GstDroidCamSrcPad * pad)
 {
   /* we don't destroy the pad itself */
-  g_mutex_clear (&pad->queue_lock);
+  g_mutex_clear (&pad->lock);
   g_cond_clear (&pad->cond);
   g_queue_free (pad->queue);
   g_slice_free (GstDroidCamSrcPad, pad);
@@ -895,25 +895,25 @@ gst_droidcamsrc_loop (gpointer user_data)
     }
 
     /* toss our queue */
-    g_mutex_lock (&data->queue_lock);
+    g_mutex_lock (&data->lock);
     g_queue_foreach (data->queue, (GFunc) gst_buffer_unref, NULL);
     g_queue_clear (data->queue);
-    g_mutex_unlock (&data->queue_lock);
+    g_mutex_unlock (&data->lock);
   }
 
-  g_mutex_lock (&data->queue_lock);
+  g_mutex_lock (&data->lock);
   buffer = g_queue_pop_head (data->queue);
   if (buffer) {
-    g_mutex_unlock (&data->queue_lock);
+    g_mutex_unlock (&data->lock);
     goto out;
   }
 
   if (!buffer) {
-    g_cond_wait (&data->cond, &data->queue_lock);
+    g_cond_wait (&data->cond, &data->lock);
     buffer = g_queue_pop_head (data->queue);
   }
 
-  g_mutex_unlock (&data->queue_lock);
+  g_mutex_unlock (&data->lock);
 
   if (!buffer) {
     /* we got signaled to exit */
@@ -962,10 +962,10 @@ out:
   /* pending events */
   GST_OBJECT_LOCK (src);
   /* queue lock is needed for vfsrc and imgsrc pads */
-  g_mutex_lock (&data->queue_lock);
+  g_mutex_lock (&data->lock);
   events = data->pending_events;
   data->pending_events = NULL;
-  g_mutex_unlock (&data->queue_lock);
+  g_mutex_unlock (&data->lock);
   GST_OBJECT_UNLOCK (src);
 
   if (G_UNLIKELY (events)) {
@@ -986,9 +986,9 @@ out:
         gst_flow_get_name (ret), GST_PAD_NAME (data->pad));
   }
 
-  g_mutex_lock (&data->queue_lock);
+  g_mutex_lock (&data->lock);
   data->pushed_buffers++;
-  g_mutex_unlock (&data->queue_lock);
+  g_mutex_unlock (&data->lock);
 }
 
 static gboolean
@@ -1034,11 +1034,11 @@ gst_droidcamsrc_pad_activate_mode (GstPad * pad, GstObject * parent,
       ret = TRUE;
     }
 
-    g_mutex_lock (&data->queue_lock);
+    g_mutex_lock (&data->lock);
     /* toss the queue */
     g_queue_foreach (data->queue, (GFunc) gst_buffer_unref, NULL);
     g_queue_clear (data->queue);
-    g_mutex_unlock (&data->queue_lock);
+    g_mutex_unlock (&data->lock);
 
     GST_OBJECT_LOCK (src);
 
@@ -1109,9 +1109,9 @@ gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent, GstEvent * event)
         ret = FALSE;
       } else if (data->capture_pad) {
         /* wake pad up to renegotiate */
-        g_mutex_lock (&data->queue_lock);
+        g_mutex_lock (&data->lock);
         g_cond_signal (&data->cond);
-        g_mutex_unlock (&data->queue_lock);
+        g_mutex_unlock (&data->lock);
         ret = TRUE;
       } else {
         /* pad will negotiate later */
@@ -1841,10 +1841,10 @@ gst_droidcamsrc_add_vfsrc_orientation_tag (GstDroidCamSrc * src)
   taglist = gst_tag_list_new (GST_TAG_IMAGE_ORIENTATION, orientation, NULL);
 
   /* The lock is not really needed but for the sake of consistency */
-  g_mutex_lock (&src->vfsrc->queue_lock);
+  g_mutex_lock (&src->vfsrc->lock);
   src->vfsrc->pending_events = g_list_append (src->vfsrc->pending_events,
 					      gst_event_new_tag (taglist));
-  g_mutex_unlock (&src->vfsrc->queue_lock);
+  g_mutex_unlock (&src->vfsrc->lock);
 
   GST_INFO_OBJECT (src, "added orientation tag event with orientation %s", orientation);
 }

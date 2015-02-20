@@ -199,7 +199,7 @@ gst_droidcamsrc_dev_compressed_image_callback(void *user, DroidMediaData *mem)
     event = gst_event_new_tag (tags);
   }
 
-  g_mutex_lock (&dev->imgsrc->queue_lock);
+  g_mutex_lock (&dev->imgsrc->lock);
 
   // TODO: get the correct lock
   if (event) {
@@ -209,7 +209,7 @@ gst_droidcamsrc_dev_compressed_image_callback(void *user, DroidMediaData *mem)
 
   g_queue_push_tail (dev->imgsrc->queue, buffer);
   g_cond_signal (&dev->imgsrc->cond);
-  g_mutex_unlock (&dev->imgsrc->queue_lock);
+  g_mutex_unlock (&dev->imgsrc->lock);
 
   /* we need to start restart the preview
    * android demands this but GStreamer does not know about it.
@@ -311,10 +311,10 @@ gst_droidcamsrc_dev_video_frame_callback(void *user, DroidMediaCameraRecordingDa
     GST_INFO_OBJECT (src, "dropping buffer because video recording is not running");
     gst_buffer_unref (buffer);
   } else {
-    g_mutex_lock (&dev->vidsrc->queue_lock);
+    g_mutex_lock (&dev->vidsrc->lock);
     g_queue_push_tail (dev->vidsrc->queue, buffer);
     g_cond_signal (&dev->vidsrc->cond);
-    g_mutex_unlock (&dev->vidsrc->queue_lock);
+    g_mutex_unlock (&dev->vidsrc->lock);
   }
 
 unlock_and_out:
@@ -465,13 +465,13 @@ gst_droidcamsrc_dev_frame_available(void *user)
   GST_LOG_OBJECT (src, "preview info: w=%d, h=%d, crop: x=%d, y=%d, w=%d, h=%d", width, height, crop_meta->x,
 		  crop_meta->y, crop_meta->width, crop_meta->height);
 
-  g_mutex_lock (&pad->queue_lock);
+  g_mutex_lock (&pad->lock);
 
   g_queue_push_tail (pad->queue, buff);
 
   g_cond_signal (&pad->cond);
 
-  g_mutex_unlock (&pad->queue_lock);
+  g_mutex_unlock (&pad->lock);
 }
 
 GstDroidCamSrcDev *
@@ -772,9 +772,9 @@ gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
 
   GST_DEBUG ("dev start video recording");
 
-  g_mutex_lock (&dev->vidsrc->queue_lock);
+  g_mutex_lock (&dev->vidsrc->lock);
   dev->vidsrc->pushed_buffers = 0;
-  g_mutex_unlock (&dev->vidsrc->queue_lock);
+  g_mutex_unlock (&dev->vidsrc->lock);
 
   g_rec_mutex_lock (dev->lock);
   dev->vid->running = TRUE;
@@ -807,14 +807,14 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
 
   /* TODO: review all those locks */
   /* We need to make sure that some buffers have been pushed */
-  g_mutex_lock (&dev->vidsrc->queue_lock);
+  g_mutex_lock (&dev->vidsrc->lock);
   while (dev->vid->video_frames <= 4) {
-    g_mutex_unlock (&dev->vidsrc->queue_lock);
+    g_mutex_unlock (&dev->vidsrc->lock);
     usleep (30000);             /* TODO: bad */
-    g_mutex_lock (&dev->vidsrc->queue_lock);
+    g_mutex_lock (&dev->vidsrc->lock);
   }
 
-  g_mutex_unlock (&dev->vidsrc->queue_lock);
+  g_mutex_unlock (&dev->vidsrc->lock);
 
   /* Now stop pushing to the pad */
   g_rec_mutex_lock (dev->lock);
@@ -826,9 +826,9 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
   g_mutex_unlock (&dev->vid->lock);
 
   /* our pad task is either sleeping or still pushing buffers. We empty the queue. */
-  g_mutex_lock (&dev->vidsrc->queue_lock);
+  g_mutex_lock (&dev->vidsrc->lock);
   g_queue_foreach (dev->vidsrc->queue, (GFunc) gst_buffer_unref, NULL);
-  g_mutex_unlock (&dev->vidsrc->queue_lock);
+  g_mutex_unlock (&dev->vidsrc->lock);
 
   /* now we are done. We just push eos */
   GST_DEBUG ("Pushing EOS");
