@@ -857,7 +857,7 @@ gst_droidcamsrc_loop (gpointer user_data)
   GST_LOG_OBJECT (src, "loop %s", GST_PAD_NAME (data->pad));
 
   if (!data->running) {
-    GST_DEBUG_OBJECT (src, "task is not running");
+    GST_DEBUG_OBJECT (src, "%s task is not running", GST_PAD_NAME (data->pad));
     goto exit;
   }
 
@@ -870,11 +870,11 @@ gst_droidcamsrc_loop (gpointer user_data)
         gst_pad_create_stream_id (data->pad, GST_ELEMENT_CAST (src),
         GST_PAD_NAME (data->pad));
 
-    GST_DEBUG_OBJECT (src, "Pushing STREAM_START");
+    GST_DEBUG_OBJECT (src, "Pushing STREAM_START for pad %s", GST_PAD_NAME (data->pad));
     event = gst_event_new_stream_start (stream_id);
     gst_event_set_group_id (event, gst_util_group_id_next ());
     if (!gst_pad_push_event (data->pad, event)) {
-      GST_ERROR_OBJECT (src, "failed to push STREAM_START event");
+      GST_ERROR_OBJECT (src, "failed to push STREAM_START event for pad %s", GST_PAD_NAME (data->pad));
     }
 
     g_free (stream_id);
