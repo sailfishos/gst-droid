@@ -907,6 +907,13 @@ gst_droidcamsrc_loop (gpointer user_data)
   }
 
   g_mutex_lock (&data->lock);
+
+  if (!data->running) {
+    GST_DEBUG_OBJECT (src, "%s task is not running", GST_PAD_NAME (data->pad));
+    g_mutex_unlock (&data->lock);
+    goto exit;
+  }
+
   buffer = g_queue_pop_head (data->queue);
   if (buffer) {
     g_mutex_unlock (&data->lock);
@@ -928,6 +935,7 @@ gst_droidcamsrc_loop (gpointer user_data)
   }
 
   return;
+
 error:
   gst_pad_pause_task (data->pad);
 
