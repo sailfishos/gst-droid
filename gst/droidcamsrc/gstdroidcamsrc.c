@@ -961,7 +961,7 @@ out:
 
   /* pending events */
   GST_OBJECT_LOCK (src);
-  /* queue lock is needed for imgsrc pad */
+  /* queue lock is needed for vfsrc and imgsrc pads */
   g_mutex_lock (&data->queue_lock);
   events = data->pending_events;
   data->pending_events = NULL;
@@ -1840,8 +1840,11 @@ gst_droidcamsrc_add_vfsrc_orientation_tag (GstDroidCamSrc * src)
 
   taglist = gst_tag_list_new (GST_TAG_IMAGE_ORIENTATION, orientation, NULL);
 
+  /* The lock is not really needed but for the sake of consistency */
+  g_mutex_lock (&src->vfsrc->queue_lock);
   src->vfsrc->pending_events = g_list_append (src->vfsrc->pending_events,
 					      gst_event_new_tag (taglist));
+  g_mutex_unlock (&src->vfsrc->queue_lock);
 
   GST_INFO_OBJECT (src, "added orientation tag event with orientation %s", orientation);
 }
