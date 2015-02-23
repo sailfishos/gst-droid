@@ -955,7 +955,7 @@ gst_droidcamsrc_dev_enable_face_detection (GstDroidCamSrcDev * dev,
   /* TODO: this is SW only. We need to investigate HW too. */
   if (!droid_media_camera_enable_face_detection (dev->cam, DROID_MEDIA_CAMERA_FACE_DETECTION_SW,
 						 enable ? true : false)) {
-    GST_ERROR ("error enabling face detection");
+    GST_ERROR ("error %s face detection", enable ? "enabling" : "disabling");
     goto out;
   }
 
