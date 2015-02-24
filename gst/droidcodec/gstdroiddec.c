@@ -503,6 +503,10 @@ gst_droiddec_loop (gpointer data)
   GST_ERROR_OBJECT (dec, "decoder loop returned error");
 
 stop_and_out:
+  g_mutex_lock (&dec->running_lock);
+  dec->running = FALSE;
+  g_mutex_unlock (&dec->running_lock);
+
   gst_pad_pause_task (GST_VIDEO_DECODER_SRC_PAD (GST_VIDEO_DECODER(dec)));
   GST_DEBUG_OBJECT (dec, "loop exit");
 }
