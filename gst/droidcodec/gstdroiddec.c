@@ -47,6 +47,14 @@ static GstVideoCodecState *
 gst_droiddec_configure_state (GstVideoDecoder * decoder, gsize width,
 			      gsize height);
 
+typedef struct
+{
+  GstDroidDec *dec;
+  GstBuffer *buffer;
+  GstMapInfo info;
+  GstVideoCodecFrame *frame;
+} GstDroidDecReleaseBufferInfo;
+
 static void
 gst_droiddec_buffers_released(G_GNUC_UNUSED void *user)
 {
@@ -57,6 +65,7 @@ static void
 gst_droiddec_frame_available(void *user)
 {
   GstDroidDec *dec = (GstDroidDec *) user;
+  GstVideoDecoder *decoder = GST_VIDEO_DECODER (dec);
   GstMemory *mem;
   guint width, height;
   GstVideoCodecFrame *frame;
@@ -64,13 +73,19 @@ gst_droiddec_frame_available(void *user)
   GstBuffer *buff;
   DroidMediaRect rect;
   GstVideoCropMeta *crop_meta;
+  GstFlowReturn flow_ret;
 
   GST_DEBUG_OBJECT (dec, "frame available");
 
+  GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+
+  /* TODO: we are still missing a lot of checks here */
   mem = gst_droid_media_buffer_allocator_alloc (dec->allocator, dec->queue);
 
   if (!mem) {
+    /* TODO: do we want an error here? */
     GST_ERROR_OBJECT (dec, "failed to acquire buffer from droidmedia");
+    GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
     return;
   }
 
@@ -98,6 +113,8 @@ gst_droiddec_frame_available(void *user)
   if (G_UNLIKELY(!frame)) {
     GST_WARNING_OBJECT (dec, "buffer without frame");
     gst_buffer_unref (buff);
+    /* TODO: do we want an error here? */
+    GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
     return;
   }
 
@@ -106,7 +123,13 @@ gst_droiddec_frame_available(void *user)
   /* We get the timestamp in ns already */
   frame->pts = droid_media_buffer_get_timestamp (buffer);
 
-  gst_video_decoder_finish_frame (GST_VIDEO_DECODER (dec), frame);
+  flow_ret = gst_video_decoder_finish_frame (GST_VIDEO_DECODER (dec), frame);
+
+  if (flow_ret != GST_FLOW_OK) {
+    /* TODO: handle that */
+  }
+
+  GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
 }
 
 static void
@@ -142,8 +165,17 @@ gst_droiddec_error (void *data, int err)
     goto out;
   }
 
+  g_mutex_lock (&dec->running_lock);
+  if (!dec->running) {
+    GST_INFO_OBJECT (dec, "error 0x%x ignored because we are not running", -err);
+    g_mutex_unlock (&dec->running_lock);
+    goto out;
+  }
+
+  g_mutex_unlock (&dec->running_lock);
+
   GST_VIDEO_DECODER_STREAM_LOCK (dec);
-  dec->has_error = TRUE;
+  dec->downstream_flow_ret = GST_FLOW_ERROR;
   GST_VIDEO_DECODER_STREAM_UNLOCK (dec);
 
   GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, NULL, ("error 0x%x from android codec", -err));
@@ -173,34 +205,6 @@ gst_droiddec_size_changed(void *data, int32_t width, int32_t height)
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
 
   return err;
-}
-
-static gboolean
-gst_droiddec_do_handle_frame (GstVideoDecoder * decoder,
-    GstVideoCodecFrame * frame)
-{
-  GstDroidDec *dec = GST_DROIDDEC (decoder);
-
-  GST_DEBUG_OBJECT (dec, "do handle frame");
-
-  /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
-   * cannot write the input buffer. We end up waiting for the write operation
-   * which does not happen because stagefright needs us to provide
-   * output buffers to be filled (which can not happen because _loop() tries
-   * to call get_oldest_frame() which acquires the stream lock the base class
-   * is holding before calling us
-   */
-  /* TODO: Check that we are still in a sane state */
-  GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
-  if (!gst_droid_codec_consume_frame (dec->codec, frame, frame->dts)) {
-    GST_VIDEO_DECODER_STREAM_LOCK (decoder);
-    /* TODO: error */
-    return FALSE;
-  }
-
-  GST_VIDEO_DECODER_STREAM_LOCK (decoder);
-
-  return TRUE;
 }
 
 static GstVideoCodecState *
@@ -238,7 +242,13 @@ gst_droiddec_stop (GstVideoDecoder * decoder)
   GST_DEBUG_OBJECT (dec, "stop");
 
   if (dec->codec) {
+    g_mutex_lock (&dec->running_lock);
+    dec->running = FALSE;
+    g_mutex_unlock (&dec->running_lock);
+
+    /* call stop first so it unlocks the loop */
     droid_media_codec_stop (dec->codec);
+    gst_pad_stop_task (GST_VIDEO_DECODER_SRC_PAD (decoder));
     droid_media_codec_destroy (dec->codec);
     dec->codec = NULL;
     dec->queue = NULL;
@@ -273,6 +283,8 @@ gst_droiddec_finalize (GObject * object)
 
   g_mutex_clear (&dec->eos_lock);
   g_cond_clear (&dec->eos_cond);
+
+  g_mutex_clear (&dec->running_lock);
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
@@ -309,7 +321,7 @@ gst_droiddec_start (GstVideoDecoder * decoder)
   GST_DEBUG_OBJECT (dec, "start");
 
   dec->eos = FALSE;
-  dec->has_error = FALSE;
+  dec->downstream_flow_ret = GST_FLOW_OK;
 
   return TRUE;
 }
@@ -450,33 +462,165 @@ gst_droiddec_finish (GstVideoDecoder * decoder)
   return GST_FLOW_OK;
 }
 
+static void
+gst_droiddec_release_buffer (void *data)
+{
+  GstDroidDecReleaseBufferInfo *info = (GstDroidDecReleaseBufferInfo *) data;
+
+  GST_DEBUG_OBJECT (info->dec, "release buffer %p", info->buffer);
+  gst_buffer_unmap (info->buffer, &info->info);
+  gst_buffer_unref (info->buffer);
+
+  /* We need to release the input buffer */
+  gst_buffer_unref (info->frame->input_buffer);
+  info->frame->input_buffer = NULL;
+
+  gst_video_codec_frame_unref (info->frame);
+  g_slice_free(GstDroidDecReleaseBufferInfo, info);
+}
+
+static void
+gst_droiddec_loop (gpointer data)
+{
+  GstDroidDec *dec = (GstDroidDec *) data;
+
+  GST_LOG_OBJECT (dec, "loop");
+
+  g_mutex_lock (&dec->running_lock);
+
+  if (!dec->running) {
+    g_mutex_unlock (&dec->running_lock);
+    goto stop_and_out;
+  }
+
+  g_mutex_unlock (&dec->running_lock);
+
+  if (droid_media_codec_loop (dec->codec)) {
+    return;
+  }
+
+  /* TODO: we need a better return value for _loop because false does not always mean an error */
+  GST_ERROR_OBJECT (dec, "decoder loop returned error");
+
+stop_and_out:
+  gst_pad_pause_task (GST_VIDEO_DECODER_SRC_PAD (GST_VIDEO_DECODER(dec)));
+  GST_DEBUG_OBJECT (dec, "loop exit");
+}
+
 static GstFlowReturn
 gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     GstVideoCodecFrame * frame)
 {
   GstDroidDec *dec = GST_DROIDDEC (decoder);
+  GstFlowReturn ret;
+  DroidMediaCodecData *data = NULL;
+  GstMapInfo info;
+  DroidMediaBufferCallbacks cb;
+  GstDroidDecReleaseBufferInfo *release_data;
 
   GST_DEBUG_OBJECT (dec, "handle frame");
 
   if (!dec->codec) {
     GST_ERROR_OBJECT (dec, "codec not initialized");
-    goto error;
+    ret = GST_FLOW_ERROR;
+    goto out;
   }
 
-  if (dec->has_error) {
+  if (dec->downstream_flow_ret != GST_FLOW_OK) {
     GST_INFO_OBJECT (dec, "not handling frame in error state");
-    goto error;
+    ret = dec->downstream_flow_ret;
+    goto out;
   }
 
-  if (gst_droiddec_do_handle_frame (decoder, frame)) {
-    return GST_FLOW_OK;
+  g_mutex_lock (&dec->eos_lock);
+  if (dec->eos) {
+    GST_WARNING_OBJECT (dec, "got frame in eos state");
+    g_mutex_unlock (&dec->eos_lock);
+    ret = GST_FLOW_EOS;
+    goto out;
+  }
+  g_mutex_unlock (&dec->eos_lock);
+
+  /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
+   * cannot write the input buffer. We end up waiting for the write operation
+   * which does not happen because stagefright needs us to provide
+   * output buffers to be filled (which can not happen because _loop() tries
+   * to call get_oldest_frame() which acquires the stream lock the base class
+   * is holding before calling us
+   */
+  GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
+  data = droid_media_codec_dequeue_input_buffer (dec->codec);
+  GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+
+  if (dec->downstream_flow_ret != GST_FLOW_OK) {
+    GST_INFO_OBJECT (dec, "not handling frame in error state");
+    ret = dec->downstream_flow_ret;
+    goto out;
   }
 
-error:
-  /* don't leak the frame */
-  gst_video_decoder_release_frame (decoder, frame);
+  g_mutex_lock (&dec->eos_lock);
+  if (dec->eos) {
+    GST_WARNING_OBJECT (dec, "got frame in eos state");
+    g_mutex_unlock (&dec->eos_lock);
+    ret = GST_FLOW_EOS;
+    goto out;
+  }
 
-  return GST_FLOW_ERROR;
+  g_mutex_unlock (&dec->eos_lock);
+
+  if (G_UNLIKELY(!data)) {
+    /* with all the above checks, this is impossible to happen but you never know */
+    GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, NULL, ("failed to dequeue input buffer from the decoder"));
+    ret = GST_FLOW_ERROR;
+    goto out;
+  }
+
+  data->sync = GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame) ? true : false;
+  data->ts = GST_TIME_AS_USECONDS(frame->pts);
+
+  if (!gst_buffer_map (frame->input_buffer, &info, GST_MAP_READ)) {
+    GST_ERROR ("failed to map buffer");
+    ret = GST_FLOW_ERROR;
+    goto out;
+  }
+
+  data->data.size = info.size;
+  data->data.data = info.data;
+
+  GST_LOG_OBJECT (dec, "handling frame data of size %d", data->data.size);
+
+  release_data = g_slice_new (GstDroidDecReleaseBufferInfo);
+
+  cb.unref = gst_droiddec_release_buffer;
+  cb.data = release_data;
+  release_data->dec = dec;
+  release_data->buffer = gst_buffer_ref (frame->input_buffer);
+  release_data->info = info;
+  release_data->frame = frame; /* We have a ref already */
+  droid_media_codec_queue_input_buffer (dec->codec, data, &cb);
+  ret = GST_FLOW_OK;
+  data = NULL;
+
+  g_mutex_lock (&dec->running_lock);
+
+  if (!dec->running) {
+    dec->running = TRUE;
+    gst_pad_start_task (GST_VIDEO_DECODER_SRC_PAD (decoder), gst_droiddec_loop, dec, NULL);
+  }
+
+  g_mutex_unlock (&dec->running_lock);
+
+out:
+  if (ret != GST_FLOW_OK) {
+    /* don't leak the frame */
+    gst_video_decoder_release_frame (decoder, frame);
+  }
+
+  if (data) {
+    droid_media_codec_release_input_buffer (dec->codec, data);
+  }
+
+  return ret;
 }
 
 static gboolean
@@ -504,14 +648,39 @@ gst_droiddec_init (GstDroidDec * dec)
   dec->queue = NULL;
   dec->codec_type = NULL;
   dec->eos = FALSE;
-  dec->has_error = FALSE;
+  dec->downstream_flow_ret = GST_FLOW_OK;
 
   g_mutex_init (&dec->eos_lock);
   g_cond_init (&dec->eos_cond);
 
+  g_mutex_init (&dec->running_lock);
+
   dec->allocator = gst_droid_media_buffer_allocator_new ();
   dec->in_state = NULL;
   dec->out_state = NULL;
+}
+
+static GstStateChangeReturn
+gst_droiddec_change_state (GstElement * element, GstStateChange transition)
+{
+  GstStateChangeReturn ret;
+  GstDroidDec *dec;
+  GstVideoDecoder *decoder;
+
+  decoder = GST_VIDEO_DECODER (element);
+  dec = GST_DROIDDEC (element);
+
+  GST_DEBUG_OBJECT (dec, "change state");
+
+  if (transition == GST_STATE_CHANGE_PAUSED_TO_READY) {
+    GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+    gst_droiddec_stop (decoder);
+    GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
+  }
+
+  ret = GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
+
+  return ret;
 }
 
 static void
@@ -541,6 +710,7 @@ gst_droiddec_class_init (GstDroidDecClass * klass)
 
   gobject_class->finalize = gst_droiddec_finalize;
 
+  gstelement_class->change_state = GST_DEBUG_FUNCPTR (gst_droiddec_change_state);
   gstvideodecoder_class->open = GST_DEBUG_FUNCPTR (gst_droiddec_open);
   gstvideodecoder_class->close = GST_DEBUG_FUNCPTR (gst_droiddec_close);
   gstvideodecoder_class->start = GST_DEBUG_FUNCPTR (gst_droiddec_start);

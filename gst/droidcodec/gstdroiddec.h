@@ -49,11 +49,17 @@ struct _GstDroidDec
   DroidMediaBufferQueue *queue;
   GstAllocator *allocator;
   GstDroidCodec *codec_type;
+
+  /* eos handling */
   gboolean eos;
   GMutex eos_lock;
   GCond eos_cond;
 
-  gboolean has_error;
+  /* protected by decoder stream lock */
+  GstFlowReturn downstream_flow_ret;
+
+  GMutex running_lock;
+  gboolean running;
 
   GstVideoCodecState *in_state;
   GstVideoCodecState *out_state;
