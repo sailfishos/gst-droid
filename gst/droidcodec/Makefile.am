@@ -10,10 +10,12 @@ libgstdroidcodec_la_LIBADD = $(GST_LIBS) $(NGI_LIBS) $(EGL_LIBS) $(DROID_LIBS) \
 
 libgstdroidcodec_la_SOURCES = \
 	gstdroiddec.c \
+	gstdroiddecbufferpool.c \
 	gstdroidenc.c \
 	gstdroidcodec.c
 
 noinst_HEADERS = \
 	gstdroiddec.h \
+	gstdroiddecbufferpool.h \
 	gstdroidenc.h \
 	gstdroidcodec.h
