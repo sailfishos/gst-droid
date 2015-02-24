@@ -27,6 +27,7 @@
 #include "gstdroiddec.h"
 #include "gst/memory/gstdroidmediabuffer.h"
 #include "plugin.h"
+#include "gstdroiddecbufferpool.h"
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
@@ -35,6 +36,8 @@ G_DEFINE_TYPE (GstDroidDec, gst_droiddec, GST_TYPE_VIDEO_DECODER);
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_dec_debug);
 #define GST_CAT_DEFAULT gst_droid_dec_debug
+
+#define GST_DROID_DEC_NUM_BUFFERS 2
 
 static GstStaticPadTemplate gst_droiddec_src_template_factory =
 GST_STATIC_PAD_TEMPLATE (GST_VIDEO_DECODER_SRC_NAME,
@@ -266,6 +269,12 @@ gst_droiddec_stop (GstVideoDecoder * decoder)
 
   dec->eos = FALSE;
 
+  if (dec->pool) {
+    gst_buffer_pool_set_active (dec->pool, FALSE);
+    gst_object_unref (dec->pool);
+    dec->pool = NULL;
+  }
+
   return TRUE;
 }
 
@@ -323,6 +332,8 @@ gst_droiddec_start (GstVideoDecoder * decoder)
   dec->eos = FALSE;
   dec->downstream_flow_ret = GST_FLOW_OK;
 
+  dec->pool = gst_droiddec_buffer_pool_new ();
+
   return TRUE;
 }
 
@@ -330,8 +341,9 @@ static gboolean
 gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 {
   DroidMediaCodecDecoderMetaData md;
-
+  GstStructure *config;
   GstDroidDec *dec = GST_DROIDDEC (decoder);
+
   /*
    * destroying the droidmedia codec here will cause stagefright to call abort.
    * That is why we create it after we are sure that everything is correct
@@ -365,6 +377,21 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
       gst_droiddec_configure_state (decoder, state->info.width,
       state->info.height);
 
+  config = gst_buffer_pool_get_config (dec->pool);
+
+  gst_buffer_pool_config_set_params (config, dec->out_state->caps, 0,
+				     GST_DROID_DEC_NUM_BUFFERS, GST_DROID_DEC_NUM_BUFFERS);
+
+  if (!gst_buffer_pool_set_config (dec->pool, config)) {
+    GST_ELEMENT_ERROR (dec, STREAM, FAILED, (NULL), ("Failed to configure buffer pool"));
+    goto free_and_out;
+  }
+
+  if (!gst_buffer_pool_set_active (dec->pool, TRUE)) {
+    GST_ELEMENT_ERROR (dec, STREAM, FAILED, (NULL), ("Failed to activate buffer pool"));
+    goto free_and_out;
+  }
+
   if (state->codec_data) {
     g_assert (dec->codec_type->construct_decoder_codec_data);
 
@@ -372,13 +399,7 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
       GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
 			 ("Failed to construct codec_data."));
 
-      gst_video_codec_state_unref (dec->in_state);
-      gst_video_codec_state_unref (dec->out_state);
-
-      dec->in_state = NULL;
-      dec->out_state = NULL;
-
-      return FALSE;
+      goto free_and_out;
     }
   }
 
@@ -391,13 +412,7 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   if (!dec->codec) {
     GST_ELEMENT_ERROR(dec, LIBRARY, SETTINGS, NULL, ("Failed to create decoder"));
 
-    gst_video_codec_state_unref (dec->in_state);
-    gst_video_codec_state_unref (dec->out_state);
-
-    dec->in_state = NULL;
-    dec->out_state = NULL;
-
-    return FALSE;
+    goto free_and_out;
   }
 
   dec->queue = droid_media_codec_get_buffer_queue (dec->codec);
@@ -424,16 +439,19 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     dec->codec = NULL;
     dec->queue = NULL;
 
-    gst_video_codec_state_unref (dec->in_state);
-    gst_video_codec_state_unref (dec->out_state);
-
-    dec->in_state = NULL;
-    dec->out_state = NULL;
-
-    return FALSE;
+    goto free_and_out;
   }
 
   return TRUE;
+
+free_and_out:
+  gst_video_codec_state_unref (dec->in_state);
+  gst_video_codec_state_unref (dec->out_state);
+
+  dec->in_state = NULL;
+  dec->out_state = NULL;
+
+  return FALSE;
 }
 
 static GstFlowReturn
@@ -494,6 +512,11 @@ gst_droiddec_loop (gpointer data)
   }
 
   g_mutex_unlock (&dec->running_lock);
+
+  if (!gst_droiddec_buffer_pool_wait_for_buffer (dec->pool)) {
+    GST_ERROR_OBJECT (dec, "error from buffer pool");
+    return;
+  }
 
   if (droid_media_codec_loop (dec->codec)) {
     return;
