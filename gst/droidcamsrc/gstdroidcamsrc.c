@@ -1512,7 +1512,7 @@ gst_droidcamsrc_start_video_recording_locked (GstDroidCamSrc * src)
   src->vidsrc->send_flush_stop = TRUE;
 
   if (!gst_droidcamsrc_dev_start_video_recording (src->dev)) {
-    GST_ERROR_OBJECT (src, "failed to start image capture");
+    GST_ERROR_OBJECT (src, "failed to start video recording");
     return FALSE;
   }
 
