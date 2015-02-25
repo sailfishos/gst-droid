@@ -29,6 +29,7 @@
 #include "gstdroidcamsrc.h"
 #include "gst/memory/gstdroidmediabuffer.h"
 #include "gst/memory/gstwrappedmemory.h"
+#include "gst/utils/gstdroidbufferpool.h"
 #include <system/camera.h>
 #include <unistd.h>
 #ifndef GST_USE_UNSTABLE_API
@@ -43,6 +44,7 @@ GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
 #define GST_CAT_DEFAULT gst_droid_camsrc_debug
 
 #define VIDEO_RECORDING_STOP_TIMEOUT                 100000     /* us */
+#define GST_DROIDCAMSRC_NUM_BUFFERS                  2
 
 struct _GstDroidCamSrcImageCaptureState
 {
@@ -433,16 +435,26 @@ gst_droidcamsrc_dev_frame_available(void *user)
     return;
   }
 
-  /* TODO: size */
-  mem = gst_droid_media_buffer_allocator_alloc (dev->media_allocator, dev->queue);
+  if (!gst_droid_buffer_pool_wait_for_buffer (dev->pool)) {
+    GST_DEBUG_OBJECT (dev, "buffer pool is flushing");
+    return;
+  }
+
+  /* TODO: error handling here */
+  gst_buffer_pool_acquire_buffer (dev->pool, &buff, NULL);
+
+  cb.ref = gst_buffer_ref;
+  cb.unref = gst_buffer_unref;
+  cb.data = buff;
+
+  mem = gst_droid_media_buffer_allocator_alloc (dev->media_allocator, dev->queue, &cb);
   if (!mem) {
     GST_ERROR_OBJECT (src, "failed to acquire buffer from droidmedia");
+    gst_buffer_unref (buff);
     return;
   }
 
   buffer = gst_droid_media_buffer_memory_get_buffer (mem);
-
-  buff = gst_buffer_new ();
 
   gst_buffer_insert_memory (buff, 0, mem);
   gst_droidcamsrc_timestamp (src, buff);
@@ -500,6 +512,8 @@ gst_droidcamsrc_dev_new (GstDroidCamSrcPad * vfsrc,
   dev->vidsrc = vidsrc;
 
   dev->lock = lock;
+
+  dev->pool = NULL;
 
   return dev;
 }
@@ -576,6 +590,11 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
 
   g_mutex_clear (&dev->vid->lock);
 
+  if (dev->pool) {
+    gst_object_unref (dev->pool);
+    dev->pool = NULL;
+  }
+
   g_slice_free (GstDroidCamSrcImageCaptureState, dev->img);
   g_slice_free (GstDroidCamSrcVideoCaptureState, dev->vid);
   g_slice_free (GstDroidCamSrcDev, dev);
@@ -641,6 +660,7 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
 {
   gboolean ret = FALSE;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+  GstStructure *config;
 
   g_rec_mutex_lock (dev->lock);
 
@@ -668,6 +688,22 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
     goto out;
   }
 
+  dev->pool = gst_droid_buffer_pool_new ();
+  config = gst_buffer_pool_get_config (dev->pool);
+
+  gst_buffer_pool_config_set_params (config, NULL, 0,
+				     GST_DROIDCAMSRC_NUM_BUFFERS, GST_DROIDCAMSRC_NUM_BUFFERS);
+
+  if (!gst_buffer_pool_set_config (dev->pool, config)) {
+    GST_ELEMENT_ERROR (src, STREAM, FAILED, (NULL), ("Failed to configure buffer pool"));
+    goto out;
+  }
+
+  if (!gst_buffer_pool_set_active (dev->pool, TRUE)) {
+    GST_ELEMENT_ERROR (src, STREAM, FAILED, (NULL), ("Failed to activate buffer pool"));
+    goto out;
+  }
+
   dev->running = TRUE;
 
   ret = TRUE;
@@ -690,6 +726,10 @@ gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev)
     dev->running = FALSE;
     GST_DEBUG ("stopped preview");
   }
+
+  gst_buffer_pool_set_active (dev->pool, FALSE);
+  gst_object_unref (dev->pool);
+  dev->pool = NULL;
 
   g_rec_mutex_unlock (dev->lock);
 }
