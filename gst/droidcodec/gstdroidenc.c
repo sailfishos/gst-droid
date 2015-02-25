@@ -50,6 +50,14 @@ enum
 
 #define GST_DROID_ENC_TARGET_BITRATE_DEFAULT 192000
 
+typedef struct
+{
+  GstDroidEnc *enc;
+  GstBuffer *buffer;
+  GstMapInfo info;
+  GstVideoCodecFrame *frame;
+} GstDroidEncReleaseBufferInfo;
+
 static void
 gst_droidenc_signal_eos (void *data)
 {
@@ -57,7 +65,15 @@ gst_droidenc_signal_eos (void *data)
 
   GST_DEBUG_OBJECT (enc, "codec signaled EOS");
 
-  // TODO:
+  /* TODO: Is it possible that we get EOS when we are not expecting it */
+  g_mutex_lock (&enc->eos_lock);
+
+  if (!enc->eos) {
+    GST_WARNING_OBJECT (enc, "codec signaled EOS but we are not expecting it");
+  }
+
+  g_cond_signal (&enc->eos_cond);
+  g_mutex_unlock (&enc->eos_lock);
 }
 
 static void
@@ -133,110 +149,6 @@ gst_droidenc_data_available(void *data, DroidMediaCodecData *encoded)
   gst_video_encoder_finish_frame (GST_VIDEO_ENCODER (enc), frame);
 }
 
-static gboolean
-gst_droidenc_do_handle_frame (GstVideoEncoder * encoder,
-    GstVideoCodecFrame * frame)
-{
-  gboolean ret;
-  GstDroidEnc *enc = GST_DROIDENC (encoder);
-
-  GST_DEBUG_OBJECT (enc, "do handle frame");
-
-  /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
-   * cannot write the input buffer. We end up waiting for the write operation
-   * which does not happen because stagefright needs us to provide
-   * output buffers to be filled (which can not happen because _loop() tries
-   * to call get_oldest_frame() which acquires the stream lock the base class
-   * is holding before calling us
-   */
-  // TODO: Check that we are still in a sane state
-
-  GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
-  if (!gst_droid_codec_consume_frame (enc->codec, frame, frame->pts)) {
-    ret = FALSE;
-    goto out;
-  }
-
-  ret = TRUE;
-
-#if 0
-
-
-  /* This can deadlock if omx does not provide an input buffer and we end up
-   * waiting for a buffer which does not happen because omx needs us to provide
-   * output buffers to be filled (which can not happen because _loop() tries
-   * to call get_oldest_frame() which acquires the stream lock the base class
-   * is holding before calling us */
-
-  GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
-  if (!gst_droid_codec_consume_frame (enc->comp, frame)) {
-    ret = FALSE;
-    goto out;
-  }
-
-  ret = TRUE;
-
-out:
-  GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
-
-  GST_DEBUG_OBJECT (enc, "do handle frame done %d", ret);
-#endif
-
-out:
-  GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
-
-  GST_DEBUG_OBJECT (enc, "do handle frame done %d", ret);
-
-  return ret;
-}
-
-#if 0
-static void
-gst_droidenc_stop_loop (GstVideoEncoder * encoder)
-{
-  GstDroidEnc *enc = GST_DROIDENC (encoder);
-
-  GST_DEBUG_OBJECT (enc, "stop loop");
-
-  if (!enc->comp) {
-    /* nothing to do here */
-    return;
-  }
-
-  gst_droid_codec_set_running (enc->comp, FALSE);
-
-  /* That should be enough for now as we can not deactivate our buffer pools
-   * otherwise we end up freeing the buffers before deactivating our omx ports
-   */
-
-  /* Just informing the task that we are finishing */
-  g_mutex_lock (&enc->comp->full_lock);
-  /* if the queue is empty then we _prepend_ a NULL buffer
-   * which should not be a problem because the loop is running
-   * and it will pop it. If it's not then we will clean it up later. */
-  if (enc->comp->full->length == 0) {
-    g_queue_push_head (enc->comp->full, NULL);
-  }
-
-  g_cond_signal (&enc->comp->full_cond);
-  g_mutex_unlock (&enc->comp->full_lock);
-
-  /* We need to release the stream lock to prevent deadlocks when the _loop ()
-   * function tries to call _finish_frame ()
-   */
-  GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
-  GST_PAD_STREAM_LOCK (GST_VIDEO_ENCODER_SRC_PAD (encoder));
-  GST_PAD_STREAM_UNLOCK (GST_VIDEO_ENCODER_SRC_PAD (encoder));
-  GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
-
-  if (!gst_pad_stop_task (GST_VIDEO_ENCODER_SRC_PAD (encoder))) {
-    GST_WARNING_OBJECT (enc, "failed to stop src pad task");
-  }
-
-  GST_DEBUG_OBJECT (enc, "stopped loop");
-}
-#endif
-
 static GstVideoCodecState *
 gst_droidenc_configure_state (GstVideoEncoder * encoder,
     GstVideoInfo * info, GstCaps * caps)
@@ -264,142 +176,6 @@ gst_droidenc_configure_state (GstVideoEncoder * encoder,
 
   return out;
 }
-
-#if 0
-static void
-gst_droidenc_loop (GstDroidEnc * enc)
-{
-  OMX_BUFFERHEADERTYPE *buff;
-  GstBuffer *buffer;
-  GstVideoCodecFrame *frame;
-  GstMapInfo map = GST_MAP_INFO_INIT;
-
-  while (gst_droid_codec_is_running (enc->comp)) {
-    if (gst_droid_codec_has_error (enc->comp)) {
-      return;
-    }
-
-    if (!gst_droid_codec_return_output_buffers (enc->comp)) {
-      GST_WARNING_OBJECT (enc,
-          "failed to return output buffers to the encoder");
-    }
-
-    GST_DEBUG_OBJECT (enc, "trying to get a buffer");
-    g_mutex_lock (&enc->comp->full_lock);
-    buff = g_queue_pop_head (enc->comp->full);
-
-    if (!buff) {
-      if (!gst_droid_codec_is_running (enc->comp)) {
-        /* this is a signal that we should quit */
-        GST_DEBUG_OBJECT (enc, "got no buffer");
-        g_mutex_unlock (&enc->comp->full_lock);
-        continue;
-      }
-
-      g_cond_wait (&enc->comp->full_cond, &enc->comp->full_lock);
-      buff = g_queue_pop_head (enc->comp->full);
-    }
-
-    g_mutex_unlock (&enc->comp->full_lock);
-    GST_DEBUG_OBJECT (enc, "got buffer %p", buff);
-
-    if (!buff) {
-      GST_DEBUG_OBJECT (enc, "got no buffer");
-      /* This can only happen if we are not running
-       * yet we will not exit because we should detect
-       * that upon looping */
-      continue;
-    }
-
-    buffer = gst_omx_buffer_get_buffer (enc->comp, buff);
-    if (!buffer) {
-      GST_ERROR_OBJECT (enc, "can not get buffer associated with omx buffer %p",
-          buff);
-      continue;
-    }
-
-    /* is it codec config? */
-    if (buff->nFlags & OMX_BUFFERFLAG_CODECCONFIG) {
-      GstBuffer *codec_data =
-          gst_buffer_new_allocate (NULL, buff->nFilledLen, NULL);
-      GST_INFO_OBJECT (enc, "received codec_data");
-      gst_buffer_fill (codec_data, 0, buff->pBuffer + buff->nOffset,
-          buff->nFilledLen);
-      if (enc->in_stream_headers) {
-        GstVideoEncoder *encoder = GST_VIDEO_ENCODER (enc);
-        GList *headers = NULL;
-        headers = g_list_append (headers, codec_data);
-        gst_video_encoder_set_headers (encoder, headers);
-      } else {
-        gst_buffer_replace (&enc->out_state->codec_data, codec_data);
-        gst_buffer_unref (buffer);
-      }
-
-      continue;
-    }
-
-    if (!enc->first_frame_sent) {
-      enc->first_frame_sent = TRUE;
-
-      if (!gst_video_encoder_negotiate (GST_VIDEO_ENCODER (enc))) {
-        GST_ELEMENT_ERROR (enc, STREAM, FORMAT, (NULL),
-            ("failed to negotiate output format"));
-
-        gst_buffer_unref (buffer);
-        continue;
-      }
-
-    }
-
-    /* Now we can proceed. */
-    frame = gst_video_encoder_get_oldest_frame (GST_VIDEO_ENCODER (enc));
-    if (!frame) {
-      gst_buffer_unref (buffer);
-      GST_ERROR_OBJECT (enc, "can not find a video frame");
-      continue;
-    }
-
-    if (!buff->nFilledLen) {
-      GST_WARNING_OBJECT (enc, "received empty buffer");
-      gst_video_codec_frame_unref (frame);      /* we have an extra ref from _get_oldest_frame */
-      gst_video_encoder_finish_frame (GST_VIDEO_ENCODER (enc), frame);
-      gst_buffer_unref (buffer);
-      continue;
-    }
-
-    frame->output_buffer =
-        gst_video_encoder_allocate_output_buffer (GST_VIDEO_ENCODER (enc),
-        buff->nFilledLen);
-
-    if (buff->nFlags & OMX_BUFFERFLAG_SYNCFRAME) {
-      GST_VIDEO_CODEC_FRAME_SET_SYNC_POINT (frame);
-    }
-
-    gst_buffer_map (frame->output_buffer, &map, GST_MAP_WRITE);
-    memcpy (map.data, buff->pBuffer + buff->nOffset, buff->nFilledLen);
-    gst_buffer_unmap (frame->output_buffer, &map);
-
-    GST_DEBUG_OBJECT (enc, "finishing frame %p", frame);
-
-    gst_droid_codec_timestamp (frame->output_buffer, buff);
-
-    gst_video_encoder_finish_frame (GST_VIDEO_ENCODER (enc), frame);
-    gst_video_codec_frame_unref (frame);
-    gst_buffer_unref (buffer);
-  }
-
-  if (!gst_droid_codec_is_running (enc->comp)) {
-    GST_DEBUG_OBJECT (enc, "stopping task");
-
-    if (!gst_pad_pause_task (GST_VIDEO_ENCODER_SRC_PAD (GST_VIDEO_ENCODER
-                (enc)))) {
-      GST_WARNING_OBJECT (enc, "failed to pause src pad task");
-    }
-
-    return;
-  }
-}
-#endif
 
 static void
 gst_droidenc_set_property (GObject * object, guint prop_id,
@@ -440,8 +216,12 @@ gst_droidenc_finalize (GObject * object)
 
   GST_DEBUG_OBJECT (enc, "finalize");
 
-  //  gst_mini_object_unref (GST_MINI_OBJECT (enc->codec));
   enc->codec = NULL;
+
+  g_mutex_clear (&enc->eos_lock);
+  g_cond_clear (&enc->eos_cond);
+
+  g_mutex_clear (&enc->running_lock);
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
@@ -477,6 +257,9 @@ gst_droidenc_start (GstVideoEncoder * encoder)
 
   GST_DEBUG_OBJECT (enc, "start");
 
+  enc->eos = FALSE;
+  enc->downstream_flow_ret = GST_FLOW_OK;
+
   return TRUE;
 }
 
@@ -487,9 +270,17 @@ gst_droidenc_stop (GstVideoEncoder * encoder)
 
   GST_DEBUG_OBJECT (enc, "stop");
 
-  GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
-  //  gst_droidenc_stop_loop (encoder);
-  GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
+  if (enc->codec) {
+    g_mutex_lock (&enc->running_lock);
+    enc->running = FALSE;
+    g_mutex_unlock (&enc->running_lock);
+
+    /* call stop first so it unlocks the loop */
+    droid_media_codec_stop (enc->codec);
+    gst_pad_stop_task (GST_VIDEO_ENCODER_SRC_PAD (encoder));
+    droid_media_codec_destroy (enc->codec);
+    enc->codec = NULL;
+  }
 
   if (enc->in_state) {
     gst_video_codec_state_unref (enc->in_state);
@@ -500,15 +291,8 @@ gst_droidenc_stop (GstVideoEncoder * encoder)
     gst_video_codec_state_unref (enc->out_state);
     enc->out_state = NULL;
   }
-#if 0
-  if (enc->comp) {
-    gst_droid_codec_stop_component (enc->comp);
-    gst_droid_codec_destroy_component (enc->comp);
-    enc->comp = NULL;
-  }
-#endif
 
-  GST_DEBUG_OBJECT (enc, "stopped");
+  enc->eos = FALSE;
 
   return TRUE;
 }
@@ -523,8 +307,8 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
   GST_DEBUG_OBJECT (enc, "set format %" GST_PTR_FORMAT, state->caps);
 
   if (enc->codec) {
-    /* TODO */
-    GST_ERROR_OBJECT (enc, "cannot renegotiate");
+    GST_FIXME_OBJECT (enc, "What to do here?");
+    GST_ERROR_OBJECT (enc, "codec already configured");
     return FALSE;
   }
 
@@ -544,51 +328,13 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
     GST_ELEMENT_ERROR (enc, LIBRARY, FAILED, (NULL),
         ("Unknown codec type for caps %" GST_PTR_FORMAT, state->caps));
 
-    /* TODO: in_state */
-    gst_caps_unref (caps);
-    return FALSE;
+    goto error;
   }
 
   md.parent.type = enc->codec_type->droid;
 
   enc->out_state =
       gst_droidenc_configure_state (encoder, &state->info, caps);
-
-#if 0
-  enc->comp =
-      gst_droid_codec_get_component (enc->codec, type, GST_ELEMENT (enc));
-  if (!enc->comp) {
-    GST_ERROR_OBJECT (enc, "failed to get component");
-    gst_caps_unref (caps);
-    return FALSE;
-  }
-
-  /* configure codec */
-  if (!gst_droid_codec_configure_component (enc->comp, &state->info)) {
-    gst_caps_unref (caps);
-    return FALSE;
-  }
-
-  if (!gst_droid_codec_apply_encoding_params (enc->comp, &state->info, caps,
-          enc->target_bitrate)) {
-    gst_caps_unref (caps);
-    return FALSE;
-  }
-
-  /* now start */
-  if (!gst_droid_codec_start_component (enc->comp, enc->in_state->caps,
-          enc->out_state->caps)) {
-    return FALSE;
-  }
-
-  if (!gst_pad_start_task (GST_VIDEO_ENCODER_SRC_PAD (encoder),
-          (GstTaskFunction) gst_droidenc_loop, gst_object_ref (enc),
-          gst_object_unref)) {
-    GST_ERROR_OBJECT (enc, "failed to start src task");
-    return FALSE;
-  }
-
-#endif
 
   md.parent.width = state->info.width;
   md.parent.height = state->info.height;
@@ -605,7 +351,7 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
 
   if (!enc->codec) {
     GST_ELEMENT_ERROR(enc, LIBRARY, SETTINGS, NULL, ("Failed to create encoder"));
-    return FALSE;
+    goto error;
   }
 
   {
@@ -622,13 +368,34 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
   }
 
   if (!droid_media_codec_start (enc->codec)) {
-    // TODO: error
-    droid_media_codec_destroy (enc->codec);
-    enc->codec = NULL;
-    return FALSE;
+    GST_ELEMENT_ERROR (enc, LIBRARY, INIT, (NULL), ("Failed to start the encoder"));
+    goto error;
   }
 
   return TRUE;
+
+error:
+  if (caps) {
+    gst_caps_unref (caps);
+    caps = NULL;
+  }
+
+  if (enc->codec) {
+    droid_media_codec_destroy (enc->codec);
+    enc->codec = NULL;
+  }
+
+  if (enc->in_state) {
+    gst_video_codec_state_unref (enc->in_state);
+    enc->in_state = NULL;
+  }
+
+  if (enc->out_state) {
+    gst_video_codec_state_unref (enc->out_state);
+    enc->out_state = NULL;
+  }
+
+  return FALSE;
 }
 
 static GstFlowReturn
@@ -638,9 +405,72 @@ gst_droidenc_finish (GstVideoEncoder * encoder)
 
   GST_DEBUG_OBJECT (enc, "finish");
 
-  //  gst_droidenc_stop_loop (encoder);
+  g_mutex_lock (&enc->eos_lock);
+  enc->eos = TRUE;
+
+  if (enc->codec) {
+    droid_media_codec_drain (enc->codec);
+  }
+
+  /* release the lock to allow _frame_available () to do its job */
+  GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
+
+  /* Now we wait for the codec to signal EOS */
+  g_cond_wait (&enc->eos_cond, &enc->eos_lock);
+  GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
+
+  g_mutex_unlock (&enc->eos_lock);
 
   return GST_FLOW_OK;
+}
+
+static void
+gst_droidenc_release_buffer (void *data)
+{
+  GstDroidEncReleaseBufferInfo *info = (GstDroidEncReleaseBufferInfo *) data;
+
+  GST_DEBUG_OBJECT (info->enc, "release buffer %p", info->buffer);
+  gst_buffer_unmap (info->buffer, &info->info);
+  gst_buffer_unref (info->buffer);
+
+  /* We need to release the input buffer */
+  gst_buffer_unref (info->frame->input_buffer);
+  info->frame->input_buffer = NULL;
+
+  gst_video_codec_frame_unref (info->frame);
+  g_slice_free(GstDroidEncReleaseBufferInfo, info);
+}
+
+static void
+gst_droidenc_loop (gpointer data)
+{
+  GstDroidEnc *enc = (GstDroidEnc *) data;
+
+  GST_LOG_OBJECT (enc, "loop");
+
+  g_mutex_lock (&enc->running_lock);
+
+  if (!enc->running) {
+    g_mutex_unlock (&enc->running_lock);
+    goto stop_and_out;
+  }
+
+  g_mutex_unlock (&enc->running_lock);
+
+  if (droid_media_codec_loop (enc->codec)) {
+    return;
+  }
+
+  /* TODO: we need a better return value for _loop because false does not always mean an error */
+  GST_ERROR_OBJECT (enc, "encoder loop returned error");
+
+stop_and_out:
+  g_mutex_lock (&enc->running_lock);
+  enc->running = FALSE;
+  g_mutex_unlock (&enc->running_lock);
+
+  gst_pad_pause_task (GST_VIDEO_ENCODER_SRC_PAD (GST_VIDEO_ENCODER(enc)));
+  GST_DEBUG_OBJECT (enc, "loop exit");
 }
 
 static GstFlowReturn
@@ -648,57 +478,111 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
     GstVideoCodecFrame * frame)
 {
   GstDroidEnc *enc = GST_DROIDENC (encoder);
-  GstFlowReturn ret = GST_FLOW_ERROR;
+  GstFlowReturn ret;
+  DroidMediaCodecData *data = NULL;
+  GstMapInfo info;
+  DroidMediaBufferCallbacks cb;
+  GstDroidEncReleaseBufferInfo *release_data;
 
   GST_DEBUG_OBJECT (enc, "handle frame");
 
   if (!enc->codec) {
-    GST_ERROR_OBJECT (enc, "component not initialized");
+    GST_ERROR_OBJECT (enc, "codec not initialized");
+    ret = GST_FLOW_ERROR;
     goto out;
   }
 
-#if 0
-
-  if (gst_droid_codec_has_error (enc->comp)) {
-    GST_ERROR_OBJECT (enc, "not handling frame while omx is in error state");
+  if (enc->downstream_flow_ret != GST_FLOW_OK) {
+    GST_INFO_OBJECT (enc, "not handling frame in error state");
+    ret = enc->downstream_flow_ret;
     goto out;
   }
 
-  if (GST_VIDEO_CODEC_FRAME_IS_FORCE_KEYFRAME (frame)) {
-    OMX_CONFIG_INTRAREFRESHVOPTYPE config;
-    OMX_ERRORTYPE err;
-
-    GST_OMX_INIT_STRUCT (&config);
-    config.nPortIndex = enc->comp->in_port->def.nPortIndex;
-    config.IntraRefreshVOP = OMX_TRUE;
-
-    GST_DEBUG_OBJECT (enc, "forcing a keyframe");
-
-    err = gst_droid_codec_set_config (enc->comp,
-        OMX_IndexConfigVideoIntraVOPRefresh, &config);
-    if (err != OMX_ErrorNone) {
-      GST_WARNING_OBJECT (enc, "got error %s (0x%08x) forcing a keyframe",
-          gst_omx_error_to_string (err), err);
-    }
+  g_mutex_lock (&enc->eos_lock);
+  if (enc->eos) {
+    GST_WARNING_OBJECT (enc, "got frame in eos state");
+    g_mutex_unlock (&enc->eos_lock);
+    ret = GST_FLOW_EOS;
+    goto out;
   }
+  g_mutex_unlock (&enc->eos_lock);
 
-  if (!gst_droid_codec_is_running (enc->comp)) {
-    ret = GST_FLOW_FLUSHING;
+  /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
+   * cannot write the input buffer. We end up waiting for the write operation
+   * which does not happen because stagefright needs us to provide
+   * output buffers to be filled (which can not happen because _loop() tries
+   * to call get_oldest_frame() which acquires the stream lock the base class
+   * is holding before calling us
+   */
+  GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
+  data = droid_media_codec_dequeue_input_buffer (enc->codec);
+  GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
+
+  if (enc->downstream_flow_ret != GST_FLOW_OK) {
+    GST_INFO_OBJECT (enc, "not handling frame in error state");
+    ret = enc->downstream_flow_ret;
     goto out;
   }
 
-
-#endif
-
-  if (gst_droidenc_do_handle_frame (encoder, frame)) {
-    ret = GST_FLOW_OK;
+  g_mutex_lock (&enc->eos_lock);
+  if (enc->eos) {
+    GST_WARNING_OBJECT (enc, "got frame in eos state");
+    g_mutex_unlock (&enc->eos_lock);
+    ret = GST_FLOW_EOS;
     goto out;
   }
+  g_mutex_unlock (&enc->eos_lock);
+
+  if (G_UNLIKELY(!data)) {
+    /* with all the above checks, this is impossible to happen but you never know */
+    GST_ELEMENT_ERROR (enc, LIBRARY, FAILED, NULL, ("failed to dequeue input buffer from the decoder"));
+    ret = GST_FLOW_ERROR;
+    goto out;
+  }
+
+  data->sync = GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame) ? true : false;
+  data->ts = GST_TIME_AS_USECONDS(frame->dts); /* TODO */
+
+  if (!gst_buffer_map (frame->input_buffer, &info, GST_MAP_READ)) {
+    GST_ERROR ("failed to map buffer");
+    ret = GST_FLOW_ERROR;
+    goto out;
+  }
+
+  data->data.size = info.size;
+  data->data.data = info.data;
+
+  GST_LOG_OBJECT (enc, "handling frame data of size %d", data->data.size);
+
+  release_data = g_slice_new (GstDroidEncReleaseBufferInfo);
+
+  cb.unref = gst_droidenc_release_buffer;
+  cb.data = release_data;
+  release_data->enc = enc;
+  release_data->buffer = gst_buffer_ref (frame->input_buffer);
+  release_data->info = info;
+  release_data->frame = frame; /* We have a ref already */
+  droid_media_codec_queue_input_buffer (enc->codec, data, &cb);
+  ret = GST_FLOW_OK;
+  data = NULL;
+
+  g_mutex_lock (&enc->running_lock);
+
+  if (!enc->running) {
+    enc->running = TRUE;
+    gst_pad_start_task (GST_VIDEO_ENCODER_SRC_PAD (encoder), gst_droidenc_loop, enc, NULL);
+  }
+
+  g_mutex_unlock (&enc->running_lock);
 
 out:
-  /* don't leak the frame */
   if (ret != GST_FLOW_OK) {
+    /* don't leak the frame */
     gst_video_encoder_finish_frame (encoder, frame);
+  }
+
+  if (data) {
+    droid_media_codec_release_input_buffer (enc->codec, data);
   }
 
   return ret;
@@ -711,21 +595,11 @@ gst_droidenc_flush (GstVideoEncoder * encoder)
 
   GST_DEBUG_OBJECT (enc, "flush");
 
-#if 0
-  if (!enc->comp) {
-    GST_DEBUG_OBJECT (enc, "no component to flush");
-    return TRUE;
+  enc->eos = FALSE;
+
+  if (enc->codec) {
+    droid_media_codec_flush (enc->codec);
   }
-
-  gst_droidenc_stop_loop (encoder);
-
-  /* now flush our component */
-  if (!gst_droid_codec_flush (enc->comp, TRUE)) {
-    return FALSE;
-  }
-#endif
-
-  GST_DEBUG_OBJECT (enc, "Flushed");
 
   return TRUE;
 }
@@ -738,8 +612,15 @@ gst_droidenc_init (GstDroidEnc * enc)
   enc->in_state = NULL;
   enc->out_state = NULL;
   enc->target_bitrate = GST_DROID_ENC_TARGET_BITRATE_DEFAULT;
+  enc->downstream_flow_ret = GST_FLOW_OK;
+
+  g_mutex_init (&enc->eos_lock);
+  g_cond_init (&enc->eos_cond);
+
+  g_mutex_init (&enc->running_lock);
 }
 
+// TODO: remove this
 static GstCaps *
 gst_droidenc_getcaps (GstVideoEncoder * encoder, GstCaps * filter)
 {

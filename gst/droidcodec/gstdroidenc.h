@@ -51,6 +51,17 @@ struct _GstDroidEnc
   GstVideoCodecState *out_state;
   gboolean first_frame_sent;
   gint32 target_bitrate;
+
+  /* eos handling */
+  gboolean eos;
+  GMutex eos_lock;
+  GCond eos_cond;
+
+  /* protected by decoder stream lock */
+  GstFlowReturn downstream_flow_ret;
+
+  GMutex running_lock;
+  gboolean running;
 };
 
 struct _GstDroidEncClass
