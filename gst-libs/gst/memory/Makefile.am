@@ -1,23 +1,20 @@
-lib_LTLIBRARIES = libgstdroidmemory-@GST_API_VERSION@.la
-libgstdroidmemory_@GST_API_VERSION@_ladir = $(libdir)
+noinst_LTLIBRARIES = libgstmemory.la
 
-libgstdroidmemory_@GST_API_VERSION@_la_includedir = \
+libgstmemory_la_includedir = \
 	$(includedir)/gstreamer-@GST_API_VERSION@/gst/allocators
 
-libgstdroidmemory_@GST_API_VERSION@_la_CFLAGS = $(GST_CFLAGS) \
-						$(DROID_CFLAGS) \
-						$(HARDWARE_CFLAGS) \
-						-I$(top_srcdir)/gst-libs/ext/droidmedia/
+libgstmemory_la_CFLAGS = \
+	$(GST_CFLAGS) \
+	-I$(top_srcdir)/gst-libs/ext/droidmedia/
 
-libgstdroidmemory_@GST_API_VERSION@_la_LIBADD = $(GST_LIBS) $(DROID_LIBS) $(HARDWARE_LIBS)
+libgstmemory_la_LIBADD = \
+	$(GST_LIBS)
 
-noinst_HEADERS =
-
-libgstdroidmemory_@GST_API_VERSION@_la_SOURCES = \
+libgstmemory_la_SOURCES = \
 	gstwrappedmemory.c \
 	gstdroidmediabuffer.c \
 	$(top_builddir)/gst-libs/ext/droidmedia/hybris.c
 
-libgstdroidmemory_@GST_API_VERSION@_la_include_HEADERS = \
+libgstmemory_la_include_HEADERS = \
 	gstwrappedmemory.h \
 	gstdroidmediabuffer.h
