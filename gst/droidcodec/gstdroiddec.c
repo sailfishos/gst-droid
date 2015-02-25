@@ -77,25 +77,31 @@ gst_droiddec_frame_available(void *user)
   DroidMediaRect rect;
   GstVideoCropMeta *crop_meta;
   GstFlowReturn flow_ret;
+  DroidMediaBufferCallbacks cb;
 
   GST_DEBUG_OBJECT (dec, "frame available");
 
   GST_VIDEO_DECODER_STREAM_LOCK (decoder);
 
+  /* TODO: error handling here */
+  gst_buffer_pool_acquire_buffer (dec->pool, &buff, NULL);
+
+  cb.ref = gst_buffer_ref;
+  cb.unref = gst_buffer_unref;
+  cb.data = buff;
+
   /* TODO: we are still missing a lot of checks here */
-  mem = gst_droid_media_buffer_allocator_alloc (dec->allocator, dec->queue);
+  mem = gst_droid_media_buffer_allocator_alloc (dec->allocator, dec->queue, &cb);
 
   if (!mem) {
     /* TODO: do we want an error here? */
     GST_ERROR_OBJECT (dec, "failed to acquire buffer from droidmedia");
     GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
+    gst_buffer_unref (buff);
     return;
   }
 
   buffer = gst_droid_media_buffer_memory_get_buffer (mem);
-
-  /* TODO: error handling here */
-  gst_buffer_pool_acquire_buffer (dec->pool, &buff, NULL);
 
   gst_buffer_insert_memory (buff, 0, mem);
 

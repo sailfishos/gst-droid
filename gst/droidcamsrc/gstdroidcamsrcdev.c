@@ -423,7 +423,8 @@ gst_droidcamsrc_dev_frame_available(void *user)
   GstVideoCropMeta *crop_meta;
   DroidMediaRect rect;
   guint width, height;
-  GstBuffer *buff;
+  GstBuffer *buff = NULL;
+  DroidMediaBufferCallbacks cb;
 
   GST_DEBUG_OBJECT (src, "frame available");
 
