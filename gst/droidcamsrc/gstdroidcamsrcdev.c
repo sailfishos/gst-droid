@@ -823,10 +823,6 @@ gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
     goto out;
   }
 
-  /* unlock frame_available so camera HAL can do its job */
-  gst_buffer_pool_set_active (dev->pool, FALSE);
-  gst_buffer_pool_set_active (dev->pool, TRUE);
-
   if (!droid_media_camera_start_recording (dev->cam)) {
     GST_ERROR ("error starting video recording");
     goto out;
