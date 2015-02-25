@@ -20,22 +20,22 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef __GST_DROID_DEC_BUFFER_POOL_H__
-#define __GST_DROID_DEC_BUFFER_POOL_H__
+#ifndef __GST_DROID_BUFFER_POOL_H__
+#define __GST_DROID_BUFFER_POOL_H__
 
 #include <gst/gstbufferpool.h>
 
 G_BEGIN_DECLS
 
-typedef struct _GstDroidDecBufferPool GstDroidDecBufferPool;
-typedef struct _GstDroidDecBufferPoolClass GstDroidDecBufferPoolClass;
+typedef struct _GstDroidBufferPool GstDroidBufferPool;
+typedef struct _GstDroidBufferPoolClass GstDroidBufferPoolClass;
 
-#define GST_TYPE_DROIDDEC_BUFFER_POOL      (gst_droiddec_buffer_pool_get_type())
-#define GST_IS_DROIDDEC_BUFFER_POOL(obj)   (G_TYPE_CHECK_INSTANCE_TYPE ((obj), GST_TYPE_DROIDDEC_BUFFER_POOL))
-#define GST_DROIDDEC_BUFFER_POOL(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), GST_TYPE_DROIDDEC_BUFFER_POOL, GstDroidDecBufferPool))
-#define GST_DROIDDEC_BUFFER_POOL_CAST(obj) ((GstDroidDecBufferPool*)(obj))
+#define GST_TYPE_DROID_BUFFER_POOL      (gst_droid_buffer_pool_get_type())
+#define GST_IS_DROID_BUFFER_POOL(obj)   (G_TYPE_CHECK_INSTANCE_TYPE ((obj), GST_TYPE_DROID_BUFFER_POOL))
+#define GST_DROID_BUFFER_POOL(obj)      (G_TYPE_CHECK_INSTANCE_CAST ((obj), GST_TYPE_DROID_BUFFER_POOL, GstDroidBufferPool))
+#define GST_DROID_BUFFER_POOL_CAST(obj) ((GstDroidBufferPool*)(obj))
 
-struct _GstDroidDecBufferPool
+struct _GstDroidBufferPool
 {
   GstBufferPool parent;
   GMutex lock;
@@ -43,15 +43,15 @@ struct _GstDroidDecBufferPool
   gint num_buffers;
 };
 
-struct _GstDroidDecBufferPoolClass
+struct _GstDroidBufferPoolClass
 {
   GstBufferPoolClass parent_class;
 };
 
-GType             gst_droiddec_buffer_pool_get_type        (void);
-GstBufferPool *   gst_droiddec_buffer_pool_new             (void);
-gboolean          gst_droiddec_buffer_pool_wait_for_buffer (GstBufferPool * pool);
+GType             gst_droid_buffer_pool_get_type        (void);
+GstBufferPool *   gst_droid_buffer_pool_new             (void);
+gboolean          gst_droid_buffer_pool_wait_for_buffer (GstBufferPool * pool);
 
 G_END_DECLS
 
-#endif /* __GST_DROID_DEC_BUFFER_POOL_H__ */
+#endif /* __GST_DROID_BUFFER_POOL_H__ */

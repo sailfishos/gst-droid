@@ -27,7 +27,7 @@
 #include "gstdroiddec.h"
 #include "gst/memory/gstdroidmediabuffer.h"
 #include "plugin.h"
-#include "gstdroiddecbufferpool.h"
+#include "gst/utils/gstdroidbufferpool.h"
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
@@ -332,7 +332,7 @@ gst_droiddec_start (GstVideoDecoder * decoder)
   dec->eos = FALSE;
   dec->downstream_flow_ret = GST_FLOW_OK;
 
-  dec->pool = gst_droiddec_buffer_pool_new ();
+  dec->pool = gst_droid_buffer_pool_new ();
 
   return TRUE;
 }
@@ -513,7 +513,7 @@ gst_droiddec_loop (gpointer data)
 
   g_mutex_unlock (&dec->running_lock);
 
-  if (!gst_droiddec_buffer_pool_wait_for_buffer (dec->pool)) {
+  if (!gst_droid_buffer_pool_wait_for_buffer (dec->pool)) {
     GST_ERROR_OBJECT (dec, "error from buffer pool");
     return;
   }
