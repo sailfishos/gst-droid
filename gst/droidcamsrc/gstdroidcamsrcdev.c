@@ -513,7 +513,7 @@ gst_droidcamsrc_dev_new (GstDroidCamSrcPad * vfsrc,
 
   dev->lock = lock;
 
-  dev->pool = NULL;
+  dev->pool = gst_droid_buffer_pool_new ();
 
   return dev;
 }
@@ -522,12 +522,25 @@ gboolean
 gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
 {
   GstDroidCamSrc *src;
+  GstStructure *config;
 
   g_rec_mutex_lock (dev->lock);
 
   src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
   GST_DEBUG_OBJECT (src, "dev open");
+
+  config = gst_buffer_pool_get_config (dev->pool);
+
+  gst_buffer_pool_config_set_params (config, NULL, 0,
+				     GST_DROIDCAMSRC_NUM_BUFFERS, GST_DROIDCAMSRC_NUM_BUFFERS);
+
+  if (!gst_buffer_pool_set_config (dev->pool, config)) {
+    g_rec_mutex_unlock (dev->lock);
+
+    GST_ELEMENT_ERROR (src, STREAM, FAILED, (NULL), ("Failed to configure buffer pool"));
+    return FALSE;
+  }
 
   dev->info = info;
   dev->cam = droid_media_camera_connect (dev->info->num);
@@ -590,10 +603,8 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
 
   g_mutex_clear (&dev->vid->lock);
 
-  if (dev->pool) {
-    gst_object_unref (dev->pool);
-    dev->pool = NULL;
-  }
+  gst_object_unref (dev->pool);
+  dev->pool = NULL;
 
   g_slice_free (GstDroidCamSrcImageCaptureState, dev->img);
   g_slice_free (GstDroidCamSrcVideoCaptureState, dev->vid);
@@ -660,7 +671,6 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
 {
   gboolean ret = FALSE;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
-  GstStructure *config;
 
   g_rec_mutex_lock (dev->lock);
 
@@ -685,17 +695,6 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
   droid_media_camera_set_preview_callback_flags(dev->cam, CAMERA_FRAME_CALLBACK_FLAG_NOOP);
   if (!droid_media_camera_start_preview (dev->cam)) {
     GST_ERROR_OBJECT (src, "error starting preview");
-    goto out;
-  }
-
-  dev->pool = gst_droid_buffer_pool_new ();
-  config = gst_buffer_pool_get_config (dev->pool);
-
-  gst_buffer_pool_config_set_params (config, NULL, 0,
-				     GST_DROIDCAMSRC_NUM_BUFFERS, GST_DROIDCAMSRC_NUM_BUFFERS);
-
-  if (!gst_buffer_pool_set_config (dev->pool, config)) {
-    GST_ELEMENT_ERROR (src, STREAM, FAILED, (NULL), ("Failed to configure buffer pool"));
     goto out;
   }
 
@@ -728,8 +727,6 @@ gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev)
   }
 
   gst_buffer_pool_set_active (dev->pool, FALSE);
-  gst_object_unref (dev->pool);
-  dev->pool = NULL;
 
   g_rec_mutex_unlock (dev->lock);
 }
