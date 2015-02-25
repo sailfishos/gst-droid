@@ -691,15 +691,16 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
     goto out;
   }
 
+  if (!gst_buffer_pool_set_active (dev->pool, TRUE)) {
+    GST_ELEMENT_ERROR (src, STREAM, FAILED, (NULL), ("Failed to activate buffer pool"));
+    goto out;
+  }
+
   /* We don't want the preview frame. We will render it using the GraphicBuffers we get */
   droid_media_camera_set_preview_callback_flags(dev->cam, CAMERA_FRAME_CALLBACK_FLAG_NOOP);
   if (!droid_media_camera_start_preview (dev->cam)) {
     GST_ERROR_OBJECT (src, "error starting preview");
-    goto out;
-  }
-
-  if (!gst_buffer_pool_set_active (dev->pool, TRUE)) {
-    GST_ELEMENT_ERROR (src, STREAM, FAILED, (NULL), ("Failed to activate buffer pool"));
+    gst_buffer_pool_set_active (dev->pool, FALSE);
     goto out;
   }
 
