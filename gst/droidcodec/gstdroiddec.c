@@ -73,7 +73,7 @@ gst_droiddec_frame_available(void *user)
   guint width, height;
   GstVideoCodecFrame *frame;
   DroidMediaBuffer *buffer;
-  GstBuffer *buff;
+  GstBuffer *buff = NULL;
   DroidMediaRect rect;
   GstVideoCropMeta *crop_meta;
   GstFlowReturn flow_ret;
@@ -94,7 +94,8 @@ gst_droiddec_frame_available(void *user)
 
   buffer = gst_droid_media_buffer_memory_get_buffer (mem);
 
-  buff = gst_buffer_new ();
+  /* TODO: error handling here */
+  gst_buffer_pool_acquire_buffer (dec->pool, &buff, NULL);
 
   gst_buffer_insert_memory (buff, 0, mem);
 
