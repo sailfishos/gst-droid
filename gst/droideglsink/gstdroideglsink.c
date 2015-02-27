@@ -424,6 +424,7 @@ gst_droideglsink_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
   GstCaps *caps = NULL;
   DroidMediaData data;
   gboolean unmap = FALSE;
+  DroidMediaBufferCallbacks cb;
 
   GST_DEBUG_OBJECT (sink, "copy buffer");
 
@@ -448,10 +449,14 @@ gst_droideglsink_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
     goto free_and_out;
   }
 
+  cb.ref = gst_buffer_ref;
+  cb.unref = gst_buffer_unref;
+  cb.data = buff;
+
   data.size = info.size;
   data.data = info.data;
   mem = gst_droid_media_buffer_allocator_alloc_from_data (sink->allocator,
-							  format.width, format.height, &data);
+							  format.width, format.height, &data, &cb);
 
   if (!mem) {
     goto free_and_out;

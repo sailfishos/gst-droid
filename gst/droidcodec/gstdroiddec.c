@@ -64,19 +64,25 @@ gst_droiddec_frame_available(void *user)
   GstBuffer *buff;
   DroidMediaRect rect;
   GstVideoCropMeta *crop_meta;
+  DroidMediaBufferCallbacks cb;
 
   GST_DEBUG_OBJECT (dec, "frame available");
 
-  mem = gst_droid_media_buffer_allocator_alloc (dec->allocator, dec->queue);
+  buff = gst_buffer_new ();
+
+  cb.ref = gst_buffer_ref;
+  cb.unref = gst_buffer_unref;
+  cb.data = buff;
+
+  mem = gst_droid_media_buffer_allocator_alloc (dec->allocator, dec->queue, &cb);
 
   if (!mem) {
     GST_ERROR_OBJECT (dec, "failed to acquire buffer from droidmedia");
+    gst_buffer_unref (buff);
     return;
   }
 
   buffer = gst_droid_media_buffer_memory_get_buffer (mem);
-
-  buff = gst_buffer_new ();
 
   gst_buffer_insert_memory (buff, 0, mem);
 

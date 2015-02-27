@@ -424,6 +424,7 @@ gst_droidcamsrc_dev_frame_available(void *user)
   DroidMediaRect rect;
   guint width, height;
   GstBuffer *buff;
+  DroidMediaBufferCallbacks cb;
 
   GST_DEBUG_OBJECT (src, "frame available");
 
@@ -432,16 +433,19 @@ gst_droidcamsrc_dev_frame_available(void *user)
     return;
   }
 
-  /* TODO: size */
-  mem = gst_droid_media_buffer_allocator_alloc (dev->media_allocator, dev->queue);
+  buff = gst_buffer_new ();
+  cb.ref = gst_buffer_ref;
+  cb.unref = gst_buffer_unref;
+  cb.data = buff;
+
+  mem = gst_droid_media_buffer_allocator_alloc (dev->media_allocator, dev->queue, &cb);
   if (!mem) {
     GST_ERROR_OBJECT (src, "failed to acquire buffer from droidmedia");
+    gst_buffer_unref (buff);
     return;
   }
 
   buffer = gst_droid_media_buffer_memory_get_buffer (mem);
-
-  buff = gst_buffer_new ();
 
   gst_buffer_insert_memory (buff, 0, mem);
   gst_droidcamsrc_timestamp (src, buff);
