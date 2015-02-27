@@ -94,7 +94,7 @@ gst_droid_codec_consume_frame (DroidMediaCodec * codec,
   buffer_data->info = info;
   buffer_data->frame = frame; /* We have a ref already */
 
-  droid_media_codec_write (codec, &data, &cb);
+  droid_media_codec_queue (codec, &data, &cb);
 
   GST_DEBUG ("frame consumed");
 
