@@ -273,7 +273,9 @@ gst_droiddec_stop (GstVideoDecoder * decoder)
     dec->out_state = NULL;
   }
 
+  g_mutex_lock (&dec->eos_lock);
   dec->eos = FALSE;
+  g_mutex_unlock (&dec->eos_lock);
 
   return TRUE;
 }
@@ -450,7 +452,6 @@ gst_droiddec_finish (GstVideoDecoder * decoder)
 
   /* release the lock to allow _frame_available () to do its job */
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
-
   /* Now we wait for the codec to signal EOS */
   g_cond_wait (&dec->eos_cond, &dec->eos_lock);
   GST_VIDEO_DECODER_STREAM_LOCK (decoder);
@@ -530,7 +531,9 @@ gst_droiddec_flush (GstVideoDecoder * decoder)
 
   GST_DEBUG_OBJECT (dec, "flush");
 
+  g_mutex_lock (&dec->eos_lock);
   dec->eos = FALSE;
+  g_mutex_unlock (&dec->eos_lock);
 
   if (dec->codec) {
     droid_media_codec_flush (dec->codec);
