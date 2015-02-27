@@ -511,6 +511,7 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     ret = GST_FLOW_EOS;
     goto out;
   }
+  g_mutex_unlock (&dec->eos_lock);
 
 out:
   ret = GST_FLOW_OK;
