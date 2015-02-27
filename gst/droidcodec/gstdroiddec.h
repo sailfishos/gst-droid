@@ -2,6 +2,7 @@
  * gst-droid
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2015 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -49,11 +50,14 @@ struct _GstDroidDec
   DroidMediaBufferQueue *queue;
   GstAllocator *allocator;
   GstDroidCodec *codec_type;
+
+  /* eos handling */
   gboolean eos;
   GMutex eos_lock;
   GCond eos_cond;
 
-  gboolean has_error;
+  /* protected by decoder stream lock */
+  GstFlowReturn downstream_flow_ret;
 
   GstVideoCodecState *in_state;
   GstVideoCodecState *out_state;

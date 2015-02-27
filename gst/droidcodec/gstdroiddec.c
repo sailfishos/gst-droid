@@ -149,7 +149,7 @@ gst_droiddec_error (void *data, int err)
   }
 
   GST_VIDEO_DECODER_STREAM_LOCK (dec);
-  dec->has_error = TRUE;
+  dec->downstream_flow_ret = GST_FLOW_ERROR;
   GST_VIDEO_DECODER_STREAM_UNLOCK (dec);
 
   GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, NULL, ("error 0x%x from android codec", -err));
@@ -315,7 +315,7 @@ gst_droiddec_start (GstVideoDecoder * decoder)
   GST_DEBUG_OBJECT (dec, "start");
 
   dec->eos = FALSE;
-  dec->has_error = FALSE;
+  dec->downstream_flow_ret = GST_FLOW_OK;
 
   return TRUE;
 }
@@ -324,8 +324,8 @@ static gboolean
 gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 {
   DroidMediaCodecDecoderMetaData md;
-
   GstDroidDec *dec = GST_DROIDDEC (decoder);
+
   /*
    * destroying the droidmedia codec here will cause stagefright to call abort.
    * That is why we create it after we are sure that everything is correct
@@ -469,8 +469,8 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     goto error;
   }
 
-  if (dec->has_error) {
-    GST_INFO_OBJECT (dec, "not handling frame in error state");
+  if (dec->downstream_flow_ret!= GST_FLOW_OK) {
+    GST_WARNING_OBJECT (dec, "not handling frame in error state");
     goto error;
   }
 
@@ -509,8 +509,8 @@ gst_droiddec_init (GstDroidDec * dec)
   dec->codec = NULL;
   dec->queue = NULL;
   dec->codec_type = NULL;
+  dec->downstream_flow_ret = GST_FLOW_OK;
   dec->eos = FALSE;
-  dec->has_error = FALSE;
 
   g_mutex_init (&dec->eos_lock);
   g_cond_init (&dec->eos_cond);
