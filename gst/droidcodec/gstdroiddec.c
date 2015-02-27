@@ -480,7 +480,8 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   }
 
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
-    GST_WARNING_OBJECT (dec, "not handling frame in error state");
+    GST_WARNING_OBJECT (dec, "not handling frame in error state: %s",
+			gst_flow_get_name (dec->downstream_flow_ret));
     ret = dec->downstream_flow_ret;
     goto error;
   }
@@ -502,7 +503,8 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   /* from now on decoder owns a frame reference so we cannot use the out label otherwise
      we will drop the needed reference */
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
-    GST_WARNING_OBJECT (dec, "not handling frame in error state");
+    GST_WARNING_OBJECT (dec, "not handling frame in error state: %s",
+			gst_flow_get_name (dec->downstream_flow_ret));
     ret = dec->downstream_flow_ret;
     goto out;
   }
