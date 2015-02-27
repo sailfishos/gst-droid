@@ -366,13 +366,7 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
       GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
 			 ("Failed to construct codec_data."));
 
-      gst_video_codec_state_unref (dec->in_state);
-      gst_video_codec_state_unref (dec->out_state);
-
-      dec->in_state = NULL;
-      dec->out_state = NULL;
-
-      return FALSE;
+      goto free_and_out;
     }
   }
 
@@ -385,13 +379,7 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   if (!dec->codec) {
     GST_ELEMENT_ERROR(dec, LIBRARY, SETTINGS, NULL, ("Failed to create decoder"));
 
-    gst_video_codec_state_unref (dec->in_state);
-    gst_video_codec_state_unref (dec->out_state);
-
-    dec->in_state = NULL;
-    dec->out_state = NULL;
-
-    return FALSE;
+    goto free_and_out;
   }
 
   dec->queue = droid_media_codec_get_buffer_queue (dec->codec);
@@ -418,16 +406,19 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     dec->codec = NULL;
     dec->queue = NULL;
 
-    gst_video_codec_state_unref (dec->in_state);
-    gst_video_codec_state_unref (dec->out_state);
-
-    dec->in_state = NULL;
-    dec->out_state = NULL;
-
-    return FALSE;
+    goto free_and_out;
   }
 
   return TRUE;
+
+free_and_out:
+  gst_video_codec_state_unref (dec->in_state);
+  gst_video_codec_state_unref (dec->out_state);
+
+  dec->in_state = NULL;
+  dec->out_state = NULL;
+
+  return FALSE;
 }
 
 static GstFlowReturn
