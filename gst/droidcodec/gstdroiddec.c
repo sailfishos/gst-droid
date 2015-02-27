@@ -122,7 +122,10 @@ gst_droiddec_frame_available(void *user)
   dec->downstream_flow_ret = gst_video_decoder_finish_frame (GST_VIDEO_DECODER (dec), frame);
 
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
-    /* TODO: handle error */
+    /* TODO: what should we really do here? */
+    GST_ELEMENT_ERROR (dec, STREAM, FAILED,
+		       ("Internal data stream error."), ("stream stopped, reason %s",
+							 gst_flow_get_name (dec->downstream_flow_ret)));
   }
 
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
