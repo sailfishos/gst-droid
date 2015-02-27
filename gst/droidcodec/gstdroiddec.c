@@ -452,28 +452,63 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     GstVideoCodecFrame * frame)
 {
   GstDroidDec *dec = GST_DROIDDEC (decoder);
+  GstFlowReturn ret;
 
   GST_DEBUG_OBJECT (dec, "handle frame");
 
   if (!dec->codec) {
     GST_ERROR_OBJECT (dec, "codec not initialized");
+    ret = GST_FLOW_ERROR;
     goto error;
   }
 
-  if (dec->downstream_flow_ret!= GST_FLOW_OK) {
+  if (dec->downstream_flow_ret != GST_FLOW_OK) {
     GST_WARNING_OBJECT (dec, "not handling frame in error state");
+    ret = dec->downstream_flow_ret;
     goto error;
   }
 
-  if (gst_droiddec_do_handle_frame (decoder, frame)) {
-    return GST_FLOW_OK;
+  g_mutex_lock (&dec->eos_lock);
+  if (dec->eos) {
+    GST_WARNING_OBJECT (dec, "got frame in eos state");
+    g_mutex_unlock (&dec->eos_lock);
+    ret = GST_FLOW_EOS;
+    goto error;
   }
+  g_mutex_unlock (&dec->eos_lock);
+
+  if (!gst_droiddec_do_handle_frame (decoder, frame)) {
+    ret = GST_FLOW_ERROR;
+    goto error;
+  }
+
+  /* from now on decoder owns a frame reference so we cannot use the out label otherwise
+     we will drop the needed reference */
+
+  if (dec->downstream_flow_ret != GST_FLOW_OK) {
+    GST_WARNING_OBJECT (dec, "not handling frame in error state");
+    ret = dec->downstream_flow_ret;
+    goto out;
+  }
+
+  g_mutex_lock (&dec->eos_lock);
+  if (dec->eos) {
+    GST_WARNING_OBJECT (dec, "got frame in eos state");
+    g_mutex_unlock (&dec->eos_lock);
+    ret = GST_FLOW_EOS;
+    goto out;
+  }
+
+out:
+  ret = GST_FLOW_OK;
+
+  return ret;
 
 error:
   /* don't leak the frame */
   gst_video_decoder_release_frame (decoder, frame);
 
-  return GST_FLOW_ERROR;
+  return ret;
 }
 
 static gboolean
