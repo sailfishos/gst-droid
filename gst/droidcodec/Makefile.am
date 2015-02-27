@@ -5,8 +5,7 @@ libgstdroidcodec_la_CFLAGS = $(GST_CFLAGS) $(NGI_CFLAGS) $(EGL_CFLAGS) $(DROID_C
 			     -I$(top_builddir)/gst-libs/ \
 			     -I$(top_builddir)/gst-libs/ext/droidmedia/
 
-libgstdroidcodec_la_LIBADD = $(GST_LIBS) $(NGI_LIBS) $(EGL_LIBS) $(DROID_LIBS) \
-                             $(top_builddir)/gst-libs/gst/memory/libgstdroidmemory-@GST_API_VERSION@.la
+libgstdroidcodec_la_LIBADD = $(GST_LIBS) $(NGI_LIBS) $(EGL_LIBS) $(DROID_LIBS)
 
 libgstdroidcodec_la_SOURCES = \
 	gstdroiddec.c \

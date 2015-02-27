@@ -27,8 +27,8 @@
 #include "gstdroidcamsrcdev.h"
 #include <stdlib.h>
 #include "gstdroidcamsrc.h"
-#include "gst/memory/gstdroidmediabuffer.h"
-#include "gst/memory/gstwrappedmemory.h"
+#include "gst/droid/gstdroidmediabuffer.h"
+#include "gst/droid/gstwrappedmemory.h"
 #include <system/camera.h>
 #include <unistd.h>
 #ifndef GST_USE_UNSTABLE_API

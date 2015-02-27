@@ -14,7 +14,7 @@ libgstdroid_la_CFLAGS = $(GST_CFLAGS) $(NGI_CFLAGS) $(EGL_CFLAGS) \
 
 libgstdroid_la_LIBADD = $(GST_LIBS) $(NGI_LIBS) $(EGL_LIBS) \
                         $(DROID_LIBS) $(NGM_LIBS) \
-                        $(top_builddir)/gst-libs/gst/memory/libgstdroidmemory-@GST_API_VERSION@.la \
+                        $(top_builddir)/gst-libs/gst/droid/libgstdroid-@GST_API_VERSION@.la \
                         -lgstbasecamerabinsrc-1.0 \
                         -lgstphotography-1.0 \
                         droideglsink/libgstdroideglsink.la \

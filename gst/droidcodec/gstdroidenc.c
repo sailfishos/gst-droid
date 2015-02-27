@@ -25,7 +25,7 @@
 #endif
 
 #include "gstdroidenc.h"
-#include "gst/memory/gstwrappedmemory.h"
+#include "gst/droid/gstwrappedmemory.h"
 #include "plugin.h"
 #include <string.h>
 

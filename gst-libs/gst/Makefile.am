@@ -1,1 +1,1 @@
-SUBDIRS = memory
+SUBDIRS = droid

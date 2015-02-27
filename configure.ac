@@ -179,7 +179,7 @@ AC_CONFIG_FILES([Makefile
 		common/m4/Makefile
 		gst-libs/Makefile
 		gst-libs/gst/Makefile
-		gst-libs/gst/memory/Makefile
+		gst-libs/gst/droid/Makefile
 		gst/Makefile
 		gst/droideglsink/Makefile
 		gst/droidcodec/Makefile

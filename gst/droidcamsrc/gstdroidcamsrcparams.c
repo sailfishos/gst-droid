@@ -26,9 +26,9 @@
 
 #include "gstdroidcamsrcparams.h"
 #include <stdlib.h>
-#include "gst/memory/gstdroidmediabuffer.h"
+#include "gst/droid/gstdroidmediabuffer.h"
 #include "plugin.h"
-#include <gst/memory/gstwrappedmemory.h>
+#include <gst/droid/gstwrappedmemory.h>
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
 #define GST_CAT_DEFAULT gst_droid_camsrc_debug

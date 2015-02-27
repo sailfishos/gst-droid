@@ -25,7 +25,7 @@
 #endif
 
 #include "gstdroiddec.h"
-#include "gst/memory/gstdroidmediabuffer.h"
+#include "gst/droid/gstdroidmediabuffer.h"
 #include "plugin.h"
 #include <EGL/egl.h>
 #include <EGL/eglext.h>

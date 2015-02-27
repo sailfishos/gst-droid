@@ -27,7 +27,7 @@
 #include "gstdroideglsink.h"
 #include <gst/video/video.h>
 #include <gst/interfaces/nemovideotexture.h>
-#include "gst/memory/gstdroidmediabuffer.h"
+#include "gst/droid/gstdroidmediabuffer.h"
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_eglsink_debug);
 #define GST_CAT_DEFAULT gst_droid_eglsink_debug
