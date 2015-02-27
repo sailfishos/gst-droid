@@ -57,6 +57,7 @@ static void
 gst_droiddec_frame_available(void *user)
 {
   GstDroidDec *dec = (GstDroidDec *) user;
+  GstVideoDecoder *decoder = GST_VIDEO_DECODER (dec);
   GstMemory *mem;
   guint width, height;
   GstVideoCodecFrame *frame;
@@ -68,6 +69,8 @@ gst_droiddec_frame_available(void *user)
 
   GST_DEBUG_OBJECT (dec, "frame available");
 
+  GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+
   buff = gst_buffer_new ();
 
   cb.ref = gst_buffer_ref;
@@ -77,7 +80,9 @@ gst_droiddec_frame_available(void *user)
   mem = gst_droid_media_buffer_allocator_alloc (dec->allocator, dec->queue, &cb);
 
   if (!mem) {
+    /* TODO: what should we do here? */
     GST_ERROR_OBJECT (dec, "failed to acquire buffer from droidmedia");
+    GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
     gst_buffer_unref (buff);
     return;
   }
@@ -102,7 +107,9 @@ gst_droiddec_frame_available(void *user)
   frame = gst_video_decoder_get_oldest_frame (GST_VIDEO_DECODER (dec));
 
   if (G_UNLIKELY(!frame)) {
+    /* TODO: what should we do here? */
     GST_WARNING_OBJECT (dec, "buffer without frame");
+    GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
     gst_buffer_unref (buff);
     return;
   }
@@ -112,7 +119,13 @@ gst_droiddec_frame_available(void *user)
   /* We get the timestamp in ns already */
   frame->pts = droid_media_buffer_get_timestamp (buffer);
 
-  gst_video_decoder_finish_frame (GST_VIDEO_DECODER (dec), frame);
+  dec->downstream_flow_ret = gst_video_decoder_finish_frame (GST_VIDEO_DECODER (dec), frame);
+
+  if (dec->downstream_flow_ret != GST_FLOW_OK) {
+    /* TODO: handle error */
+  }
+
+  GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
 }
 
 static void
@@ -484,7 +497,6 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
 
   /* from now on decoder owns a frame reference so we cannot use the out label otherwise
      we will drop the needed reference */
-
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
     GST_WARNING_OBJECT (dec, "not handling frame in error state");
     ret = dec->downstream_flow_ret;
