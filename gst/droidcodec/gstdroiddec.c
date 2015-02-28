@@ -75,7 +75,7 @@ gst_droiddec_frame_available(void *user)
     GST_WARNING_OBJECT (dec, "not handling frame in error state: %s",
 			gst_flow_get_name (dec->downstream_flow_ret));
     GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
-    return;
+    goto acquire_and_release;
   }
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
 
@@ -140,6 +140,13 @@ out:
   GST_VIDEO_DECODER_STREAM_LOCK (decoder);
   dec->downstream_flow_ret = flow_ret;
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
+  return;
+
+acquire_and_release:
+  mem = gst_droid_media_buffer_allocator_alloc (dec->allocator, dec->queue, &cb);
+  if (mem) {
+    gst_memory_unref (mem);
+  }
 }
 
 static void
