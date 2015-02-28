@@ -215,34 +215,6 @@ gst_droiddec_size_changed(void *data, int32_t width, int32_t height)
   return err;
 }
 
-static gboolean
-gst_droiddec_do_handle_frame (GstVideoDecoder * decoder,
-    GstVideoCodecFrame * frame)
-{
-  GstDroidDec *dec = GST_DROIDDEC (decoder);
-
-  GST_DEBUG_OBJECT (dec, "do handle frame");
-
-  /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
-   * cannot write the input buffer. We end up waiting for the write operation
-   * which does not happen because stagefright needs us to provide
-   * output buffers to be filled (which can not happen because _loop() tries
-   * to call get_oldest_frame() which acquires the stream lock the base class
-   * is holding before calling us
-   */
-  /* TODO: Check that we are still in a sane state */
-  GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
-  if (!gst_droid_codec_consume_frame (dec->codec, frame, frame->dts)) {
-    GST_VIDEO_DECODER_STREAM_LOCK (decoder);
-    /* TODO: error */
-    return FALSE;
-  }
-
-  GST_VIDEO_DECODER_STREAM_LOCK (decoder);
-
-  return TRUE;
-}
-
 static GstVideoCodecState *
 gst_droiddec_configure_state (GstVideoDecoder * decoder, gsize width,
     gsize height)
@@ -513,13 +485,27 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   }
   g_mutex_unlock (&dec->eos_lock);
 
-  if (!gst_droiddec_do_handle_frame (decoder, frame)) {
+  /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
+   * cannot write the input buffer. We end up waiting for the write operation
+   * which does not happen because stagefright needs us to provide
+   * output buffers to be filled (which can not happen because _loop() tries
+   * to call get_oldest_frame() which acquires the stream lock the base class
+   * is holding before calling us
+   */
+
+  GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
+  if (!gst_droid_codec_consume_frame (dec->codec, frame, frame->dts)) {
+    GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+    /* TODO: error */
     ret = GST_FLOW_ERROR;
     goto error;
   }
+  GST_VIDEO_DECODER_STREAM_LOCK (decoder);
 
   /* from now on decoder owns a frame reference so we cannot use the out label otherwise
-     we will drop the needed reference */
+   * we will drop the needed reference
+   */
+
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
     GST_WARNING_OBJECT (dec, "not handling frame in error state: %s",
 			gst_flow_get_name (dec->downstream_flow_ret));
