@@ -553,6 +553,8 @@ gst_droiddec_flush (GstVideoDecoder * decoder)
 static void
 gst_droiddec_init (GstDroidDec * dec)
 {
+  gst_video_decoder_set_needs_format (GST_VIDEO_DECODER (dec), TRUE);
+
   dec->codec = NULL;
   dec->queue = NULL;
   dec->codec_type = NULL;
