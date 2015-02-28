@@ -556,6 +556,8 @@ gst_droiddec_flush (GstVideoDecoder * decoder)
     droid_media_codec_flush (dec->codec);
   }
 
+  dec->downstream_flow_ret = GST_FLOW_OK;
+
   GST_DEBUG_OBJECT (dec, "Flushed");
 
   return TRUE;
