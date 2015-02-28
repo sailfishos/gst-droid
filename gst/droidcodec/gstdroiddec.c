@@ -66,10 +66,18 @@ gst_droiddec_frame_available(void *user)
   DroidMediaRect rect;
   GstVideoCropMeta *crop_meta;
   DroidMediaBufferCallbacks cb;
+  GstFlowReturn flow_ret;
 
   GST_DEBUG_OBJECT (dec, "frame available");
 
   GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+  if (dec->downstream_flow_ret != GST_FLOW_OK) {
+    GST_WARNING_OBJECT (dec, "not handling frame in error state: %s",
+			gst_flow_get_name (dec->downstream_flow_ret));
+    GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
+    return;
+  }
+  GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
 
   buff = gst_buffer_new ();
 
@@ -82,7 +90,6 @@ gst_droiddec_frame_available(void *user)
   if (!mem) {
     /* TODO: what should we do here? */
     GST_ERROR_OBJECT (dec, "failed to acquire buffer from droidmedia");
-    GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
     gst_buffer_unref (buff);
     return;
   }
@@ -109,7 +116,6 @@ gst_droiddec_frame_available(void *user)
   if (G_UNLIKELY(!frame)) {
     /* TODO: what should we do here? */
     GST_WARNING_OBJECT (dec, "buffer without frame");
-    GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
     gst_buffer_unref (buff);
     return;
   }
@@ -119,15 +125,20 @@ gst_droiddec_frame_available(void *user)
   /* We get the timestamp in ns already */
   frame->pts = droid_media_buffer_get_timestamp (buffer);
 
-  dec->downstream_flow_ret = gst_video_decoder_finish_frame (GST_VIDEO_DECODER (dec), frame);
+  flow_ret = gst_video_decoder_finish_frame (GST_VIDEO_DECODER (dec), frame);
 
-  if (dec->downstream_flow_ret != GST_FLOW_OK) {
-    /* TODO: what should we really do here? */
+  if (flow_ret == GST_FLOW_OK || flow_ret == GST_FLOW_FLUSHING) {
+    goto out;
+  } else if (flow_ret < GST_FLOW_OK) {
+    /* TODO: better error */
     GST_ELEMENT_ERROR (dec, STREAM, FAILED,
-		       ("Internal data stream error."), ("stream stopped, reason %s",
-							 gst_flow_get_name (dec->downstream_flow_ret)));
+	("Internal data stream error."), ("stream stopped, reason %s",
+	gst_flow_get_name (flow_ret)));
   }
 
+out:
+  GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+  dec->downstream_flow_ret = flow_ret;
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
 }
 
