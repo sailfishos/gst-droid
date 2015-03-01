@@ -156,63 +156,6 @@ gst_droidenc_data_available (void *data, DroidMediaCodecData * encoded)
   gst_video_encoder_finish_frame (GST_VIDEO_ENCODER (enc), frame);
 }
 
-static gboolean
-gst_droidenc_do_handle_frame (GstVideoEncoder * encoder,
-    GstVideoCodecFrame * frame)
-{
-  gboolean ret;
-  GstDroidEnc *enc = GST_DROIDENC (encoder);
-
-  GST_DEBUG_OBJECT (enc, "do handle frame");
-
-  /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
-   * cannot write the input buffer. We end up waiting for the write operation
-   * which does not happen because stagefright needs us to provide
-   * output buffers to be filled (which can not happen because _loop() tries
-   * to call get_oldest_frame() which acquires the stream lock the base class
-   * is holding before calling us
-   */
-  // TODO: Check that we are still in a sane state
-
-  GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
-  if (!gst_droid_codec_consume_frame (enc->codec, frame, frame->pts)) {
-    ret = FALSE;
-    goto out;
-  }
-
-  ret = TRUE;
-
-#if 0
-
-
-  /* This can deadlock if omx does not provide an input buffer and we end up
-   * waiting for a buffer which does not happen because omx needs us to provide
-   * output buffers to be filled (which can not happen because _loop() tries
-   * to call get_oldest_frame() which acquires the stream lock the base class
-   * is holding before calling us */
-
-  GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
-  if (!gst_droid_codec_consume_frame (enc->comp, frame)) {
-    ret = FALSE;
-    goto out;
-  }
-
-  ret = TRUE;
-
-out:
-  GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
-
-  GST_DEBUG_OBJECT (enc, "do handle frame done %d", ret);
-#endif
-
-out:
-  GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
-
-  GST_DEBUG_OBJECT (enc, "do handle frame done %d", ret);
-
-  return ret;
-}
-
 #if 0
 static void
 gst_droidenc_stop_loop (GstVideoEncoder * encoder)
@@ -698,49 +641,64 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
 
   if (!enc->codec) {
     GST_ERROR_OBJECT (enc, "component not initialized");
+    goto error;
+  }
+
+  if (enc->downstream_flow_ret != GST_FLOW_OK) {
+    GST_WARNING_OBJECT (enc, "not handling frame in error state: %s",
+        gst_flow_get_name (enc->downstream_flow_ret));
+    ret = enc->downstream_flow_ret;
+    goto error;
+  }
+
+  g_mutex_lock (&enc->eos_lock);
+  if (enc->eos) {
+    GST_WARNING_OBJECT (enc, "got frame in eos state");
+    g_mutex_unlock (&enc->eos_lock);
+    ret = GST_FLOW_EOS;
+    goto error;
+  }
+  g_mutex_unlock (&enc->eos_lock);
+
+  /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
+   * cannot write the input buffer. We end up waiting for the write operation
+   * which does not happen because stagefright needs us to provide
+   * output buffers to be filled (which can not happen because _loop() tries
+   * to call get_oldest_frame() which acquires the stream lock the base class
+   * is holding before calling us
+   */
+  GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
+  if (!gst_droid_codec_consume_frame (enc->codec, frame, frame->pts)) {
+    ret = GST_FLOW_ERROR;
+    GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
+    goto error;
+  }
+  GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
+
+  if (enc->downstream_flow_ret != GST_FLOW_OK) {
+    GST_WARNING_OBJECT (enc, "not handling frame in error state: %s",
+        gst_flow_get_name (enc->downstream_flow_ret));
+    ret = enc->downstream_flow_ret;
     goto out;
   }
-#if 0
 
-  if (gst_droid_codec_has_error (enc->comp)) {
-    GST_ERROR_OBJECT (enc, "not handling frame while omx is in error state");
+  g_mutex_lock (&enc->eos_lock);
+  if (enc->eos) {
+    GST_WARNING_OBJECT (enc, "got frame in eos state");
+    g_mutex_unlock (&enc->eos_lock);
+    ret = GST_FLOW_EOS;
     goto out;
   }
+  g_mutex_unlock (&enc->eos_lock);
 
-  if (GST_VIDEO_CODEC_FRAME_IS_FORCE_KEYFRAME (frame)) {
-    OMX_CONFIG_INTRAREFRESHVOPTYPE config;
-    OMX_ERRORTYPE err;
-
-    GST_OMX_INIT_STRUCT (&config);
-    config.nPortIndex = enc->comp->in_port->def.nPortIndex;
-    config.IntraRefreshVOP = OMX_TRUE;
-
-    GST_DEBUG_OBJECT (enc, "forcing a keyframe");
-
-    err = gst_droid_codec_set_config (enc->comp,
-        OMX_IndexConfigVideoIntraVOPRefresh, &config);
-    if (err != OMX_ErrorNone) {
-      GST_WARNING_OBJECT (enc, "got error %s (0x%08x) forcing a keyframe",
-          gst_omx_error_to_string (err), err);
-    }
-  }
-
-  if (!gst_droid_codec_is_running (enc->comp)) {
-    ret = GST_FLOW_FLUSHING;
-    goto out;
-  }
-#endif
-
-  if (gst_droidenc_do_handle_frame (encoder, frame)) {
-    ret = GST_FLOW_OK;
-    goto out;
-  }
+  ret = GST_FLOW_OK;
 
 out:
+  return ret;
+
+error:
   /* don't leak the frame */
-  if (ret != GST_FLOW_OK) {
-    gst_video_encoder_finish_frame (encoder, frame);
-  }
+  gst_video_encoder_finish_frame (encoder, frame);
 
   return ret;
 }
