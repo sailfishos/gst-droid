@@ -481,6 +481,8 @@ gst_droiddec_finish (GstVideoDecoder * decoder)
   g_cond_wait (&dec->eos_cond, &dec->eos_lock);
   GST_VIDEO_DECODER_STREAM_LOCK (decoder);
 
+  dec->eos = FALSE;
+
   g_mutex_unlock (&dec->eos_lock);
 
   return GST_FLOW_OK;
