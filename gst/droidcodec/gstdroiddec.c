@@ -145,6 +145,11 @@ gst_droiddec_frame_available(void *user)
   GST_DEBUG_OBJECT (dec, "frame available");
 
   GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+
+  if (dec->dirty) {
+    goto acquire_and_release;
+  }
+
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
     GST_WARNING_OBJECT (dec, "not handling frame in error state: %s",
 			gst_flow_get_name (dec->downstream_flow_ret));
@@ -498,12 +503,6 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
 
   GST_DEBUG_OBJECT (dec, "handle frame");
 
-  if (!dec->codec) {
-    GST_ERROR_OBJECT (dec, "codec not initialized");
-    ret = GST_FLOW_ERROR;
-    goto error;
-  }
-
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
     GST_WARNING_OBJECT (dec, "not handling frame in error state: %s",
 			gst_flow_get_name (dec->downstream_flow_ret));
@@ -533,6 +532,25 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     gst_buffer_extract (frame->input_buffer, 0, data.data.data, data.data.size);
   }
 
+  data.ts = GST_TIME_AS_USECONDS(frame->dts);
+  data.sync = GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame) ? true : false;
+
+  if (G_UNLIKELY (dec->dirty)) {
+    if (dec->codec) {
+      gst_droiddec_finish (decoder);
+      droid_media_codec_stop (dec->codec);
+      droid_media_codec_destroy (dec->codec);
+      dec->codec = NULL;
+      dec->queue = NULL;
+    }
+
+    if (!gst_droiddec_create_codec (dec)) {
+      goto error;
+    }
+
+    dec->dirty = FALSE;
+  }
+
   /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
    * cannot write the input buffer. We end up waiting for the write operation
    * which does not happen because stagefright needs us to provide
@@ -540,9 +558,6 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
    * to call get_oldest_frame() which acquires the stream lock the base class
    * is holding before calling us
    */
-
-  data.ts = GST_TIME_AS_USECONDS(frame->dts);
-  data.sync = GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame) ? true : false;
 
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
   if (!gst_droid_codec_consume_frame2 (dec->codec, frame, &data)) {
@@ -591,17 +606,21 @@ gst_droiddec_flush (GstVideoDecoder * decoder)
 
   GST_DEBUG_OBJECT (dec, "flush");
 
+  /* We cannot flush the frames being decoded from the decoder. There is simply no way
+   * to do that. The best we can do is to clear the queue of frames to be encoded.
+   * The problem now is if we get flushed we will still decode the previous queued frames
+   * and push them later on when they get decoded.
+   * This will lead to frames being repeated if the flush happens in the beginning
+   * or inaccurate seeking.
+   * We will just mark the decoder as "dirty" so the next handle_frame can recreate it
+   */
+
+  dec->dirty = TRUE;
+
+  dec->downstream_flow_ret = GST_FLOW_OK;
   g_mutex_lock (&dec->eos_lock);
   dec->eos = FALSE;
   g_mutex_unlock (&dec->eos_lock);
-
-  if (dec->codec) {
-    droid_media_codec_flush (dec->codec);
-  }
-
-  dec->downstream_flow_ret = GST_FLOW_OK;
-
-  GST_DEBUG_OBJECT (dec, "Flushed");
 
   return TRUE;
 }

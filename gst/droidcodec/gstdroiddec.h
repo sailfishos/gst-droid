@@ -60,6 +60,7 @@ struct _GstDroidDec
   /* protected by decoder stream lock */
   GstFlowReturn downstream_flow_ret;
   GstBuffer *codec_data;
+  gboolean dirty;
 
   GstVideoCodecState *in_state;
   GstVideoCodecState *out_state;
