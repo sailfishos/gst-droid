@@ -212,6 +212,8 @@ gst_droiddec_frame_available (void *user)
 
   if (flow_ret == GST_FLOW_OK || flow_ret == GST_FLOW_FLUSHING) {
     goto out;
+  } else if (flow_ret == GST_FLOW_EOS) {
+    GST_INFO_OBJECT (dec, "eos");
   } else if (flow_ret < GST_FLOW_OK) {
     GST_ELEMENT_ERROR (dec, STREAM, FAILED,
         ("Internal data stream error."), ("stream stopped, reason %s",
