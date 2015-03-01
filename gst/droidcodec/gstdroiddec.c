@@ -408,6 +408,7 @@ gst_droiddec_start (GstVideoDecoder * decoder)
   dec->downstream_flow_ret = GST_FLOW_OK;
   dec->codec_type = NULL;
   dec->codec_type_data = NULL;
+  dec->dirty = TRUE;
 
   return TRUE;
 }
@@ -450,9 +451,8 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     goto free_and_out;
   }
 
-  if (!gst_droiddec_create_codec (dec)) {
-    goto free_and_out;
-  }
+  /* handle_frame will create the codec */
+  dec->dirty = TRUE;
 
   return TRUE;
 
@@ -519,6 +519,26 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   }
   g_mutex_unlock (&dec->eos_lock);
 
+  /* We must create the codec before we process any data. _create_codec will call
+   * construct_decoder_codec_data which will store the nal prefix length for H264.
+   * This is a bad situation. TODO: fix it
+   */
+  if (G_UNLIKELY (dec->dirty)) {
+    if (dec->codec) {
+      gst_droiddec_finish (decoder);
+      droid_media_codec_stop (dec->codec);
+      droid_media_codec_destroy (dec->codec);
+      dec->codec = NULL;
+      dec->queue = NULL;
+    }
+
+    if (!gst_droiddec_create_codec (dec)) {
+      goto error;
+    }
+
+    dec->dirty = FALSE;
+  }
+
   if (dec->codec_type->process_decoder_data) {
     if (!dec->codec_type->process_decoder_data (frame->input_buffer,
 						dec->codec_type_data, &data.data)) {
@@ -535,21 +555,6 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   data.ts = GST_TIME_AS_USECONDS(frame->dts);
   data.sync = GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame) ? true : false;
 
-  if (G_UNLIKELY (dec->dirty)) {
-    if (dec->codec) {
-      gst_droiddec_finish (decoder);
-      droid_media_codec_stop (dec->codec);
-      droid_media_codec_destroy (dec->codec);
-      dec->codec = NULL;
-      dec->queue = NULL;
-    }
-
-    if (!gst_droiddec_create_codec (dec)) {
-      goto error;
-    }
-
-    dec->dirty = FALSE;
-  }
 
   /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
    * cannot write the input buffer. We end up waiting for the write operation
