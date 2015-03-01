@@ -50,6 +50,100 @@ enum
 
 #define GST_DROID_ENC_TARGET_BITRATE_DEFAULT 192000
 
+static GstVideoCodecState *gst_droidenc_configure_state (GstDroidEnc * enc,
+    GstCaps * caps);
+static void gst_droidenc_signal_eos (void *data);
+static void gst_droidenc_error (void *data, int err);
+static void
+gst_droidenc_data_available (void *data, DroidMediaCodecData * encoded);
+
+static gboolean
+gst_droidenc_negotiate_src_caps (GstDroidEnc * enc)
+{
+  GstCaps *caps;
+
+  GST_DEBUG_OBJECT (enc, "negotiate src caps");
+
+  caps =
+      gst_pad_peer_query_caps (GST_VIDEO_ENCODER_SRC_PAD (GST_VIDEO_ENCODER
+          (enc)), NULL);
+
+  GST_LOG_OBJECT (enc, "peer caps %" GST_PTR_FORMAT, caps);
+
+  caps = gst_caps_truncate (caps);
+
+  enc->codec_type =
+      gst_droid_codec_get_from_caps (caps, GST_DROID_CODEC_ENCODER);
+  if (!enc->codec_type) {
+    GST_ELEMENT_ERROR (enc, LIBRARY, FAILED, (NULL),
+        ("Unknown codec type for caps %" GST_PTR_FORMAT, caps));
+
+    gst_caps_unref (caps);
+    goto error;
+  }
+
+  /* ownership of caps is transferred */
+  enc->out_state = gst_droidenc_configure_state (enc, caps);
+
+  return TRUE;
+
+error:
+  return FALSE;
+}
+
+static gboolean
+gst_droidenc_create_codec (GstDroidEnc * enc)
+{
+  DroidMediaCodecEncoderMetaData md;
+
+  GST_INFO_OBJECT (enc, "create codec of type %s: %dx%d",
+      enc->codec_type->droid, enc->in_state->info.width,
+      enc->in_state->info.height);
+  md.parent.type = enc->codec_type->droid;
+  md.parent.width = enc->in_state->info.width;
+  md.parent.height = enc->in_state->info.height;
+  md.parent.fps = enc->in_state->info.fps_n / enc->in_state->info.fps_d;        // TODO: bad
+  md.parent.flags = DROID_MEDIA_CODEC_HW_ONLY;
+  md.bitrate = enc->target_bitrate;
+  md.stride = enc->in_state->info.width;
+  md.slice_height = enc->in_state->info.height;
+
+  /* TODO: get this from caps */
+  md.meta_data = true;
+
+  enc->codec = droid_media_codec_create_encoder (&md);
+
+  if (!enc->codec) {
+    GST_ELEMENT_ERROR (enc, LIBRARY, SETTINGS, NULL,
+        ("Failed to create encoder"));
+    return FALSE;
+  }
+
+  {
+    DroidMediaCodecCallbacks cb;
+    cb.signal_eos = gst_droidenc_signal_eos;
+    cb.error = gst_droidenc_error;
+    droid_media_codec_set_callbacks (enc->codec, &cb, enc);
+  }
+
+  {
+    DroidMediaCodecDataCallbacks cb;
+    cb.data_available = gst_droidenc_data_available;
+    droid_media_codec_set_data_callbacks (enc->codec, &cb, enc);
+  }
+
+  if (!droid_media_codec_start (enc->codec)) {
+    GST_ELEMENT_ERROR (enc, LIBRARY, INIT, (NULL),
+        ("Failed to start the encoder"));
+
+    droid_media_codec_destroy (enc->codec);
+    enc->codec = NULL;
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
 static void
 gst_droidenc_signal_eos (void *data)
 {
@@ -178,20 +272,14 @@ out:
 }
 
 static GstVideoCodecState *
-gst_droidenc_configure_state (GstVideoEncoder * encoder,
-    GstVideoInfo * info, GstCaps * caps)
+gst_droidenc_configure_state (GstDroidEnc * enc, GstCaps * caps)
 {
   GstVideoCodecState *out = NULL;
-  GstDroidEnc *enc = GST_DROIDENC (encoder);
+
   GST_DEBUG_OBJECT (enc, "configure state: width: %d, height: %d",
-      info->width, info->height);
+      enc->in_state->info.width, enc->in_state->info.height);
 
-  GST_DEBUG_OBJECT (enc, "peer caps %" GST_PTR_FORMAT, caps);
-
-  /* we care about width, height and framerate */
-  gst_caps_set_simple (caps, "width", G_TYPE_INT, info->width,
-      "height", G_TYPE_INT, info->height,
-      "framerate", GST_TYPE_FRACTION, info->fps_n, info->fps_d, NULL);
+  GST_LOG_OBJECT (enc, "caps %" GST_PTR_FORMAT, caps);
 
   caps = gst_caps_fixate (caps);
 
@@ -321,84 +409,43 @@ gst_droidenc_stop (GstVideoEncoder * encoder)
 static gboolean
 gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
 {
-  DroidMediaCodecEncoderMetaData md;
   GstDroidEnc *enc = GST_DROIDENC (encoder);
-  GstCaps *caps = NULL;
+  gboolean ret = FALSE;
 
   GST_DEBUG_OBJECT (enc, "set format %" GST_PTR_FORMAT, state->caps);
 
   if (enc->codec) {
-    /* TODO */
-    GST_ERROR_OBJECT (enc, "cannot renegotiate");
-    return FALSE;
+    GST_FIXME_OBJECT (enc, "What to do here?");
+    GST_ERROR_OBJECT (enc, "codec already renegotiate");
+    goto error;
   }
 
   enc->first_frame_sent = FALSE;
 
   enc->in_state = gst_video_codec_state_ref (state);
 
-  caps = gst_pad_peer_query_caps (GST_VIDEO_ENCODER_SRC_PAD (encoder), NULL);
-
-  GST_DEBUG_OBJECT (enc, "peer caps %" GST_PTR_FORMAT, caps);
-
-  caps = gst_caps_truncate (caps);
-
-  /* try to get our codec */
-  enc->codec_type =
-      gst_droid_codec_get_from_caps (caps, GST_DROID_CODEC_ENCODER);
-  if (!enc->codec_type) {
-    GST_ELEMENT_ERROR (enc, LIBRARY, FAILED, (NULL),
-        ("Unknown codec type for caps %" GST_PTR_FORMAT, state->caps));
-
-    /* TODO: in_state */
-    gst_caps_unref (caps);
-    return FALSE;
+  if (!gst_droidenc_negotiate_src_caps (enc)) {
+    goto error;
   }
 
-  md.parent.type = enc->codec_type->droid;
-
-  enc->out_state = gst_droidenc_configure_state (encoder, &state->info, caps);
-
-  md.parent.width = state->info.width;
-  md.parent.height = state->info.height;
-  md.parent.fps = state->info.fps_n / state->info.fps_d;        // TODO: bad
-  md.parent.flags = DROID_MEDIA_CODEC_HW_ONLY;
-  md.bitrate = enc->target_bitrate;
-  md.stride = state->info.width;
-  md.slice_height = state->info.height;
-
-  /* TODO: get this from caps */
-  md.meta_data = true;
-
-  enc->codec = droid_media_codec_create_encoder (&md);
-
-  if (!enc->codec) {
-    GST_ELEMENT_ERROR (enc, LIBRARY, SETTINGS, NULL,
-        ("Failed to create encoder"));
-    return FALSE;
-  }
-
-  {
-    DroidMediaCodecCallbacks cb;
-    cb.signal_eos = gst_droidenc_signal_eos;
-    cb.error = gst_droidenc_error;
-    droid_media_codec_set_callbacks (enc->codec, &cb, enc);
-  }
-
-  {
-    DroidMediaCodecDataCallbacks cb;
-    cb.data_available = gst_droidenc_data_available;
-    droid_media_codec_set_data_callbacks (enc->codec, &cb, enc);
-  }
-
-  if (!droid_media_codec_start (enc->codec)) {
-    // TODO: error
-    droid_media_codec_destroy (enc->codec);
-    enc->codec = NULL;
-    return FALSE;
+  if (!gst_droidenc_create_codec (enc)) {
+    goto error;
   }
 
   return TRUE;
+
+error:
+  if (enc->in_state) {
+    gst_video_codec_state_unref (enc->in_state);
+    enc->in_state = NULL;
+  }
+
+  if (enc->out_state) {
+    gst_video_codec_state_unref (enc->out_state);
+    enc->out_state = NULL;
+  }
+
+  return ret;
 }
 
 static GstFlowReturn
