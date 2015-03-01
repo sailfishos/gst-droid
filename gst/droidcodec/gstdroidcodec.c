@@ -165,7 +165,7 @@ is_h264_dec (const GstStructure * s)
 
   /* Enforce alignment and format */
   return alignment && format && !g_strcmp0 (alignment, "au")
-      && !g_strcmp0 (format, "byte-stream");
+      && !g_strcmp0 (format, "avc");
 }
 
 static gboolean
@@ -375,7 +375,7 @@ construct_h264enc_data (DroidMediaData *in, DroidMediaData *out)
 }
 
 static gboolean
-construct_mpeg4_esds (GstBuffer *data, DroidMediaData *out)
+construct_mpeg4_esds (GstBuffer *data, DroidMediaData *out, gpointer *codec_type_data)
 {
   /*
    * If there are things which I hate the most, this function will be among them
@@ -383,6 +383,7 @@ construct_mpeg4_esds (GstBuffer *data, DroidMediaData *out)
    */
   GstMapInfo info;
   GstByteWriter *writer = NULL;
+  *codec_type_data = NULL;
 
   if (!gst_buffer_map (data, &info, GST_MAP_READ)) {
     GST_ERROR ("failed to map buffer");
@@ -432,23 +433,146 @@ construct_mpeg4_esds (GstBuffer *data, DroidMediaData *out)
   return TRUE;
 }
 
+static gboolean
+construct_h264dec_codec_data (GstBuffer *data, DroidMediaData *out, gpointer *codec_type_data)
+{
+  GstMapInfo info;
+  gboolean ret = FALSE;
+
+  if (!gst_buffer_map (data, &info, GST_MAP_READ)) {
+    GST_ERROR ("failed to map buffer");
+    return FALSE;
+  }
+
+  if (info.size < 7 || info.data[0] != 1) {
+    GST_ERROR ("malformed codec_data");
+    goto out;
+  }
+
+  *codec_type_data = GINT_TO_POINTER (1 + (info.data[4] & 3));
+
+  GST_INFO ("nal prefix length %d", GPOINTER_TO_INT (*codec_type_data));
+
+  out->size = info.size;
+  out->data = g_malloc (info.size);
+  memcpy (out->data, info.data, info.size);
+  ret = TRUE;
+
+out:
+  gst_buffer_unmap (data, &info);
+
+  return ret;
+}
+
+static gboolean
+construct_h264dec_data (GstBuffer *buffer, gpointer codec_type_data, DroidMediaData *out)
+{
+  GstMapInfo info;
+  gboolean ret = FALSE;
+  gint nal_size = GPOINTER_TO_INT (codec_type_data);
+  guint8 *data;
+
+  if (!gst_buffer_map (buffer, &info, GST_MAP_READ)) {
+    GST_ERROR ("failed to map buffer");
+    return FALSE;
+  }
+
+  if (info.size < 4) {
+    GST_ERROR ("malformed data");
+    goto out;
+  }
+
+  switch (nal_size) {
+  case 4:
+    out->size = info.size;
+    out->data = g_malloc (info.size);
+    if (!out->data) {
+      goto out;
+    }
+
+    memcpy(out->data, info.data, info.size);
+
+    data = out->data;
+
+    data[0] = data[1] = data[2] = 0;
+    data[3] = 1;
+    ret = TRUE;
+    goto out;
+
+  case 3:
+    out->size = info.size + 1;
+    out->data = g_malloc (out->size);
+    if (!out->data) {
+      goto out;
+    }
+
+    data = out->data;
+    memcpy(data[1], info.data, info.size);
+    data[0] = data[1] = data[2] = 0;
+    data[3] = 1;
+    ret = TRUE;
+    goto out;
+
+  case 2:
+    out->size = info.size + 2;
+    out->data = g_malloc (out->size);
+    if (!out->data) {
+      goto out;
+    }
+
+    data = out->data;
+    memcpy(&data[2], info.data, info.size);
+
+    data[0] = data[1] = data[2] = 0;
+    data[3] = 1;
+    ret = TRUE;
+    goto out;
+
+  case 1:
+    out->size = info.size + 3;
+    out->data = g_malloc (out->size);
+    if (!out->data) {
+      goto out;
+    }
+
+    data = out->data;
+    memcpy(&data[3], info.data, info.size);
+
+    data[0] = data[1] = data[2] = 0;
+    data[3] = 1;
+    ret = TRUE;
+    goto out;
+
+  default:
+    GST_ERROR ("unhandled nal prefix size %d", nal_size);
+
+    goto out;
+  }
+
+out:
+  gst_buffer_unmap (buffer, &info);
+
+  return ret;
+}
+
 static GstDroidCodec codecs[] = {
   /* decoders */
   {GST_DROID_CODEC_DECODER, "video/mpeg", "video/mp4v-es", is_mpeg4v, NULL,
-   "video/mpeg, mpegversion=4"CAPS_FRAGMENT, NULL, NULL, construct_mpeg4_esds},
+   "video/mpeg, mpegversion=4"CAPS_FRAGMENT, NULL, NULL, construct_mpeg4_esds, NULL},
   {GST_DROID_CODEC_DECODER, "video/x-h264", "video/avc", is_h264_dec,
-   NULL, "video/x-h264, alignment=au, stream-format=byte-stream"CAPS_FRAGMENT, NULL, NULL, NULL},
+   NULL, "video/x-h264, stream-format=avc,alignment=au"CAPS_FRAGMENT, NULL, NULL,
+   construct_h264dec_codec_data, construct_h264dec_data},
   {GST_DROID_CODEC_DECODER, "video/x-h263", "video/3gpp", NULL,
-   NULL, "video/x-h263"CAPS_FRAGMENT, NULL, NULL, NULL},
+   NULL, "video/x-h263"CAPS_FRAGMENT, NULL, NULL, NULL, NULL},
 
   /* encoders */
   {GST_DROID_CODEC_ENCODER, "video/mpeg", "video/mp4v-es", is_mpeg4v,
       NULL, "video/mpeg, mpegversion=4, systemstream=false"CAPS_FRAGMENT,
-   construct_normal_codec_data, NULL, NULL},
+   construct_normal_codec_data, NULL, NULL, NULL},
   {GST_DROID_CODEC_ENCODER, "video/x-h264", "video/avc",
         is_h264_enc, h264_compliment,
    "video/x-h264, stream-format=avc,alignment=au"CAPS_FRAGMENT,
-   construct_h264enc_codec_data, construct_h264enc_data, NULL},
+   construct_h264enc_codec_data, construct_h264enc_data, NULL, NULL},
 };
 
 GstDroidCodec *

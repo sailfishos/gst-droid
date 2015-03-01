@@ -50,6 +50,7 @@ struct _GstDroidDec
   DroidMediaBufferQueue *queue;
   GstAllocator *allocator;
   GstDroidCodec *codec_type;
+  gpointer codec_type_data;
 
   /* eos handling */
   gboolean eos;

@@ -70,7 +70,8 @@ gst_droiddec_create_codec (GstDroidDec * dec)
   if (dec->codec_data) {
     g_assert (dec->codec_type->construct_decoder_codec_data);
 
-    if (!dec->codec_type->construct_decoder_codec_data (dec->codec_data, &md.codec_data)) {
+    if (!dec->codec_type->construct_decoder_codec_data (dec->codec_data, &md.codec_data,
+							&dec->codec_type_data)) {
       GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
 			 ("Failed to construct codec_data."));
 
@@ -343,6 +344,9 @@ gst_droiddec_stop (GstVideoDecoder * decoder)
 
   gst_buffer_replace (&dec->codec_data, NULL);
 
+  dec->codec_type = NULL;
+  dec->codec_type_data = NULL;
+
   return TRUE;
 }
 
@@ -397,6 +401,8 @@ gst_droiddec_start (GstVideoDecoder * decoder)
 
   dec->eos = FALSE;
   dec->downstream_flow_ret = GST_FLOW_OK;
+  dec->codec_type = NULL;
+  dec->codec_type_data = NULL;
 
   return TRUE;
 }
@@ -486,6 +492,7 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
 {
   GstDroidDec *dec = GST_DROIDDEC (decoder);
   GstFlowReturn ret;
+  DroidMediaCodecData data;
 
   GST_DEBUG_OBJECT (dec, "handle frame");
 
@@ -511,6 +518,19 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   }
   g_mutex_unlock (&dec->eos_lock);
 
+  if (dec->codec_type->process_decoder_data) {
+    if (!dec->codec_type->process_decoder_data (frame->input_buffer,
+						dec->codec_type_data, &data.data)) {
+      GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL), ("Failed to process data"));
+      ret = GST_FLOW_ERROR;
+      goto error;
+    }
+  } else {
+    data.data.size = gst_buffer_get_size (frame->input_buffer);
+    data.data.data = g_malloc (data.data.size);
+    gst_buffer_extract (frame->input_buffer, 0, data.data.data, data.data.size);
+  }
+
   /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
    * cannot write the input buffer. We end up waiting for the write operation
    * which does not happen because stagefright needs us to provide
@@ -519,8 +539,11 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
    * is holding before calling us
    */
 
+  data.ts = GST_TIME_AS_USECONDS(frame->dts);
+  data.sync = GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame) ? true : false;
+
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
-  if (!gst_droid_codec_consume_frame (dec->codec, frame, frame->dts)) {
+  if (!gst_droid_codec_consume_frame2 (dec->codec, frame, &data)) {
     GST_VIDEO_DECODER_STREAM_LOCK (decoder);
     ret = GST_FLOW_ERROR;
     goto error;
