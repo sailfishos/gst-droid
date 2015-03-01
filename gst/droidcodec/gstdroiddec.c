@@ -112,7 +112,7 @@ gst_droiddec_create_codec (GstDroidDec * dec)
 
   if (!droid_media_codec_start (dec->codec)) {
     GST_ELEMENT_ERROR (dec, LIBRARY, INIT, (NULL),
-        ("Failed to create a corresponding decoder"));
+        ("Failed to start the decoder"));
 
     droid_media_codec_destroy (dec->codec);
     dec->codec = NULL;
