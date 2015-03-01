@@ -555,7 +555,6 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   data.ts = GST_TIME_AS_USECONDS(frame->dts);
   data.sync = GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame) ? true : false;
 
-
   /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
    * cannot write the input buffer. We end up waiting for the write operation
    * which does not happen because stagefright needs us to provide
@@ -568,6 +567,7 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   if (!gst_droid_codec_consume_frame2 (dec->codec, frame, &data)) {
     GST_VIDEO_DECODER_STREAM_LOCK (decoder);
     ret = GST_FLOW_ERROR;
+    g_free (data.data.data);
     goto error;
   }
   GST_VIDEO_DECODER_STREAM_LOCK (decoder);
