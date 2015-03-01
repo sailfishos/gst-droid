@@ -172,6 +172,7 @@ gst_droiddec_frame_available (void *user)
     /* TODO: what should we do here? */
     GST_ERROR_OBJECT (dec, "failed to acquire buffer from droidmedia");
     gst_buffer_unref (buff);
+    GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
     return;
   }
 
