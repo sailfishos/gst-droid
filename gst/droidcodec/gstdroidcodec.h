@@ -47,7 +47,10 @@ typedef struct {
 
 GstDroidCodec *gst_droid_codec_get_from_caps (GstCaps * caps, GstDroidCodecType type);
 GstCaps *gst_droid_codec_get_all_caps (GstDroidCodecType type);
-gboolean gst_droid_codec_consume_frame (DroidMediaCodec * codec, GstVideoCodecFrame * frame, GstClockTime ts);
+gboolean gst_droid_codec_consume_frame (DroidMediaCodec * codec, GstVideoCodecFrame * frame,
+					GstClockTime ts);
+gboolean gst_droid_codec_consume_frame2 (DroidMediaCodec * codec, GstVideoCodecFrame * frame,
+					DroidMediaCodecData *data);
 
 G_END_DECLS
 

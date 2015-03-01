@@ -44,6 +44,12 @@ typedef struct
   GstVideoCodecFrame *frame;
 } DroidBufferCallbackMapInfo;
 
+typedef struct
+{
+  gpointer data;
+  GstVideoCodecFrame *frame;
+} DroidBufferCallbackMapInfo2;
+
 static void
 gst_droid_codec_release_buffer (void *data)
 {
@@ -59,6 +65,19 @@ gst_droid_codec_release_buffer (void *data)
 
   gst_video_codec_frame_unref (info->frame);
   g_slice_free(DroidBufferCallbackMapInfo, info);
+}
+
+static void
+gst_droid_codec_release_buffer2 (void *data)
+{
+  DroidBufferCallbackMapInfo2 *info = (DroidBufferCallbackMapInfo2 *) data;
+
+  GST_DEBUG ("release buffer");
+
+  gst_video_codec_frame_unref (info->frame);
+  g_free (info->data);
+
+  g_slice_free(DroidBufferCallbackMapInfo2, info);
 }
 
 gboolean
@@ -95,6 +114,32 @@ gst_droid_codec_consume_frame (DroidMediaCodec * codec,
   buffer_data->frame = frame; /* We have a ref already */
 
   droid_media_codec_queue (codec, &data, &cb);
+
+  GST_DEBUG ("frame consumed");
+
+  return TRUE;
+}
+
+gboolean
+gst_droid_codec_consume_frame2 (DroidMediaCodec * codec, GstVideoCodecFrame * frame,
+				DroidMediaCodecData *data)
+{
+  DroidMediaBufferCallbacks cb;
+  DroidBufferCallbackMapInfo2 *buffer_data;
+
+  GST_DEBUG ("consume frame");
+
+  GST_LOG ("Consuming frame of size %d", data->data.size);
+
+  buffer_data = g_slice_new (DroidBufferCallbackMapInfo2);
+
+  cb.unref = gst_droid_codec_release_buffer2;
+  cb.data = buffer_data;
+
+  buffer_data->data = data->data.data;
+  buffer_data->frame = frame; /* We have a ref already */
+
+  droid_media_codec_queue (codec, data, &cb);
 
   GST_DEBUG ("frame consumed");
 
