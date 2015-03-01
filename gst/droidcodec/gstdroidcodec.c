@@ -302,7 +302,7 @@ out:
 }
 
 static gboolean
-construct_h264_data (DroidMediaData *in, DroidMediaData *out)
+construct_h264enc_data (DroidMediaData *in, DroidMediaData *out)
 {
   guint32 size;
   guint8 *data;
@@ -403,7 +403,7 @@ static GstDroidCodec codecs[] = {
   {GST_DROID_CODEC_ENCODER, "video/x-h264", "video/avc",
         is_h264_enc, h264_compliment,
    "video/x-h264, stream-format=avc,alignment=au"CAPS_FRAGMENT,
-   construct_h264enc_codec_data, construct_h264_data, NULL},
+   construct_h264enc_codec_data, construct_h264enc_data, NULL},
 };
 
 GstDroidCodec *
