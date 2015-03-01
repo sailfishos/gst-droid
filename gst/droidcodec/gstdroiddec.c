@@ -43,14 +43,14 @@ GST_STATIC_PAD_TEMPLATE (GST_VIDEO_DECODER_SRC_NAME,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
         (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER, "{YV12}")));
 
-static GstVideoCodecState *
-gst_droiddec_configure_state (GstVideoDecoder * decoder, gsize width,
-			      gsize height);
+static GstVideoCodecState *gst_droiddec_configure_state (GstVideoDecoder *
+    decoder, gsize width, gsize height);
 static void gst_droiddec_error (void *data, int err);
-static int gst_droiddec_size_changed(void *data, int32_t width, int32_t height);
+static int gst_droiddec_size_changed (void *data, int32_t width,
+    int32_t height);
 static void gst_droiddec_signal_eos (void *data);
-static void gst_droiddec_buffers_released(void *user);
-static void gst_droiddec_frame_available(void *user);
+static void gst_droiddec_buffers_released (void *user);
+static void gst_droiddec_frame_available (void *user);
 
 static gboolean
 gst_droiddec_create_codec (GstDroidDec * dec)
@@ -58,7 +58,8 @@ gst_droiddec_create_codec (GstDroidDec * dec)
   DroidMediaCodecDecoderMetaData md;
 
   GST_INFO_OBJECT (dec, "create codec of type %s: %dx%d",
-      dec->codec_type->droid, dec->in_state->info.width, dec->in_state->info.height);
+      dec->codec_type->droid, dec->in_state->info.width,
+      dec->in_state->info.height);
 
   md.parent.type = dec->codec_type->droid;
   md.parent.width = dec->in_state->info.width;
@@ -70,23 +71,24 @@ gst_droiddec_create_codec (GstDroidDec * dec)
   if (dec->codec_data) {
     g_assert (dec->codec_type->construct_decoder_codec_data);
 
-    if (!dec->codec_type->construct_decoder_codec_data (dec->codec_data, &md.codec_data,
-							&dec->codec_type_data)) {
+    if (!dec->codec_type->construct_decoder_codec_data (dec->codec_data,
+            &md.codec_data, &dec->codec_type_data)) {
       GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
-			 ("Failed to construct codec_data."));
+          ("Failed to construct codec_data."));
 
       return FALSE;
     }
   }
 
-  dec->codec = droid_media_codec_create_decoder(&md);
+  dec->codec = droid_media_codec_create_decoder (&md);
 
   if (md.codec_data.size > 0) {
     g_free (md.codec_data.data);
   }
 
   if (!dec->codec) {
-    GST_ELEMENT_ERROR(dec, LIBRARY, SETTINGS, NULL, ("Failed to create decoder"));
+    GST_ELEMENT_ERROR (dec, LIBRARY, SETTINGS, NULL,
+        ("Failed to create decoder"));
 
     return FALSE;
   }
@@ -109,7 +111,8 @@ gst_droiddec_create_codec (GstDroidDec * dec)
   }
 
   if (!droid_media_codec_start (dec->codec)) {
-    GST_ELEMENT_ERROR (dec, LIBRARY, INIT, (NULL), ("Failed to create a corresponding decoder"));
+    GST_ELEMENT_ERROR (dec, LIBRARY, INIT, (NULL),
+        ("Failed to create a corresponding decoder"));
 
     droid_media_codec_destroy (dec->codec);
     dec->codec = NULL;
@@ -122,13 +125,13 @@ gst_droiddec_create_codec (GstDroidDec * dec)
 }
 
 static void
-gst_droiddec_buffers_released(G_GNUC_UNUSED void *user)
+gst_droiddec_buffers_released (G_GNUC_UNUSED void *user)
 {
   GST_FIXME ("Not sure what to do here really");
 }
 
 static void
-gst_droiddec_frame_available(void *user)
+gst_droiddec_frame_available (void *user)
 {
   GstDroidDec *dec = (GstDroidDec *) user;
   GstVideoDecoder *decoder = GST_VIDEO_DECODER (dec);
@@ -152,7 +155,7 @@ gst_droiddec_frame_available(void *user)
 
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
     GST_WARNING_OBJECT (dec, "not handling frame in error state: %s",
-			gst_flow_get_name (dec->downstream_flow_ret));
+        gst_flow_get_name (dec->downstream_flow_ret));
     goto acquire_and_release;
   }
 
@@ -162,7 +165,8 @@ gst_droiddec_frame_available(void *user)
   cb.unref = gst_buffer_unref;
   cb.data = buff;
 
-  mem = gst_droid_media_buffer_allocator_alloc (dec->allocator, dec->queue, &cb);
+  mem =
+      gst_droid_media_buffer_allocator_alloc (dec->allocator, dec->queue, &cb);
 
   if (!mem) {
     /* TODO: what should we do here? */
@@ -182,15 +186,15 @@ gst_droiddec_frame_available(void *user)
   crop_meta->width = rect.right - rect.left;
   crop_meta->height = rect.bottom - rect.top;
 
-  width = droid_media_buffer_get_width(buffer);
-  height = droid_media_buffer_get_height(buffer);
+  width = droid_media_buffer_get_width (buffer);
+  height = droid_media_buffer_get_height (buffer);
 
-  gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE, GST_VIDEO_FORMAT_YV12,
-			     width, height);
+  gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE,
+      GST_VIDEO_FORMAT_YV12, width, height);
 
   frame = gst_video_decoder_get_oldest_frame (GST_VIDEO_DECODER (dec));
 
-  if (G_UNLIKELY(!frame)) {
+  if (G_UNLIKELY (!frame)) {
     /* TODO: what should we do here? */
     GST_WARNING_OBJECT (dec, "buffer without frame");
     gst_buffer_unref (buff);
@@ -209,8 +213,8 @@ gst_droiddec_frame_available(void *user)
     goto out;
   } else if (flow_ret < GST_FLOW_OK) {
     GST_ELEMENT_ERROR (dec, STREAM, FAILED,
-	("Internal data stream error."), ("stream stopped, reason %s",
-	gst_flow_get_name (flow_ret)));
+        ("Internal data stream error."), ("stream stopped, reason %s",
+            gst_flow_get_name (flow_ret)));
   }
 
 out:
@@ -219,7 +223,8 @@ out:
   return;
 
 acquire_and_release:
-  mem = gst_droid_media_buffer_allocator_alloc (dec->allocator, dec->queue, &cb);
+  mem =
+      gst_droid_media_buffer_allocator_alloc (dec->allocator, dec->queue, &cb);
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
 
   if (mem) {
@@ -263,14 +268,15 @@ gst_droiddec_error (void *data, int err)
   dec->downstream_flow_ret = GST_FLOW_ERROR;
   GST_VIDEO_DECODER_STREAM_UNLOCK (dec);
 
-  GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, NULL, ("error 0x%x from android codec", -err));
+  GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, NULL,
+      ("error 0x%x from android codec", -err));
 
 out:
   g_mutex_unlock (&dec->eos_lock);
 }
 
 static int
-gst_droiddec_size_changed(void *data, int32_t width, int32_t height)
+gst_droiddec_size_changed (void *data, int32_t width, int32_t height)
 {
   GstDroidDec *dec = (GstDroidDec *) data;
   GstVideoDecoder *decoder = GST_VIDEO_DECODER (dec);
@@ -284,8 +290,7 @@ gst_droiddec_size_changed(void *data, int32_t width, int32_t height)
     gst_video_codec_state_unref (dec->out_state);
   }
 
-  dec->out_state =
-    gst_droiddec_configure_state (decoder, width, height);
+  dec->out_state = gst_droiddec_configure_state (decoder, width, height);
 
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
 
@@ -311,7 +316,8 @@ gst_droiddec_configure_state (GstVideoDecoder * decoder, gsize width,
     out->caps = gst_video_info_to_caps (&out->info);
   }
 
-  feature = gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER, NULL);
+  feature =
+      gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER, NULL);
   gst_caps_set_features (out->caps, 0, feature);
 
   GST_DEBUG_OBJECT (dec, "output caps %" GST_PTR_FORMAT, out->caps);
@@ -431,7 +437,8 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     return FALSE;
   }
 
-  dec->codec_type = gst_droid_codec_get_from_caps (state->caps, GST_DROID_CODEC_DECODER);
+  dec->codec_type =
+      gst_droid_codec_get_from_caps (state->caps, GST_DROID_CODEC_DECODER);
   if (!dec->codec_type) {
     GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, (NULL),
         ("Unknown codec type for caps %" GST_PTR_FORMAT, state->caps));
@@ -505,7 +512,7 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
 
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
     GST_WARNING_OBJECT (dec, "not handling frame in error state: %s",
-			gst_flow_get_name (dec->downstream_flow_ret));
+        gst_flow_get_name (dec->downstream_flow_ret));
     ret = dec->downstream_flow_ret;
     goto error;
   }
@@ -541,8 +548,9 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
 
   if (dec->codec_type->process_decoder_data) {
     if (!dec->codec_type->process_decoder_data (frame->input_buffer,
-						dec->codec_type_data, &data.data)) {
-      GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL), ("Failed to process data"));
+            dec->codec_type_data, &data.data)) {
+      GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
+          ("Failed to process data"));
       ret = GST_FLOW_ERROR;
       goto error;
     }
@@ -552,7 +560,7 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     gst_buffer_extract (frame->input_buffer, 0, data.data.data, data.data.size);
   }
 
-  data.ts = GST_TIME_AS_USECONDS(frame->dts);
+  data.ts = GST_TIME_AS_USECONDS (frame->dts);
   data.sync = GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame) ? true : false;
 
   /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
@@ -578,7 +586,7 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
 
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
     GST_WARNING_OBJECT (dec, "not handling frame in error state: %s",
-			gst_flow_get_name (dec->downstream_flow_ret));
+        gst_flow_get_name (dec->downstream_flow_ret));
     ret = dec->downstream_flow_ret;
     goto out;
   }

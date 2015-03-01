@@ -66,11 +66,11 @@ typedef struct _GstDroidCamSrcDevVideoData
 } GstDroidCamSrcDevVideoData;
 
 static void gst_droidcamsrc_dev_release_recording_frame (void *data,
-    GstDroidCamSrcDevVideoData *video_data);
+    GstDroidCamSrcDevVideoData * video_data);
 void gst_droidcamsrc_dev_update_params_locked (GstDroidCamSrcDev * dev);
 
 static void
-gst_droidcamsrc_dev_shutter_callback(void *user)
+gst_droidcamsrc_dev_shutter_callback (void *user)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
@@ -89,7 +89,7 @@ gst_droidcamsrc_dev_shutter_callback(void *user)
 }
 
 static void
-gst_droidcamsrc_dev_focus_callback(void *user, int arg)
+gst_droidcamsrc_dev_focus_callback (void *user, int arg)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
@@ -110,7 +110,7 @@ gst_droidcamsrc_dev_focus_callback(void *user, int arg)
 }
 
 static void
-gst_droidcamsrc_dev_focus_move_callback(void *user, int arg)
+gst_droidcamsrc_dev_focus_move_callback (void *user, int arg)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
@@ -128,7 +128,7 @@ gst_droidcamsrc_dev_focus_move_callback(void *user, int arg)
 }
 
 static void
-gst_droidcamsrc_dev_error_callback(void *user, int arg)
+gst_droidcamsrc_dev_error_callback (void *user, int arg)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
@@ -136,11 +136,12 @@ gst_droidcamsrc_dev_error_callback(void *user, int arg)
   GST_DEBUG_OBJECT (src, "dev error callback");
 
   GST_ELEMENT_ERROR (src, LIBRARY, FAILED, (NULL),
-		     ("error 0x%x from camera HAL", arg));
+      ("error 0x%x from camera HAL", arg));
 }
 
 static void
-gst_droidcamsrc_dev_zoom_callback(void *user, G_GNUC_UNUSED int value, G_GNUC_UNUSED int arg)
+gst_droidcamsrc_dev_zoom_callback (void *user, G_GNUC_UNUSED int value,
+    G_GNUC_UNUSED int arg)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
@@ -151,7 +152,8 @@ gst_droidcamsrc_dev_zoom_callback(void *user, G_GNUC_UNUSED int value, G_GNUC_UN
 }
 
 static void
-gst_droidcamsrc_dev_raw_image_callback(void *user, G_GNUC_UNUSED DroidMediaData *mem)
+gst_droidcamsrc_dev_raw_image_callback (void *user,
+    G_GNUC_UNUSED DroidMediaData * mem)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
@@ -162,7 +164,7 @@ gst_droidcamsrc_dev_raw_image_callback(void *user, G_GNUC_UNUSED DroidMediaData 
 }
 
 static void
-gst_droidcamsrc_dev_compressed_image_callback(void *user, DroidMediaData *mem)
+gst_droidcamsrc_dev_compressed_image_callback (void *user, DroidMediaData * mem)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
@@ -186,7 +188,7 @@ gst_droidcamsrc_dev_compressed_image_callback(void *user, DroidMediaData *mem)
   buffer = gst_buffer_new_wrapped (d, size);
   if (!dev->img->image_preview_sent) {
     gst_droidcamsrc_post_message (src,
-				  gst_structure_new_empty (GST_DROIDCAMSRC_CAPTURE_END));
+        gst_structure_new_empty (GST_DROIDCAMSRC_CAPTURE_END));
     /* TODO: generate and send preview if we don't get it from HAL */
     dev->img->image_preview_sent = TRUE;
   }
@@ -204,7 +206,7 @@ gst_droidcamsrc_dev_compressed_image_callback(void *user, DroidMediaData *mem)
   // TODO: get the correct lock
   if (event) {
     src->imgsrc->pending_events =
-      g_list_append (src->imgsrc->pending_events, event);
+        g_list_append (src->imgsrc->pending_events, event);
   }
 
   g_queue_push_tail (dev->imgsrc->queue, buffer);
@@ -228,7 +230,8 @@ gst_droidcamsrc_dev_compressed_image_callback(void *user, DroidMediaData *mem)
 }
 
 static void
-gst_droidcamsrc_dev_postview_frame_callback(void *user, G_GNUC_UNUSED DroidMediaData *mem)
+gst_droidcamsrc_dev_postview_frame_callback (void *user,
+    G_GNUC_UNUSED DroidMediaData * mem)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
@@ -239,7 +242,7 @@ gst_droidcamsrc_dev_postview_frame_callback(void *user, G_GNUC_UNUSED DroidMedia
 }
 
 static void
-gst_droidcamsrc_dev_raw_image_notify_callback(void *user)
+gst_droidcamsrc_dev_raw_image_notify_callback (void *user)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
@@ -250,7 +253,8 @@ gst_droidcamsrc_dev_raw_image_notify_callback(void *user)
 }
 
 static void
-gst_droidcamsrc_dev_preview_frame_callback(void *user, G_GNUC_UNUSED DroidMediaData *mem)
+gst_droidcamsrc_dev_preview_frame_callback (void *user,
+    G_GNUC_UNUSED DroidMediaData * mem)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
@@ -260,7 +264,8 @@ gst_droidcamsrc_dev_preview_frame_callback(void *user, G_GNUC_UNUSED DroidMediaD
 }
 
 static void
-gst_droidcamsrc_dev_video_frame_callback(void *user, DroidMediaCameraRecordingData *video_data)
+gst_droidcamsrc_dev_video_frame_callback (void *user,
+    DroidMediaCameraRecordingData * video_data)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
@@ -284,14 +289,14 @@ gst_droidcamsrc_dev_video_frame_callback(void *user, DroidMediaCameraRecordingDa
   }
 
   /* TODO: this is bad */
-  mem_data = g_slice_new0(GstDroidCamSrcDevVideoData);
+  mem_data = g_slice_new0 (GstDroidCamSrcDevVideoData);
   mem_data->dev = dev;
   mem_data->data = video_data;
 
   buffer = gst_buffer_new ();
   mem = gst_wrapped_memory_allocator_wrap (dev->wrap_allocator,
       data, droid_media_camera_recording_frame_get_size (video_data),
-     (GFunc) gst_droidcamsrc_dev_release_recording_frame, mem_data);
+      (GFunc) gst_droidcamsrc_dev_release_recording_frame, mem_data);
   gst_buffer_insert_memory (buffer, 0, mem);
 
   GST_BUFFER_OFFSET (buffer) = dev->vid->video_frames;
@@ -308,7 +313,8 @@ gst_droidcamsrc_dev_video_frame_callback(void *user, DroidMediaCameraRecordingDa
   g_rec_mutex_unlock (dev->lock);
 
   if (drop_buffer) {
-    GST_INFO_OBJECT (src, "dropping buffer because video recording is not running");
+    GST_INFO_OBJECT (src,
+        "dropping buffer because video recording is not running");
     gst_buffer_unref (buffer);
   } else {
     g_mutex_lock (&dev->vidsrc->lock);
@@ -322,7 +328,8 @@ unlock_and_out:
 }
 
 static void
-gst_droidcamsrc_dev_preview_metadata_callback (void *user, const DroidMediaCameraFace *faces, size_t num_faces)
+gst_droidcamsrc_dev_preview_metadata_callback (void *user,
+    const DroidMediaCameraFace * faces, size_t num_faces)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
@@ -337,75 +344,68 @@ gst_droidcamsrc_dev_preview_metadata_callback (void *user, const DroidMediaCamer
 
 #if 0
 
-      /*
-       * It should be safe to access window here
-       * We cannot really take dev->lock otherwise we might deadlock
-       * if we happen to try to acquire it while the device is being stopped.
-       * window gets destroyed when we destroy the whole device so it is
-       * not going anywhere.
-       */
-      if (dev->win) {
-        g_mutex_lock (&dev->win->lock);
-        width = dev->win->width;
-        height = dev->win->height;
-        g_mutex_unlock (&dev->win->lock);
-      }
+  /*
+   * It should be safe to access window here
+   * We cannot really take dev->lock otherwise we might deadlock
+   * if we happen to try to acquire it while the device is being stopped.
+   * window gets destroyed when we destroy the whole device so it is
+   * not going anywhere.
+   */
+  if (dev->win) {
+    g_mutex_lock (&dev->win->lock);
+    width = dev->win->width;
+    height = dev->win->height;
+    g_mutex_unlock (&dev->win->lock);
+  }
 
-      if (!width || !height) {
-        GST_WARNING_OBJECT (src, "failed to get preview dimensions");
-        return;
-      }
+  if (!width || !height) {
+    GST_WARNING_OBJECT (src, "failed to get preview dimensions");
+    return;
+  }
 
-      s = gst_structure_new ("regions-of-interest", "frame-width", G_TYPE_UINT,
-          width, "frame-height", G_TYPE_UINT, height, NULL);
+  s = gst_structure_new ("regions-of-interest", "frame-width", G_TYPE_UINT,
+      width, "frame-height", G_TYPE_UINT, height, NULL);
 
-      g_value_init (&regions, GST_TYPE_LIST);
+  g_value_init (&regions, GST_TYPE_LIST);
 
-      for (i = 0; i < metadata->number_of_faces; i++) {
-        GValue region = G_VALUE_INIT;
-        int x, y, w, h, r, b;
-        GstStructure *rs;
+  for (i = 0; i < metadata->number_of_faces; i++) {
+    GValue region = G_VALUE_INIT;
+    int x, y, w, h, r, b;
+    GstStructure *rs;
 
-        g_value_init (&region, GST_TYPE_STRUCTURE);
+    g_value_init (&region, GST_TYPE_STRUCTURE);
 
-        GST_DEBUG_OBJECT (src,
-            "face %d: left = %d, top = %d, right = %d, bottom = %d", i,
-            metadata->faces->rect[0], metadata->faces->rect[1],
-            metadata->faces->rect[2], metadata->faces->rect[3]);
-        x = gst_util_uint64_scale (metadata->faces[i].rect[0] + 1000, width,
-            2000);
-        y = gst_util_uint64_scale (metadata->faces[i].rect[1] + 1000, height,
-            2000);
-        r = gst_util_uint64_scale (metadata->faces[i].rect[2] + 1000, width,
-            2000);
-        b = gst_util_uint64_scale (metadata->faces[i].rect[3] + 1000, height,
-            2000);
-        w = r - x;
-        h = b - y;
-        rs = gst_structure_new ("region-of-interest",
-            "region-x", G_TYPE_UINT, x,
-            "region-y", G_TYPE_UINT, y,
-            "region-w", G_TYPE_UINT, w,
-            "region-h", G_TYPE_UINT, h,
-            "region-id", G_TYPE_INT, metadata->faces[i].id,
-            "region-score", G_TYPE_INT, metadata->faces[i].score, NULL);
+    GST_DEBUG_OBJECT (src,
+        "face %d: left = %d, top = %d, right = %d, bottom = %d", i,
+        metadata->faces->rect[0], metadata->faces->rect[1],
+        metadata->faces->rect[2], metadata->faces->rect[3]);
+    x = gst_util_uint64_scale (metadata->faces[i].rect[0] + 1000, width, 2000);
+    y = gst_util_uint64_scale (metadata->faces[i].rect[1] + 1000, height, 2000);
+    r = gst_util_uint64_scale (metadata->faces[i].rect[2] + 1000, width, 2000);
+    b = gst_util_uint64_scale (metadata->faces[i].rect[3] + 1000, height, 2000);
+    w = r - x;
+    h = b - y;
+    rs = gst_structure_new ("region-of-interest",
+        "region-x", G_TYPE_UINT, x,
+        "region-y", G_TYPE_UINT, y,
+        "region-w", G_TYPE_UINT, w,
+        "region-h", G_TYPE_UINT, h,
+        "region-id", G_TYPE_INT, metadata->faces[i].id,
+        "region-score", G_TYPE_INT, metadata->faces[i].score, NULL);
 
-        gst_value_set_structure (&region, rs);
-        gst_structure_free (rs);
-        gst_value_list_append_value (&regions, &region);
-        g_value_unset (&region);
-      }
+    gst_value_set_structure (&region, rs);
+    gst_structure_free (rs);
+    gst_value_list_append_value (&regions, &region);
+    g_value_unset (&region);
+  }
 
-      gst_structure_take_value (s, "regions", &regions);
-      gst_droidcamsrc_post_message (src, s);
-    }
-      break;
+  gst_structure_take_value (s, "regions", &regions);
+  gst_droidcamsrc_post_message (src, s);
 #endif
-
 }
 
 static void
-gst_droidcamsrc_dev_buffers_released(G_GNUC_UNUSED void *user)
+gst_droidcamsrc_dev_buffers_released (G_GNUC_UNUSED void *user)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
 
@@ -413,7 +413,7 @@ gst_droidcamsrc_dev_buffers_released(G_GNUC_UNUSED void *user)
 }
 
 static void
-gst_droidcamsrc_dev_frame_available(void *user)
+gst_droidcamsrc_dev_frame_available (void *user)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
@@ -438,7 +438,9 @@ gst_droidcamsrc_dev_frame_available(void *user)
   cb.unref = gst_buffer_unref;
   cb.data = buff;
 
-  mem = gst_droid_media_buffer_allocator_alloc (dev->media_allocator, dev->queue, &cb);
+  mem =
+      gst_droid_media_buffer_allocator_alloc (dev->media_allocator, dev->queue,
+      &cb);
   if (!mem) {
     GST_ERROR_OBJECT (src, "failed to acquire buffer from droidmedia");
     gst_buffer_unref (buff);
@@ -460,14 +462,15 @@ gst_droidcamsrc_dev_frame_available(void *user)
   gst_buffer_add_gst_buffer_orientation_meta (buff,
       dev->info->orientation, dev->info->direction);
 
-  width = droid_media_buffer_get_width(buffer);
-  height = droid_media_buffer_get_height(buffer);
+  width = droid_media_buffer_get_width (buffer);
+  height = droid_media_buffer_get_height (buffer);
 
-  gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE, GST_VIDEO_FORMAT_YV12,
-			     width, height);
+  gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE,
+      GST_VIDEO_FORMAT_YV12, width, height);
 
-  GST_LOG_OBJECT (src, "preview info: w=%d, h=%d, crop: x=%d, y=%d, w=%d, h=%d", width, height, crop_meta->x,
-		  crop_meta->y, crop_meta->width, crop_meta->height);
+  GST_LOG_OBJECT (src, "preview info: w=%d, h=%d, crop: x=%d, y=%d, w=%d, h=%d",
+      width, height, crop_meta->x, crop_meta->y, crop_meta->width,
+      crop_meta->height);
 
   g_mutex_lock (&pad->lock);
 
@@ -531,7 +534,7 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
   dev->queue = droid_media_camera_get_buffer_queue (dev->cam);
 
   if (!droid_media_camera_lock (dev->cam)) {
-    droid_media_camera_disconnect(dev->cam);
+    droid_media_camera_disconnect (dev->cam);
     dev->cam = NULL;
     dev->queue = NULL;
 
@@ -540,7 +543,8 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
   }
 
   /* disable shutter sound */
-  droid_media_camera_send_command (dev->cam, CAMERA_CMD_ENABLE_SHUTTER_SOUND, 0, 0);
+  droid_media_camera_send_command (dev->cam, CAMERA_CMD_ENABLE_SHUTTER_SOUND, 0,
+      0);
 
   g_rec_mutex_unlock (dev->lock);
 
@@ -665,7 +669,8 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
   }
 
   /* We don't want the preview frame. We will render it using the GraphicBuffers we get */
-  droid_media_camera_set_preview_callback_flags(dev->cam, CAMERA_FRAME_CALLBACK_FLAG_NOOP);
+  droid_media_camera_set_preview_callback_flags (dev->cam,
+      CAMERA_FRAME_CALLBACK_FLAG_NOOP);
   if (!droid_media_camera_start_preview (dev->cam)) {
     GST_ERROR_OBJECT (src, "error starting preview");
     goto out;
@@ -744,7 +749,7 @@ gst_droidcamsrc_dev_capture_image (GstDroidCamSrcDev * dev)
 {
   gboolean ret = FALSE;
   int msg_type = CAMERA_MSG_SHUTTER | CAMERA_MSG_RAW_IMAGE
-    | CAMERA_MSG_POSTVIEW_FRAME | CAMERA_MSG_COMPRESSED_IMAGE;
+      | CAMERA_MSG_POSTVIEW_FRAME | CAMERA_MSG_COMPRESSED_IMAGE;
 
   GST_DEBUG ("dev capture image");
 
@@ -861,7 +866,7 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
 
 static void
 gst_droidcamsrc_dev_release_recording_frame (void *data,
-    GstDroidCamSrcDevVideoData *video_data)
+    GstDroidCamSrcDevVideoData * video_data)
 {
   GstDroidCamSrcDev *dev;
 
@@ -874,7 +879,7 @@ gst_droidcamsrc_dev_release_recording_frame (void *data,
 
   droid_media_camera_release_recording_frame (dev->cam, video_data->data);
 
-  g_slice_free(GstDroidCamSrcDevVideoData, video_data);
+  g_slice_free (GstDroidCamSrcDevVideoData, video_data);
   g_rec_mutex_unlock (dev->lock);
 }
 
@@ -957,8 +962,8 @@ gst_droidcamsrc_dev_enable_face_detection (GstDroidCamSrcDev * dev,
   }
 
   /* TODO: this is SW only. We need to investigate HW too. */
-  if (!droid_media_camera_enable_face_detection (dev->cam, DROID_MEDIA_CAMERA_FACE_DETECTION_SW,
-						 enable ? true : false)) {
+  if (!droid_media_camera_enable_face_detection (dev->cam,
+          DROID_MEDIA_CAMERA_FACE_DETECTION_SW, enable ? true : false)) {
     GST_ERROR ("error %s face detection", enable ? "enabling" : "disabling");
     goto out;
   }

@@ -201,7 +201,8 @@ gst_droidcamsrc_photography_set_autofocus (GstPhotography * photo, gboolean on)
 }
 
 void
-gst_droidcamsrc_photography_register (G_GNUC_UNUSED gpointer g_iface, gpointer iface_data)
+gst_droidcamsrc_photography_register (G_GNUC_UNUSED gpointer g_iface,
+    gpointer iface_data)
 {
   GstPhotographyInterface *iface = (GstPhotographyInterface *) g_iface;
   iface->get_ev_compensation = gst_droidcamsrc_photography_get_ev_compensation;

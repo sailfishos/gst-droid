@@ -53,7 +53,7 @@ enum
 static void
 gst_droidenc_signal_eos (void *data)
 {
-  GstDroidEnc * enc = (GstDroidEnc *) data;
+  GstDroidEnc *enc = (GstDroidEnc *) data;
 
   GST_DEBUG_OBJECT (enc, "codec signaled EOS");
 
@@ -63,21 +63,22 @@ gst_droidenc_signal_eos (void *data)
 static void
 gst_droidenc_error (void *data, int err)
 {
-  GstDroidEnc * enc = (GstDroidEnc *) data;
+  GstDroidEnc *enc = (GstDroidEnc *) data;
 
   GST_DEBUG_OBJECT (enc, "codec error");
 
-  GST_ELEMENT_ERROR (enc, LIBRARY, FAILED, NULL, ("error 0x%x from android codec", -err));
+  GST_ELEMENT_ERROR (enc, LIBRARY, FAILED, NULL,
+      ("error 0x%x from android codec", -err));
 
   // TODO:
 }
 
 static void
-gst_droidenc_data_available(void *data, DroidMediaCodecData *encoded)
+gst_droidenc_data_available (void *data, DroidMediaCodecData * encoded)
 {
   GstVideoCodecFrame *frame;
   DroidMediaData out;
-  GstDroidEnc * enc = (GstDroidEnc *) data;
+  GstDroidEnc *enc = (GstDroidEnc *) data;
 
   GST_DEBUG_OBJECT (enc, "data available");
 
@@ -89,10 +90,10 @@ gst_droidenc_data_available(void *data, DroidMediaCodecData *encoded)
     GST_INFO_OBJECT (enc, "received codec_data");
 
     if (!enc->codec_type->construct_encoder_codec_data (encoded->data.data,
-						encoded->data.size, &codec_data)) {
+            encoded->data.size, &codec_data)) {
 
       GST_ELEMENT_ERROR (enc, STREAM, FORMAT, (NULL),
-			 ("Failed to construct codec_data. Expect corrupted stream"));
+          ("Failed to construct codec_data. Expect corrupted stream"));
     }
 
     if (codec_data) {
@@ -118,16 +119,18 @@ gst_droidenc_data_available(void *data, DroidMediaCodecData *encoded)
       frame->output_buffer = gst_buffer_new_wrapped (out.data, out.size);
     }
   } else {
-    frame->output_buffer = gst_video_encoder_allocate_output_buffer (GST_VIDEO_ENCODER (enc),
-								     encoded->data.size);
-    gst_buffer_fill (frame->output_buffer, 0, encoded->data.data, encoded->data.size);
+    frame->output_buffer =
+        gst_video_encoder_allocate_output_buffer (GST_VIDEO_ENCODER (enc),
+        encoded->data.size);
+    gst_buffer_fill (frame->output_buffer, 0, encoded->data.data,
+        encoded->data.size);
   }
 
   GST_BUFFER_PTS (frame->output_buffer) = encoded->ts;
   GST_BUFFER_DTS (frame->output_buffer) = encoded->decoding_ts;
 
   if (encoded->sync) {
-    GST_VIDEO_CODEC_FRAME_SET_SYNC_POINT(frame);
+    GST_VIDEO_CODEC_FRAME_SET_SYNC_POINT (frame);
   }
 
   gst_video_encoder_finish_frame (GST_VIDEO_ENCODER (enc), frame);
@@ -539,7 +542,8 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
   caps = gst_caps_truncate (caps);
 
   /* try to get our codec */
-  enc->codec_type = gst_droid_codec_get_from_caps (caps, GST_DROID_CODEC_ENCODER);
+  enc->codec_type =
+      gst_droid_codec_get_from_caps (caps, GST_DROID_CODEC_ENCODER);
   if (!enc->codec_type) {
     GST_ELEMENT_ERROR (enc, LIBRARY, FAILED, (NULL),
         ("Unknown codec type for caps %" GST_PTR_FORMAT, state->caps));
@@ -551,8 +555,7 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
 
   md.parent.type = enc->codec_type->droid;
 
-  enc->out_state =
-      gst_droidenc_configure_state (encoder, &state->info, caps);
+  enc->out_state = gst_droidenc_configure_state (encoder, &state->info, caps);
 
 #if 0
   enc->comp =
@@ -587,12 +590,11 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
     GST_ERROR_OBJECT (enc, "failed to start src task");
     return FALSE;
   }
-
 #endif
 
   md.parent.width = state->info.width;
   md.parent.height = state->info.height;
-  md.parent.fps = state->info.fps_n / state->info.fps_d; // TODO: bad
+  md.parent.fps = state->info.fps_n / state->info.fps_d;        // TODO: bad
   md.parent.flags = DROID_MEDIA_CODEC_HW_ONLY;
   md.bitrate = enc->target_bitrate;
   md.stride = state->info.width;
@@ -604,7 +606,8 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
   enc->codec = droid_media_codec_create_encoder (&md);
 
   if (!enc->codec) {
-    GST_ELEMENT_ERROR(enc, LIBRARY, SETTINGS, NULL, ("Failed to create encoder"));
+    GST_ELEMENT_ERROR (enc, LIBRARY, SETTINGS, NULL,
+        ("Failed to create encoder"));
     return FALSE;
   }
 
@@ -656,7 +659,6 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
     GST_ERROR_OBJECT (enc, "component not initialized");
     goto out;
   }
-
 #if 0
 
   if (gst_droid_codec_has_error (enc->comp)) {
@@ -686,8 +688,6 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
     ret = GST_FLOW_FLUSHING;
     goto out;
   }
-
-
 #endif
 
   if (gst_droidenc_do_handle_frame (encoder, frame)) {

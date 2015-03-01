@@ -64,9 +64,10 @@ static void gst_wrapped_memory_allocator_free (GstAllocator * allocator,
 static gpointer gst_wrapped_memory_map (GstMemory * mem, gsize maxsize,
     GstMapFlags flags);
 static void gst_wrapped_memory_unmap (GstMemory * mem);
-static GstMemory *gst_wrapped_memory_allocator_memory_new (GstAllocator * allocator, gsize size);
-static void gst_wrapped_memory_allocator_memory_set_data(GstMemory *mem, gpointer data,
-							 GFunc cb, gpointer user_data);
+static GstMemory *gst_wrapped_memory_allocator_memory_new (GstAllocator *
+    allocator, gsize size);
+static void gst_wrapped_memory_allocator_memory_set_data (GstMemory * mem,
+    gpointer data, GFunc cb, gpointer user_data);
 
 GstAllocator *
 gst_wrapped_memory_allocator_new (void)
@@ -114,9 +115,9 @@ wrapped_memory_allocator_class_init (GstWrappedMemoryAllocatorClass * klass)
   allocator_class->free = gst_wrapped_memory_allocator_free;
 }
 
-GstMemory    *
+GstMemory *
 gst_wrapped_memory_allocator_wrap (GstAllocator * allocator,
-				   void *data, gsize size, GFunc cb, gpointer user_data)
+    void *data, gsize size, GFunc cb, gpointer user_data)
 {
   GstMemory *mem = gst_wrapped_memory_allocator_memory_new (allocator, size);
 
@@ -146,7 +147,8 @@ gst_wrapped_memory_allocator_memory_new (GstAllocator * allocator, gsize size)
 }
 
 void
-gst_wrapped_memory_allocator_memory_set_data(GstMemory *mem, gpointer data, GFunc cb, gpointer user_data)
+gst_wrapped_memory_allocator_memory_set_data (GstMemory * mem, gpointer data,
+    GFunc cb, gpointer user_data)
 {
   GstWrappedMemory *m;
 
@@ -154,20 +156,21 @@ gst_wrapped_memory_allocator_memory_set_data(GstMemory *mem, gpointer data, GFun
     return;
   }
 
-  m = (GstWrappedMemory *)mem;
+  m = (GstWrappedMemory *) mem;
 
   m->cb = cb;
   m->data = data;
   m->user_data = user_data;
 }
 
-void *gst_wrapped_memory_get_data (GstMemory * mem)
+void *
+gst_wrapped_memory_get_data (GstMemory * mem)
 {
   if (!gst_is_wrapped_memory_memory (mem)) {
     return NULL;
   }
 
-  return ((GstWrappedMemory *)mem)->data;
+  return ((GstWrappedMemory *) mem)->data;
 }
 
 gboolean
@@ -177,7 +180,8 @@ gst_is_wrapped_memory_memory (GstMemory * mem)
 }
 
 static gpointer
-gst_wrapped_memory_map (GstMemory * mem, G_GNUC_UNUSED gsize maxsize, GstMapFlags flags)
+gst_wrapped_memory_map (GstMemory * mem, G_GNUC_UNUSED gsize maxsize,
+    GstMapFlags flags)
 {
   GstWrappedMemory *m = (GstWrappedMemory *) mem;
 

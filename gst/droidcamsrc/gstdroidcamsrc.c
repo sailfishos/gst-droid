@@ -353,8 +353,8 @@ gst_droidcamsrc_fill_info (GstDroidCamSrc * src, GstDroidCamSrcCamInfo * target,
       target->num = x;
       target->direction =
           facing ==
-          DROID_MEDIA_CAMERA_FACING_FRONT ? NEMO_GST_META_DEVICE_DIRECTION_FRONT :
-          NEMO_GST_META_DEVICE_DIRECTION_BACK;
+          DROID_MEDIA_CAMERA_FACING_FRONT ? NEMO_GST_META_DEVICE_DIRECTION_FRONT
+          : NEMO_GST_META_DEVICE_DIRECTION_BACK;
       target->orientation = info.orientation / 90;
 
       GST_INFO_OBJECT (src, "camera %d is facing %d with orientation %d",
@@ -388,13 +388,15 @@ gst_droid_cam_src_get_hw (GstDroidCamSrc * src)
   src->info[0].num = src->info[1].num = -1;
 
   back_found =
-      gst_droidcamsrc_fill_info (src, &src->info[0], DROID_MEDIA_CAMERA_FACING_BACK);
+      gst_droidcamsrc_fill_info (src, &src->info[0],
+      DROID_MEDIA_CAMERA_FACING_BACK);
   if (!back_found) {
     GST_WARNING_OBJECT (src, "cannot find back camera");
   }
 
   front_found =
-      gst_droidcamsrc_fill_info (src, &src->info[1], DROID_MEDIA_CAMERA_FACING_FRONT);
+      gst_droidcamsrc_fill_info (src, &src->info[1],
+      DROID_MEDIA_CAMERA_FACING_FRONT);
   if (!front_found) {
     GST_WARNING_OBJECT (src, "cannot find front camera");
   }
@@ -875,11 +877,13 @@ gst_droidcamsrc_loop (gpointer user_data)
         gst_pad_create_stream_id (data->pad, GST_ELEMENT_CAST (src),
         GST_PAD_NAME (data->pad));
 
-    GST_DEBUG_OBJECT (src, "Pushing STREAM_START for pad %s", GST_PAD_NAME (data->pad));
+    GST_DEBUG_OBJECT (src, "Pushing STREAM_START for pad %s",
+        GST_PAD_NAME (data->pad));
     event = gst_event_new_stream_start (stream_id);
     gst_event_set_group_id (event, gst_util_group_id_next ());
     if (!gst_pad_push_event (data->pad, event)) {
-      GST_ERROR_OBJECT (src, "failed to push STREAM_START event for pad %s", GST_PAD_NAME (data->pad));
+      GST_ERROR_OBJECT (src, "failed to push STREAM_START event for pad %s",
+          GST_PAD_NAME (data->pad));
     }
 
     g_free (stream_id);
@@ -1261,7 +1265,8 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   GST_DEBUG_OBJECT (src, "our caps %" GST_PTR_FORMAT, our_caps);
 
   if (!our_caps || gst_caps_is_empty (our_caps)) {
-    GST_ELEMENT_ERROR (src, STREAM, FORMAT, ("failed to get caps from HAL"), (NULL));
+    GST_ELEMENT_ERROR (src, STREAM, FORMAT, ("failed to get caps from HAL"),
+        (NULL));
     goto out;
   }
 
@@ -1269,7 +1274,8 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   GST_DEBUG_OBJECT (src, "peer caps %" GST_PTR_FORMAT, peer);
 
   if (!peer || gst_caps_is_empty (peer)) {
-    GST_ELEMENT_ERROR (src, STREAM, FORMAT, ("failed to negotiate caps"), (NULL));
+    GST_ELEMENT_ERROR (src, STREAM, FORMAT, ("failed to negotiate caps"),
+        (NULL));
     goto out;
   }
 
@@ -1339,7 +1345,8 @@ gst_droidcamsrc_imgsrc_negotiate (GstDroidCamSrcPad * data)
   GST_DEBUG_OBJECT (src, "our caps %" GST_PTR_FORMAT, our_caps);
 
   if (!our_caps || gst_caps_is_empty (our_caps)) {
-    GST_ELEMENT_ERROR (src, STREAM, FORMAT, ("failed to get caps from HAL"), (NULL));
+    GST_ELEMENT_ERROR (src, STREAM, FORMAT, ("failed to get caps from HAL"),
+        (NULL));
     goto out;
   }
 
@@ -1347,7 +1354,8 @@ gst_droidcamsrc_imgsrc_negotiate (GstDroidCamSrcPad * data)
   GST_DEBUG_OBJECT (src, "peer caps %" GST_PTR_FORMAT, peer);
 
   if (!peer || gst_caps_is_empty (peer)) {
-    GST_ELEMENT_ERROR (src, STREAM, FORMAT, ("failed to negotiate caps"), (NULL));
+    GST_ELEMENT_ERROR (src, STREAM, FORMAT, ("failed to negotiate caps"),
+        (NULL));
     goto out;
   }
 
@@ -1413,7 +1421,8 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
   GST_DEBUG_OBJECT (src, "our caps %" GST_PTR_FORMAT, our_caps);
 
   if (!our_caps || gst_caps_is_empty (our_caps)) {
-    GST_ELEMENT_ERROR (src, STREAM, FORMAT, ("failed to get caps from HAL"), (NULL));
+    GST_ELEMENT_ERROR (src, STREAM, FORMAT, ("failed to get caps from HAL"),
+        (NULL));
     goto out;
   }
 
@@ -1421,7 +1430,8 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
   GST_DEBUG_OBJECT (src, "peer caps %" GST_PTR_FORMAT, peer);
 
   if (!peer || gst_caps_is_empty (peer)) {
-    GST_ELEMENT_ERROR (src, STREAM, FORMAT, ("failed to negotiate caps"), (NULL));
+    GST_ELEMENT_ERROR (src, STREAM, FORMAT, ("failed to negotiate caps"),
+        (NULL));
     goto out;
   }
 
@@ -1713,8 +1723,7 @@ gst_droidcamsrc_apply_quirk (GstDroidCamSrc * src, GstDroidCamSrcQuirk * quirk,
     return;
   }
 
-  if (src->dev->info->direction == quirk->direction
-      || quirk->direction == -1) {
+  if (src->dev->info->direction == quirk->direction || quirk->direction == -1) {
     if (!state || src->mode == MODE_VIDEO) {
       /* disable */
       GST_DEBUG_OBJECT (src, "disabling %s", name);
@@ -1857,8 +1866,9 @@ gst_droidcamsrc_add_vfsrc_orientation_tag (GstDroidCamSrc * src)
   /* The lock is not really needed but for the sake of consistency */
   g_mutex_lock (&src->vfsrc->lock);
   src->vfsrc->pending_events = g_list_append (src->vfsrc->pending_events,
-					      gst_event_new_tag (taglist));
+      gst_event_new_tag (taglist));
   g_mutex_unlock (&src->vfsrc->lock);
 
-  GST_INFO_OBJECT (src, "added orientation tag event with orientation %s", orientation);
+  GST_INFO_OBJECT (src, "added orientation tag event with orientation %s",
+      orientation);
 }

@@ -55,8 +55,8 @@ typedef struct
   GST_DEBUG_CATEGORY_INIT (droid_memory_debug, "droidmemory", 0, \
       "droid memory allocator");
 
-G_DEFINE_TYPE_WITH_CODE (GstDroidMediaBufferAllocator, droid_media_buffer_allocator,
-    GST_TYPE_ALLOCATOR, _do_init);
+G_DEFINE_TYPE_WITH_CODE (GstDroidMediaBufferAllocator,
+    droid_media_buffer_allocator, GST_TYPE_ALLOCATOR, _do_init);
 
 #define GST_TYPE_DROID_MEDIA_BUFFER_ALLOCATOR    (droid_media_buffer_allocator_get_type())
 #define GST_IS_DROID_MEDIA_BUFFER_ALLOCATOR(obj) (G_TYPE_CHECK_INSTANCE_TYPE ((obj), GST_TYPE_DROID_MEDIA_BUFFER_ALLOCATOR))
@@ -89,7 +89,8 @@ droid_media_buffer_allocator_init (GstDroidMediaBufferAllocator * allocator)
 }
 
 static void
-droid_media_buffer_allocator_class_init (GstDroidMediaBufferAllocatorClass * klass)
+droid_media_buffer_allocator_class_init (GstDroidMediaBufferAllocatorClass *
+    klass)
 {
   GstAllocatorClass *allocator_class = (GstAllocatorClass *) klass;
 
@@ -99,13 +100,14 @@ droid_media_buffer_allocator_class_init (GstDroidMediaBufferAllocatorClass * kla
 
 GstMemory *
 gst_droid_media_buffer_allocator_alloc (GstAllocator * allocator,
-					DroidMediaBufferQueue *queue, DroidMediaBufferCallbacks *cb)
+    DroidMediaBufferQueue * queue, DroidMediaBufferCallbacks * cb)
 {
   GstDroidMediaBufferMemory *mem;
   DroidMediaBuffer *buffer;
 
   if (!GST_IS_DROID_MEDIA_BUFFER_ALLOCATOR (allocator)) {
-    GST_WARNING_OBJECT (allocator, "allocator is not the correct allocator for droidmediabuffer");
+    GST_WARNING_OBJECT (allocator,
+        "allocator is not the correct allocator for droidmediabuffer");
     return NULL;
   }
 
@@ -131,14 +133,14 @@ gst_droid_media_buffer_allocator_alloc (GstAllocator * allocator,
 
 GstMemory *
 gst_droid_media_buffer_allocator_alloc_from_data (GstAllocator * allocator,
-						  gsize w, gsize h, DroidMediaData * data,
-						  DroidMediaBufferCallbacks *cb)
+    gsize w, gsize h, DroidMediaData * data, DroidMediaBufferCallbacks * cb)
 {
   GstDroidMediaBufferMemory *mem;
   DroidMediaBuffer *buffer;
 
   if (!GST_IS_DROID_MEDIA_BUFFER_ALLOCATOR (allocator)) {
-    GST_WARNING_OBJECT (allocator, "allocator is not the correct allocator for droidmediabuffer");
+    GST_WARNING_OBJECT (allocator,
+        "allocator is not the correct allocator for droidmediabuffer");
     return NULL;
   }
 
@@ -169,7 +171,8 @@ gst_is_droid_media_buffer_memory (GstMemory * mem)
 }
 
 static void
-gst_droid_media_buffer_allocator_free (GstAllocator * allocator, GstMemory * mem)
+gst_droid_media_buffer_allocator_free (GstAllocator * allocator,
+    GstMemory * mem)
 {
   GstDroidMediaBufferMemory *m = (GstDroidMediaBufferMemory *) mem;
 
@@ -190,5 +193,5 @@ gst_droid_media_buffer_memory_get_buffer (GstMemory * mem)
     return NULL;
   }
 
-  return ((GstDroidMediaBufferMemory *)mem)->buffer;
+  return ((GstDroidMediaBufferMemory *) mem)->buffer;
 }

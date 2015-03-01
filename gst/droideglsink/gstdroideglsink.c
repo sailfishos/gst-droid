@@ -393,7 +393,8 @@ gst_droideglsink_class_init (GstDroidEglSinkClass * klass)
 }
 
 static GstMemory *
-gst_droideglsink_get_droid_media_buffer_memory (GstDroidEglSink * sink, GstBuffer * buffer)
+gst_droideglsink_get_droid_media_buffer_memory (GstDroidEglSink * sink,
+    GstBuffer * buffer)
 {
   int x, num;
 
@@ -456,7 +457,7 @@ gst_droideglsink_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
   data.size = info.size;
   data.data = info.data;
   mem = gst_droid_media_buffer_allocator_alloc_from_data (sink->allocator,
-							  format.width, format.height, &data, &cb);
+      format.width, format.height, &data, &cb);
 
   if (!mem) {
     goto free_and_out;
@@ -558,7 +559,7 @@ gst_droideglsink_acquire_frame (NemoGstVideoTexture * iface)
   }
 
   mem =
-    gst_droideglsink_get_droid_media_buffer_memory (sink, sink->last_buffer);
+      gst_droideglsink_get_droid_media_buffer_memory (sink, sink->last_buffer);
 
   if (mem) {
     sink->acquired_buffer = gst_buffer_ref (sink->last_buffer);
@@ -614,13 +615,16 @@ gst_droideglsink_bind_frame (NemoGstVideoTexture * iface, EGLImageKHR * image)
   /* Now we are ready */
 
   /* We can safely use peek here because we have an extra ref to the buffer */
-  mem = gst_droideglsink_get_droid_media_buffer_memory (sink, sink->acquired_buffer);
+  mem =
+      gst_droideglsink_get_droid_media_buffer_memory (sink,
+      sink->acquired_buffer);
   g_assert (mem);
 
   sink->image =
-    sink->eglCreateImageKHR (sink->dpy, EGL_NO_CONTEXT,
-        EGL_NATIVE_BUFFER_ANDROID,
-        (EGLClientBuffer) gst_droid_media_buffer_memory_get_buffer (mem), eglImgAttrs);
+      sink->eglCreateImageKHR (sink->dpy, EGL_NO_CONTEXT,
+      EGL_NATIVE_BUFFER_ANDROID,
+      (EGLClientBuffer) gst_droid_media_buffer_memory_get_buffer (mem),
+      eglImgAttrs);
 
   /* Buffer will not go anywhere so we should be safe to unlock. */
   g_mutex_unlock (&sink->lock);

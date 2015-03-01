@@ -64,7 +64,7 @@ gst_droid_codec_release_buffer (void *data)
   info->frame->input_buffer = NULL;
 
   gst_video_codec_frame_unref (info->frame);
-  g_slice_free(DroidBufferCallbackMapInfo, info);
+  g_slice_free (DroidBufferCallbackMapInfo, info);
 }
 
 static void
@@ -77,7 +77,7 @@ gst_droid_codec_release_buffer2 (void *data)
   gst_video_codec_frame_unref (info->frame);
   g_free (info->data);
 
-  g_slice_free(DroidBufferCallbackMapInfo2, info);
+  g_slice_free (DroidBufferCallbackMapInfo2, info);
 }
 
 gboolean
@@ -92,7 +92,7 @@ gst_droid_codec_consume_frame (DroidMediaCodec * codec,
   GST_DEBUG ("consume frame");
 
   data.sync = GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame) ? true : false;
-  data.ts = GST_TIME_AS_USECONDS(ts);
+  data.ts = GST_TIME_AS_USECONDS (ts);
 
   if (!gst_buffer_map (frame->input_buffer, &info, GST_MAP_READ)) {
     GST_ERROR ("failed to map buffer");
@@ -111,7 +111,7 @@ gst_droid_codec_consume_frame (DroidMediaCodec * codec,
 
   buffer_data->buffer = gst_buffer_ref (frame->input_buffer);
   buffer_data->info = info;
-  buffer_data->frame = frame; /* We have a ref already */
+  buffer_data->frame = frame;   /* We have a ref already */
 
   droid_media_codec_queue (codec, &data, &cb);
 
@@ -121,8 +121,8 @@ gst_droid_codec_consume_frame (DroidMediaCodec * codec,
 }
 
 gboolean
-gst_droid_codec_consume_frame2 (DroidMediaCodec * codec, GstVideoCodecFrame * frame,
-				DroidMediaCodecData *data)
+gst_droid_codec_consume_frame2 (DroidMediaCodec * codec,
+    GstVideoCodecFrame * frame, DroidMediaCodecData * data)
 {
   DroidMediaBufferCallbacks cb;
   DroidBufferCallbackMapInfo2 *buffer_data;
@@ -137,7 +137,7 @@ gst_droid_codec_consume_frame2 (DroidMediaCodec * codec, GstVideoCodecFrame * fr
   cb.data = buffer_data;
 
   buffer_data->data = data->data.data;
-  buffer_data->frame = frame; /* We have a ref already */
+  buffer_data->frame = frame;   /* We have a ref already */
 
   droid_media_codec_queue (codec, data, &cb);
 
@@ -194,7 +194,7 @@ h264_compliment (GstCaps * caps)
 }
 
 static gboolean
-construct_normal_codec_data (gpointer data, gsize size, GstBuffer **buffer)
+construct_normal_codec_data (gpointer data, gsize size, GstBuffer ** buffer)
 {
   GstBuffer *codec_data = gst_buffer_new_allocate (NULL, size, NULL);
 
@@ -213,7 +213,7 @@ construct_normal_codec_data (gpointer data, gsize size, GstBuffer **buffer)
 }
 
 static gboolean
-construct_h264enc_codec_data (gpointer data, gsize size, GstBuffer **buffer)
+construct_h264enc_codec_data (gpointer data, gsize size, GstBuffer ** buffer)
 {
   GstH264NalParser *parser = gst_h264_nal_parser_new ();
   gsize offset = 0;
@@ -238,20 +238,20 @@ construct_h264enc_codec_data (gpointer data, gsize size, GstBuffer **buffer)
 
     if (nal.type == GST_H264_NAL_SPS) {
       if (nal.size >= 4 && !idc_found) {
-	idc_found = TRUE;
+        idc_found = TRUE;
 
-	profile_idc = nal.data[1];
-	profile_comp = nal.data[2];
-	level_idc = nal.data[3];
+        profile_idc = nal.data[1];
+        profile_comp = nal.data[2];
+        level_idc = nal.data[3];
       } else if (nal.size >= 4) {
-	if (profile_idc != nal.data[1] || profile_comp != nal.data[2] ||
-	    level_idc != nal.data[3]) {
-	  GST_ERROR ("Inconsistency in SPS");
-	  goto out;
-	}
+        if (profile_idc != nal.data[1] || profile_comp != nal.data[2] ||
+            level_idc != nal.data[3]) {
+          GST_ERROR ("Inconsistency in SPS");
+          goto out;
+        }
       } else {
-	GST_ERROR ("malformed SPS");
-	goto out;
+        GST_ERROR ("malformed SPS");
+        goto out;
       }
 
       GST_MEMDUMP ("Found SPS", nal.data + nal.offset, nal.size);
@@ -295,12 +295,12 @@ construct_h264enc_codec_data (gpointer data, gsize size, GstBuffer **buffer)
   GST_INFO ("SPS found: %d, PPS found: %d", num_sps, num_pps);
 
   writer = gst_byte_writer_new_with_size (sps_size + pps_size + 7, FALSE);
-  gst_byte_writer_put_uint8 (writer, 1); /* AVC decoder configuration version 1 */
-  gst_byte_writer_put_uint8 (writer, profile_idc); /* profile idc */
-  gst_byte_writer_put_uint8 (writer, profile_comp); /* profile compatibility */
-  gst_byte_writer_put_uint8 (writer, level_idc); /* level idc */
+  gst_byte_writer_put_uint8 (writer, 1);        /* AVC decoder configuration version 1 */
+  gst_byte_writer_put_uint8 (writer, profile_idc);      /* profile idc */
+  gst_byte_writer_put_uint8 (writer, profile_comp);     /* profile compatibility */
+  gst_byte_writer_put_uint8 (writer, level_idc);        /* level idc */
   gst_byte_writer_put_uint8 (writer, (0xfc | (4 - 1))); /* nal length size - 1 */
-  gst_byte_writer_put_uint8 (writer, 0xe0 | num_sps);/* number of sps */
+  gst_byte_writer_put_uint8 (writer, 0xe0 | num_sps);   /* number of sps */
 
   /* SPS */
   for (x = 0; x < num_sps; x++) {
@@ -313,7 +313,7 @@ construct_h264enc_codec_data (gpointer data, gsize size, GstBuffer **buffer)
     gst_buffer_unmap (buf, &info);
   }
 
-  gst_byte_writer_put_uint8 (writer, num_pps);/* number of pps */
+  gst_byte_writer_put_uint8 (writer, num_pps);  /* number of pps */
 
   /* PPS */
   for (x = 0; x < num_pps; x++) {
@@ -332,11 +332,11 @@ construct_h264enc_codec_data (gpointer data, gsize size, GstBuffer **buffer)
 
 out:
   if (sps) {
-    g_slist_free_full (sps, (GDestroyNotify)gst_buffer_unref);
+    g_slist_free_full (sps, (GDestroyNotify) gst_buffer_unref);
   }
 
   if (pps) {
-    g_slist_free_full (pps, (GDestroyNotify)gst_buffer_unref);
+    g_slist_free_full (pps, (GDestroyNotify) gst_buffer_unref);
   }
 
   if (parser) {
@@ -347,7 +347,7 @@ out:
 }
 
 static gboolean
-construct_h264enc_data (DroidMediaData *in, DroidMediaData *out)
+construct_h264enc_data (DroidMediaData * in, DroidMediaData * out)
 {
   guint32 size;
   guint8 *data;
@@ -375,7 +375,8 @@ construct_h264enc_data (DroidMediaData *in, DroidMediaData *out)
 }
 
 static gboolean
-construct_mpeg4_esds (GstBuffer *data, DroidMediaData *out, gpointer *codec_type_data)
+construct_mpeg4_esds (GstBuffer * data, DroidMediaData * out,
+    gpointer * codec_type_data)
 {
   /*
    * If there are things which I hate the most, this function will be among them
@@ -391,39 +392,39 @@ construct_mpeg4_esds (GstBuffer *data, DroidMediaData *out, gpointer *codec_type
   }
 
   writer = gst_byte_writer_new_with_size (info.size + 29 - 4, FALSE);
-#if 0 /* stagefright ESDS parser does not like us when we have the first 4 bytes */
-  gst_byte_writer_put_uint32_be (writer, 0); /* version and flags */
+#if 0                           /* stagefright ESDS parser does not like us when we have the first 4 bytes */
+  gst_byte_writer_put_uint32_be (writer, 0);    /* version and flags */
 #endif
-  gst_byte_writer_put_uint8 (writer, 0x03); /* ES descriptor type tag */
-  gst_byte_writer_put_uint8 (writer, 23 + info.size); /* size */
-  gst_byte_writer_put_uint16_be (writer, 0); /* ES ID */
-  gst_byte_writer_put_uint8 (writer, 0x1f); /* priority */
-  gst_byte_writer_put_uint8 (writer, 0x04); /* decoder config descriptor type tag */
+  gst_byte_writer_put_uint8 (writer, 0x03);     /* ES descriptor type tag */
+  gst_byte_writer_put_uint8 (writer, 23 + info.size);   /* size */
+  gst_byte_writer_put_uint16_be (writer, 0);    /* ES ID */
+  gst_byte_writer_put_uint8 (writer, 0x1f);     /* priority */
+  gst_byte_writer_put_uint8 (writer, 0x04);     /* decoder config descriptor type tag */
   gst_byte_writer_put_uint8 (writer, 15 + info.size);
-  gst_byte_writer_put_uint8 (writer, 0x20); /* object type: MPEG4 video */
-  gst_byte_writer_put_uint8 (writer, 0x11); /* stream type: visual stream */
+  gst_byte_writer_put_uint8 (writer, 0x20);     /* object type: MPEG4 video */
+  gst_byte_writer_put_uint8 (writer, 0x11);     /* stream type: visual stream */
 
   /* buffer size db, average bit rate and max bit rate values are taken from stagefright MPEG4Writer */
-  gst_byte_writer_put_uint8 (writer, 0x01); /* buffer size db: 1/3 */
-  gst_byte_writer_put_uint8 (writer, 0x77); /* buffer size db: 2/3 */
-  gst_byte_writer_put_uint8 (writer, 0x00); /* buffer size db: 3/3 */
-  gst_byte_writer_put_uint8 (writer, 0x00); /* max bit rate: 1/4 */
-  gst_byte_writer_put_uint8 (writer, 0x03); /* max bit rate: 2/4 */
-  gst_byte_writer_put_uint8 (writer, 0xe8); /* max bit rate: 3/4 */
-  gst_byte_writer_put_uint8 (writer, 0x00); /* max bit rate: 4/4 */
+  gst_byte_writer_put_uint8 (writer, 0x01);     /* buffer size db: 1/3 */
+  gst_byte_writer_put_uint8 (writer, 0x77);     /* buffer size db: 2/3 */
+  gst_byte_writer_put_uint8 (writer, 0x00);     /* buffer size db: 3/3 */
+  gst_byte_writer_put_uint8 (writer, 0x00);     /* max bit rate: 1/4 */
+  gst_byte_writer_put_uint8 (writer, 0x03);     /* max bit rate: 2/4 */
+  gst_byte_writer_put_uint8 (writer, 0xe8);     /* max bit rate: 3/4 */
+  gst_byte_writer_put_uint8 (writer, 0x00);     /* max bit rate: 4/4 */
 
-  gst_byte_writer_put_uint8 (writer, 0x00); /* average bit rate: 1/4 */
-  gst_byte_writer_put_uint8 (writer, 0x03); /* average bit rate: 2/4 */
-  gst_byte_writer_put_uint8 (writer, 0xe8); /* average bit rate: 3/4 */
-  gst_byte_writer_put_uint8 (writer, 0x00); /* average bit rate: 4/4 */
+  gst_byte_writer_put_uint8 (writer, 0x00);     /* average bit rate: 1/4 */
+  gst_byte_writer_put_uint8 (writer, 0x03);     /* average bit rate: 2/4 */
+  gst_byte_writer_put_uint8 (writer, 0xe8);     /* average bit rate: 3/4 */
+  gst_byte_writer_put_uint8 (writer, 0x00);     /* average bit rate: 4/4 */
 
-  gst_byte_writer_put_uint8 (writer, 0x05); /* decoder specific descriptor type tag */
-  gst_byte_writer_put_uint8 (writer, info.size); /* size */
-  gst_byte_writer_put_data (writer, info.data, info.size);     /* codec data */
+  gst_byte_writer_put_uint8 (writer, 0x05);     /* decoder specific descriptor type tag */
+  gst_byte_writer_put_uint8 (writer, info.size);        /* size */
+  gst_byte_writer_put_data (writer, info.data, info.size);      /* codec data */
 
-  gst_byte_writer_put_uint8 (writer, 0x06); /* SL config descriptor type tag */
-  gst_byte_writer_put_uint8 (writer, 0x01); /* descriptor type length */
-  gst_byte_writer_put_uint8 (writer, 0x02); /* SL value */
+  gst_byte_writer_put_uint8 (writer, 0x06);     /* SL config descriptor type tag */
+  gst_byte_writer_put_uint8 (writer, 0x01);     /* descriptor type length */
+  gst_byte_writer_put_uint8 (writer, 0x02);     /* SL value */
 
   out->size = gst_byte_writer_get_size (writer);
   out->data = gst_byte_writer_free_and_get_data (writer);
@@ -434,7 +435,8 @@ construct_mpeg4_esds (GstBuffer *data, DroidMediaData *out, gpointer *codec_type
 }
 
 static gboolean
-construct_h264dec_codec_data (GstBuffer *data, DroidMediaData *out, gpointer *codec_type_data)
+construct_h264dec_codec_data (GstBuffer * data, DroidMediaData * out,
+    gpointer * codec_type_data)
 {
   GstMapInfo info;
   gboolean ret = FALSE;
@@ -465,7 +467,8 @@ out:
 }
 
 static gboolean
-construct_h264dec_data (GstBuffer *buffer, gpointer codec_type_data, DroidMediaData *out)
+construct_h264dec_data (GstBuffer * buffer, gpointer codec_type_data,
+    DroidMediaData * out)
 {
   GstMapInfo info;
   gboolean ret = FALSE;
@@ -483,70 +486,70 @@ construct_h264dec_data (GstBuffer *buffer, gpointer codec_type_data, DroidMediaD
   }
 
   switch (nal_size) {
-  case 4:
-    out->size = info.size;
-    out->data = g_malloc (info.size);
-    if (!out->data) {
+    case 4:
+      out->size = info.size;
+      out->data = g_malloc (info.size);
+      if (!out->data) {
+        goto out;
+      }
+
+      memcpy (out->data, info.data, info.size);
+
+      data = out->data;
+
+      data[0] = data[1] = data[2] = 0;
+      data[3] = 1;
+      ret = TRUE;
       goto out;
-    }
 
-    memcpy(out->data, info.data, info.size);
+    case 3:
+      out->size = info.size + 1;
+      out->data = g_malloc (out->size);
+      if (!out->data) {
+        goto out;
+      }
 
-    data = out->data;
-
-    data[0] = data[1] = data[2] = 0;
-    data[3] = 1;
-    ret = TRUE;
-    goto out;
-
-  case 3:
-    out->size = info.size + 1;
-    out->data = g_malloc (out->size);
-    if (!out->data) {
+      data = out->data;
+      memcpy (data[1], info.data, info.size);
+      data[0] = data[1] = data[2] = 0;
+      data[3] = 1;
+      ret = TRUE;
       goto out;
-    }
 
-    data = out->data;
-    memcpy(data[1], info.data, info.size);
-    data[0] = data[1] = data[2] = 0;
-    data[3] = 1;
-    ret = TRUE;
-    goto out;
+    case 2:
+      out->size = info.size + 2;
+      out->data = g_malloc (out->size);
+      if (!out->data) {
+        goto out;
+      }
 
-  case 2:
-    out->size = info.size + 2;
-    out->data = g_malloc (out->size);
-    if (!out->data) {
+      data = out->data;
+      memcpy (&data[2], info.data, info.size);
+
+      data[0] = data[1] = data[2] = 0;
+      data[3] = 1;
+      ret = TRUE;
       goto out;
-    }
 
-    data = out->data;
-    memcpy(&data[2], info.data, info.size);
+    case 1:
+      out->size = info.size + 3;
+      out->data = g_malloc (out->size);
+      if (!out->data) {
+        goto out;
+      }
 
-    data[0] = data[1] = data[2] = 0;
-    data[3] = 1;
-    ret = TRUE;
-    goto out;
+      data = out->data;
+      memcpy (&data[3], info.data, info.size);
 
-  case 1:
-    out->size = info.size + 3;
-    out->data = g_malloc (out->size);
-    if (!out->data) {
+      data[0] = data[1] = data[2] = 0;
+      data[3] = 1;
+      ret = TRUE;
       goto out;
-    }
 
-    data = out->data;
-    memcpy(&data[3], info.data, info.size);
+    default:
+      GST_ERROR ("unhandled nal prefix size %d", nal_size);
 
-    data[0] = data[1] = data[2] = 0;
-    data[3] = 1;
-    ret = TRUE;
-    goto out;
-
-  default:
-    GST_ERROR ("unhandled nal prefix size %d", nal_size);
-
-    goto out;
+      goto out;
   }
 
 out:
@@ -558,21 +561,23 @@ out:
 static GstDroidCodec codecs[] = {
   /* decoders */
   {GST_DROID_CODEC_DECODER, "video/mpeg", "video/mp4v-es", is_mpeg4v, NULL,
-   "video/mpeg, mpegversion=4"CAPS_FRAGMENT, NULL, NULL, construct_mpeg4_esds, NULL},
+        "video/mpeg, mpegversion=4" CAPS_FRAGMENT, NULL, NULL,
+      construct_mpeg4_esds, NULL},
   {GST_DROID_CODEC_DECODER, "video/x-h264", "video/avc", is_h264_dec,
-   NULL, "video/x-h264, stream-format=avc,alignment=au"CAPS_FRAGMENT, NULL, NULL,
-   construct_h264dec_codec_data, construct_h264dec_data},
+        NULL, "video/x-h264, stream-format=avc,alignment=au" CAPS_FRAGMENT,
+        NULL, NULL,
+      construct_h264dec_codec_data, construct_h264dec_data},
   {GST_DROID_CODEC_DECODER, "video/x-h263", "video/3gpp", NULL,
-   NULL, "video/x-h263"CAPS_FRAGMENT, NULL, NULL, NULL, NULL},
+      NULL, "video/x-h263" CAPS_FRAGMENT, NULL, NULL, NULL, NULL},
 
   /* encoders */
   {GST_DROID_CODEC_ENCODER, "video/mpeg", "video/mp4v-es", is_mpeg4v,
-      NULL, "video/mpeg, mpegversion=4, systemstream=false"CAPS_FRAGMENT,
-   construct_normal_codec_data, NULL, NULL, NULL},
+        NULL, "video/mpeg, mpegversion=4, systemstream=false" CAPS_FRAGMENT,
+      construct_normal_codec_data, NULL, NULL, NULL},
   {GST_DROID_CODEC_ENCODER, "video/x-h264", "video/avc",
         is_h264_enc, h264_compliment,
-   "video/x-h264, stream-format=avc,alignment=au"CAPS_FRAGMENT,
-   construct_h264enc_codec_data, construct_h264enc_data, NULL, NULL},
+        "video/x-h264, stream-format=avc,alignment=au" CAPS_FRAGMENT,
+      construct_h264enc_codec_data, construct_h264enc_data, NULL, NULL},
 };
 
 GstDroidCodec *
