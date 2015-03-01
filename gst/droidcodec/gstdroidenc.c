@@ -57,7 +57,14 @@ gst_droidenc_signal_eos (void *data)
 
   GST_DEBUG_OBJECT (enc, "codec signaled EOS");
 
-  // TODO:
+  g_mutex_lock (&enc->eos_lock);
+
+  if (!enc->eos) {
+    GST_WARNING_OBJECT (enc, "codec signaled EOS but we are not expecting it");
+  }
+
+  g_cond_signal (&enc->eos_cond);
+  g_mutex_unlock (&enc->eos_lock);
 }
 
 static void
@@ -67,10 +74,23 @@ gst_droidenc_error (void *data, int err)
 
   GST_DEBUG_OBJECT (enc, "codec error");
 
+  g_mutex_lock (&enc->eos_lock);
+
+  if (enc->eos) {
+    /* Gotta love Android. We will ignore errors if we are expecting EOS */
+    g_cond_signal (&enc->eos_cond);
+    goto out;
+  }
+
+  GST_VIDEO_ENCODER_STREAM_LOCK (enc);
+  enc->downstream_flow_ret = GST_FLOW_ERROR;
+  GST_VIDEO_ENCODER_STREAM_UNLOCK (enc);
+
   GST_ELEMENT_ERROR (enc, LIBRARY, FAILED, NULL,
       ("error 0x%x from android codec", -err));
 
-  // TODO:
+out:
+  g_mutex_unlock (&enc->eos_lock);
 }
 
 static void
@@ -443,8 +463,10 @@ gst_droidenc_finalize (GObject * object)
 
   GST_DEBUG_OBJECT (enc, "finalize");
 
-  //  gst_mini_object_unref (GST_MINI_OBJECT (enc->codec));
   enc->codec = NULL;
+
+  g_mutex_clear (&enc->eos_lock);
+  g_cond_clear (&enc->eos_cond);
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
@@ -479,6 +501,10 @@ gst_droidenc_start (GstVideoEncoder * encoder)
   GstDroidEnc *enc = GST_DROIDENC (encoder);
 
   GST_DEBUG_OBJECT (enc, "start");
+
+  enc->eos = FALSE;
+  enc->downstream_flow_ret = GST_FLOW_OK;
+  enc->dirty = TRUE;
 
   return TRUE;
 }
@@ -641,7 +667,22 @@ gst_droidenc_finish (GstVideoEncoder * encoder)
 
   GST_DEBUG_OBJECT (enc, "finish");
 
-  //  gst_droidenc_stop_loop (encoder);
+  g_mutex_lock (&enc->eos_lock);
+  enc->eos = TRUE;
+
+  if (enc->codec) {
+    droid_media_codec_drain (enc->codec);
+  }
+
+  /* release the lock to allow _frame_available () to do its job */
+  GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
+  /* Now we wait for the codec to signal EOS */
+  g_cond_wait (&enc->eos_cond, &enc->eos_lock);
+  GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
+
+  enc->eos = FALSE;
+
+  g_mutex_unlock (&enc->eos_lock);
 
   return GST_FLOW_OK;
 }
@@ -738,6 +779,9 @@ gst_droidenc_init (GstDroidEnc * enc)
   enc->in_state = NULL;
   enc->out_state = NULL;
   enc->target_bitrate = GST_DROID_ENC_TARGET_BITRATE_DEFAULT;
+  enc->downstream_flow_ret = GST_FLOW_OK;
+  g_mutex_init (&enc->eos_lock);
+  g_cond_init (&enc->eos_cond);
 }
 
 static GstCaps *
