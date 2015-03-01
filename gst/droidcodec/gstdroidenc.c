@@ -98,9 +98,13 @@ gst_droidenc_data_available (void *data, DroidMediaCodecData * encoded)
 {
   GstVideoCodecFrame *frame;
   DroidMediaData out;
+  GstFlowReturn flow_ret;
   GstDroidEnc *enc = (GstDroidEnc *) data;
+  GstVideoEncoder *encoder = GST_VIDEO_ENCODER (enc);
 
   GST_DEBUG_OBJECT (enc, "data available");
+
+  GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
 
   if (encoded->codec_config) {
     GstBuffer *codec_data = NULL;
@@ -121,13 +125,16 @@ gst_droidenc_data_available (void *data, DroidMediaCodecData * encoded)
       gst_buffer_replace (&enc->out_state->codec_data, codec_data);
     }
 
+    GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
     return;
   }
 
   frame = gst_video_encoder_get_oldest_frame (GST_VIDEO_ENCODER (enc));
-  if (!frame) {
-    /* TODO: */
+  if (G_UNLIKELY (!frame)) {
+    /* TODO: what should we do here? */
     GST_WARNING_OBJECT (enc, "buffer without frame");
+
+    GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
     return;
   }
 
@@ -153,7 +160,21 @@ gst_droidenc_data_available (void *data, DroidMediaCodecData * encoded)
     GST_VIDEO_CODEC_FRAME_SET_SYNC_POINT (frame);
   }
 
-  gst_video_encoder_finish_frame (GST_VIDEO_ENCODER (enc), frame);
+  flow_ret = gst_video_encoder_finish_frame (GST_VIDEO_ENCODER (enc), frame);
+
+  if (flow_ret == GST_FLOW_OK || flow_ret == GST_FLOW_FLUSHING) {
+    goto out;
+  } else if (flow_ret == GST_FLOW_EOS) {
+    GST_INFO_OBJECT (enc, "eos");
+  } else if (flow_ret < GST_FLOW_OK) {
+    GST_ELEMENT_ERROR (enc, STREAM, FAILED,
+        ("Internal data stream error."), ("stream stopped, reason %s",
+            gst_flow_get_name (flow_ret)));
+  }
+
+out:
+  enc->downstream_flow_ret = flow_ret;
+  GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
 }
 
 #if 0
