@@ -459,9 +459,11 @@ gst_droidenc_stop (GstVideoEncoder * encoder)
 
   GST_DEBUG_OBJECT (enc, "stop");
 
-  GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
-  //  gst_droidenc_stop_loop (encoder);
-  GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
+  if (enc->codec) {
+    droid_media_codec_stop (enc->codec);
+    droid_media_codec_destroy (enc->codec);
+    enc->codec = NULL;
+  }
 
   if (enc->in_state) {
     gst_video_codec_state_unref (enc->in_state);
@@ -472,15 +474,8 @@ gst_droidenc_stop (GstVideoEncoder * encoder)
     gst_video_codec_state_unref (enc->out_state);
     enc->out_state = NULL;
   }
-#if 0
-  if (enc->comp) {
-    gst_droid_codec_stop_component (enc->comp);
-    gst_droid_codec_destroy_component (enc->comp);
-    enc->comp = NULL;
-  }
-#endif
 
-  GST_DEBUG_OBJECT (enc, "stopped");
+  enc->codec_type = NULL;
 
   return TRUE;
 }
