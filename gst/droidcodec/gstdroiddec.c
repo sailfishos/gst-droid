@@ -434,6 +434,11 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 
   gst_buffer_replace (&dec->codec_data, state->codec_data);
 
+  if (!gst_video_decoder_negotiate (decoder)) {
+    GST_ERROR_OBJECT (dec, "not negotiated");
+    goto free_and_out;
+  }
+
   if (!gst_droiddec_create_codec (dec)) {
     goto free_and_out;
   }

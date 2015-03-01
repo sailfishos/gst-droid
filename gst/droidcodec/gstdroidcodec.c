@@ -168,7 +168,7 @@ construct_normal_codec_data (gpointer data, gsize size, GstBuffer **buffer)
 }
 
 static gboolean
-construct_h264_codec_data (gpointer data, gsize size, GstBuffer **buffer)
+construct_h264enc_codec_data (gpointer data, gsize size, GstBuffer **buffer)
 {
   GstH264NalParser *parser = gst_h264_nal_parser_new ();
   gsize offset = 0;
@@ -402,8 +402,8 @@ static GstDroidCodec codecs[] = {
    construct_normal_codec_data, NULL, NULL},
   {GST_DROID_CODEC_ENCODER, "video/x-h264", "video/avc",
         is_h264_enc, h264_compliment,
-   "video/x-h264, alignment=au, stream-format=avc"CAPS_FRAGMENT,
-   construct_h264_codec_data, construct_h264_data, NULL},
+   "video/x-h264, stream-format=avc,alignment=au"CAPS_FRAGMENT,
+   construct_h264enc_codec_data, construct_h264_data, NULL},
 };
 
 GstDroidCodec *
