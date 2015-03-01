@@ -46,6 +46,79 @@ GST_STATIC_PAD_TEMPLATE (GST_VIDEO_DECODER_SRC_NAME,
 static GstVideoCodecState *
 gst_droiddec_configure_state (GstVideoDecoder * decoder, gsize width,
 			      gsize height);
+static void gst_droiddec_error (void *data, int err);
+static int gst_droiddec_size_changed(void *data, int32_t width, int32_t height);
+static void gst_droiddec_signal_eos (void *data);
+static void gst_droiddec_buffers_released(void *user);
+static void gst_droiddec_frame_available(void *user);
+
+static gboolean
+gst_droiddec_create_codec (GstDroidDec * dec)
+{
+  DroidMediaCodecDecoderMetaData md;
+
+  GST_INFO_OBJECT (dec, "create codec of type %s: %dx%d",
+      dec->codec_type->droid, dec->in_state->info.width, dec->in_state->info.height);
+
+  md.parent.type = dec->codec_type->droid;
+  md.parent.width = dec->in_state->info.width;
+  md.parent.height = dec->in_state->info.height;
+  md.parent.fps = dec->in_state->info.fps_n / dec->in_state->info.fps_d;
+  md.parent.flags = DROID_MEDIA_CODEC_HW_ONLY;
+  md.codec_data.size = 0;
+
+  if (dec->codec_data) {
+    g_assert (dec->codec_type->construct_decoder_codec_data);
+
+    if (!dec->codec_type->construct_decoder_codec_data (dec->codec_data, &md.codec_data)) {
+      GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
+			 ("Failed to construct codec_data."));
+
+      return FALSE;
+    }
+  }
+
+  dec->codec = droid_media_codec_create_decoder(&md);
+
+  if (md.codec_data.size > 0) {
+    g_free (md.codec_data.data);
+  }
+
+  if (!dec->codec) {
+    GST_ELEMENT_ERROR(dec, LIBRARY, SETTINGS, NULL, ("Failed to create decoder"));
+
+    return FALSE;
+  }
+
+  dec->queue = droid_media_codec_get_buffer_queue (dec->codec);
+
+  {
+    DroidMediaCodecCallbacks cb;
+    cb.signal_eos = gst_droiddec_signal_eos;
+    cb.error = gst_droiddec_error;
+    cb.size_changed = gst_droiddec_size_changed;
+    droid_media_codec_set_callbacks (dec->codec, &cb, dec);
+  }
+
+  {
+    DroidMediaBufferQueueCallbacks cb;
+    cb.buffers_released = gst_droiddec_buffers_released;
+    cb.frame_available = gst_droiddec_frame_available;
+    droid_media_buffer_queue_set_callbacks (dec->queue, &cb, dec);
+  }
+
+  if (!droid_media_codec_start (dec->codec)) {
+    GST_ELEMENT_ERROR (dec, LIBRARY, INIT, (NULL), ("Failed to create a corresponding decoder"));
+
+    droid_media_codec_destroy (dec->codec);
+    dec->codec = NULL;
+    dec->queue = NULL;
+
+    return FALSE;
+  }
+
+  return TRUE;
+}
 
 static void
 gst_droiddec_buffers_released(G_GNUC_UNUSED void *user)
@@ -130,7 +203,6 @@ gst_droiddec_frame_available(void *user)
   if (flow_ret == GST_FLOW_OK || flow_ret == GST_FLOW_FLUSHING) {
     goto out;
   } else if (flow_ret < GST_FLOW_OK) {
-    /* TODO: better error */
     GST_ELEMENT_ERROR (dec, STREAM, FAILED,
 	("Internal data stream error."), ("stream stopped, reason %s",
 	gst_flow_get_name (flow_ret)));
@@ -156,7 +228,6 @@ gst_droiddec_signal_eos (void *data)
 
   GST_DEBUG_OBJECT (dec, "codec signaled EOS");
 
-  /* TODO: Is it possible that we get EOS when we are not expecting it */
   g_mutex_lock (&dec->eos_lock);
 
   if (!dec->eos) {
@@ -270,6 +341,8 @@ gst_droiddec_stop (GstVideoDecoder * decoder)
   dec->eos = FALSE;
   g_mutex_unlock (&dec->eos_lock);
 
+  gst_buffer_replace (&dec->codec_data, NULL);
+
   return TRUE;
 }
 
@@ -331,7 +404,6 @@ gst_droiddec_start (GstVideoDecoder * decoder)
 static gboolean
 gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 {
-  DroidMediaCodecDecoderMetaData md;
   GstDroidDec *dec = GST_DROIDDEC (decoder);
 
   /*
@@ -354,66 +426,15 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     return FALSE;
   }
 
-  md.parent.type = dec->codec_type->droid;
-  md.parent.width = state->info.width;
-  md.parent.height = state->info.height;
-  md.parent.fps = state->info.fps_n / state->info.fps_d;
-  md.parent.flags = DROID_MEDIA_CODEC_HW_ONLY;
-  md.codec_data.size = 0;
-
   dec->in_state = gst_video_codec_state_ref (state);
 
   dec->out_state =
       gst_droiddec_configure_state (decoder, state->info.width,
       state->info.height);
 
-  if (state->codec_data) {
-    g_assert (dec->codec_type->construct_decoder_codec_data);
+  gst_buffer_replace (&dec->codec_data, state->codec_data);
 
-    if (!dec->codec_type->construct_decoder_codec_data (state->codec_data, &md.codec_data)) {
-      GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
-			 ("Failed to construct codec_data."));
-
-      goto free_and_out;
-    }
-  }
-
-  dec->codec = droid_media_codec_create_decoder(&md);
-
-  if (md.codec_data.size > 0) {
-    g_free (md.codec_data.data);
-  }
-
-  if (!dec->codec) {
-    GST_ELEMENT_ERROR(dec, LIBRARY, SETTINGS, NULL, ("Failed to create decoder"));
-
-    goto free_and_out;
-  }
-
-  dec->queue = droid_media_codec_get_buffer_queue (dec->codec);
-
-  {
-    DroidMediaCodecCallbacks cb;
-    cb.signal_eos = gst_droiddec_signal_eos;
-    cb.error = gst_droiddec_error;
-    cb.size_changed = gst_droiddec_size_changed;
-    droid_media_codec_set_callbacks (dec->codec, &cb, dec);
-  }
-
-  {
-    DroidMediaBufferQueueCallbacks cb;
-    cb.buffers_released = gst_droiddec_buffers_released;
-    cb.frame_available = gst_droiddec_frame_available;
-    droid_media_buffer_queue_set_callbacks (dec->queue, &cb, dec);
-  }
-
-  if (!droid_media_codec_start (dec->codec)) {
-    GST_ELEMENT_ERROR (dec, LIBRARY, INIT, (NULL), ("Failed to create a corresponding decoder"));
-
-    droid_media_codec_destroy (dec->codec);
-    dec->codec = NULL;
-    dec->queue = NULL;
-
+  if (!gst_droiddec_create_codec (dec)) {
     goto free_and_out;
   }
 
@@ -496,7 +517,6 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
   if (!gst_droid_codec_consume_frame (dec->codec, frame, frame->dts)) {
     GST_VIDEO_DECODER_STREAM_LOCK (decoder);
-    /* TODO: error */
     ret = GST_FLOW_ERROR;
     goto error;
   }
@@ -566,6 +586,7 @@ gst_droiddec_init (GstDroidDec * dec)
   dec->codec_type = NULL;
   dec->downstream_flow_ret = GST_FLOW_OK;
   dec->eos = FALSE;
+  dec->codec_data = NULL;
 
   g_mutex_init (&dec->eos_lock);
   g_cond_init (&dec->eos_cond);
