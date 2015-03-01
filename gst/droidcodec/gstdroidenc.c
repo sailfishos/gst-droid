@@ -373,7 +373,6 @@ gst_droidenc_start (GstVideoEncoder * encoder)
 
   enc->eos = FALSE;
   enc->downstream_flow_ret = GST_FLOW_OK;
-  enc->dirty = TRUE;
 
   return TRUE;
 }
@@ -555,8 +554,14 @@ gst_droidenc_flush (GstVideoEncoder * encoder)
 
   GST_DEBUG_OBJECT (enc, "flush");
 
+  enc->downstream_flow_ret = GST_FLOW_OK;
+  g_mutex_lock (&enc->eos_lock);
+  enc->eos = FALSE;
+  g_mutex_unlock (&enc->eos_lock);
 
-  GST_DEBUG_OBJECT (enc, "Flushed");
+  if (enc->codec) {
+    GST_WARNING_OBJECT (enc, "encoder cannot be flushed!");
+  }
 
   return TRUE;
 }
