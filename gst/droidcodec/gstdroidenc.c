@@ -110,8 +110,8 @@ gst_droidenc_data_available(void *data, DroidMediaCodecData *encoded)
     return;
   }
 
-  if (enc->codec_type->process_data) {
-    if (!enc->codec_type->process_data (&(encoded->data), &out)) {
+  if (enc->codec_type->process_encoder_data) {
+    if (!enc->codec_type->process_encoder_data (&(encoded->data), &out)) {
       /* TODO: error */
       GST_WARNING_OBJECT (enc, "failed to process data");
     } else {

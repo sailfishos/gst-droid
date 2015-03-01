@@ -41,7 +41,7 @@ typedef struct {
   void (*compliment)(GstCaps * caps);
   const gchar *caps;
   gboolean (*construct_encoder_codec_data) (gpointer data, gsize size, GstBuffer **buffer);
-  gboolean (*process_data) (DroidMediaData *in, DroidMediaData *out);
+  gboolean (*process_encoder_data) (DroidMediaData *in, DroidMediaData *out);
   gboolean (*construct_decoder_codec_data) (GstBuffer *data, DroidMediaData *out);
 } GstDroidCodec;
 
