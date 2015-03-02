@@ -100,7 +100,6 @@ struct _GstDroidCamSrc
   GstDroidCamSrcPad *vidsrc;
 
   GstDroidCamSrcCameraDevice camera_device;
-  GstDroidCamSrcCameraDevice user_camera_device;
   GstCameraBinMode mode;
 
   int captures;

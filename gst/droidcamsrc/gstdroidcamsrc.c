@@ -151,7 +151,6 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   g_rec_mutex_init (&src->dev_lock);
   src->dev = NULL;
   src->camera_device = DEFAULT_CAMERA_DEVICE;
-  src->user_camera_device = DEFAULT_CAMERA_DEVICE;
   src->mode = DEFAULT_MODE;
   src->captures = 0;
   g_mutex_init (&src->capture_lock);
@@ -260,9 +259,15 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
 
   switch (prop_id) {
     case PROP_CAMERA_DEVICE:
-      src->user_camera_device = g_value_get_enum (value);
-      GST_DEBUG_OBJECT (src, "camera device set to %d",
-          src->user_camera_device);
+      g_rec_mutex_lock (&src->dev_lock);
+      if (src->dev && src->dev->info) {
+        GST_ERROR_OBJECT (src,
+            "cannot change camera-device while camera is running");
+      } else {
+        src->camera_device = g_value_get_enum (value);
+        GST_DEBUG_OBJECT (src, "camera device set to %d", src->camera_device);
+      }
+      g_rec_mutex_unlock (&src->dev_lock);
       break;
 
     case PROP_MODE:
@@ -457,7 +462,6 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       /* find the device */
       gboolean res;
       GstDroidCamSrcCamInfo *info;
-      src->camera_device = src->user_camera_device;
       info = gst_droidcamsrc_find_camera_device (src);
 
       if (!info) {
