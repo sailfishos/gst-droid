@@ -230,6 +230,7 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
       g_value_set_boolean (value, src->image_noise_reduction);
       break;
 
+    case PROP_SENSOR_MOUNT_ANGLE:
     case PROP_SENSOR_ORIENTATION:
       g_rec_mutex_lock (&src->dev_lock);
       if (!src->dev || !src->dev->info) {
@@ -476,6 +477,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       }
 
       g_object_notify (G_OBJECT (src), "sensor-orientation");
+      g_object_notify (G_OBJECT (src), "sensor-mount-angle");
 
       /* now that we have camera parameters, we can update min and max ev-compensation */
       gst_droidcamsrc_update_ev_compensation_bounds (src);
@@ -828,6 +830,12 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
           "Sensor orientation as reported by HAL", 0, 270,
           DEFAULT_SENSOR_ORIENTATION,
           G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_SENSOR_MOUNT_ANGLE,
+      g_param_spec_int ("sensor-mount-angle", "Sensor mount angle",
+          "Sensor orientation as reported by HAL (deprecated, use sensor-orientation)",
+          0, 270, DEFAULT_SENSOR_ORIENTATION,
+          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS | G_PARAM_DEPRECATED));
 
   gst_droidcamsrc_photography_add_overrides (gobject_class);
 
