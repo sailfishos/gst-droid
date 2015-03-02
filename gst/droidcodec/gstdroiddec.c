@@ -499,10 +499,13 @@ gst_droiddec_finish (GstVideoDecoder * decoder)
   GST_VIDEO_DECODER_STREAM_LOCK (decoder);
 
   /* We drained the codec. Better to recreate it. */
-  droid_media_codec_stop (dec->codec);
-  droid_media_codec_destroy (dec->codec);
-  dec->codec = NULL;
-  dec->queue = NULL;
+  if (dec->codec) {
+    droid_media_codec_stop (dec->codec);
+    droid_media_codec_destroy (dec->codec);
+    dec->codec = NULL;
+    dec->queue = NULL;
+  }
+
   dec->dirty = TRUE;
 
 out:
