@@ -234,7 +234,7 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
     case PROP_SENSOR_ORIENTATION:
       g_rec_mutex_lock (&src->dev_lock);
       if (!src->dev || !src->dev->info) {
-        GST_DEBUG_OBJECT (src, "reporting default orientation");
+        GST_WARNING_OBJECT (src, "reporting default orientation");
         g_value_set_int (value, DEFAULT_SENSOR_ORIENTATION);
       } else {
         g_value_set_int (value, src->dev->info->orientation * 90);
