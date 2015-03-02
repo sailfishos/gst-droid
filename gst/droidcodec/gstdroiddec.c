@@ -549,10 +549,6 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   if (G_UNLIKELY (dec->dirty)) {
     if (dec->codec) {
       gst_droiddec_finish (decoder);
-      droid_media_codec_stop (dec->codec);
-      droid_media_codec_destroy (dec->codec);
-      dec->codec = NULL;
-      dec->queue = NULL;
     }
 
     if (!gst_droiddec_create_codec (dec)) {
