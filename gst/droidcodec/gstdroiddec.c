@@ -488,6 +488,8 @@ gst_droiddec_finish (GstVideoDecoder * decoder)
 
   if (dec->codec) {
     droid_media_codec_drain (dec->codec);
+  } else {
+    goto out;
   }
 
   /* release the lock to allow _frame_available () to do its job */
@@ -496,6 +498,7 @@ gst_droiddec_finish (GstVideoDecoder * decoder)
   g_cond_wait (&dec->eos_cond, &dec->eos_lock);
   GST_VIDEO_DECODER_STREAM_LOCK (decoder);
 
+out:
   dec->eos = FALSE;
 
   g_mutex_unlock (&dec->eos_lock);
