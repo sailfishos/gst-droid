@@ -119,11 +119,11 @@ static gboolean
 gst_droidenc_create_codec (GstDroidEnc * enc)
 {
   DroidMediaCodecEncoderMetaData md;
+  const gchar *droid = gst_droid_codec_get_droid_type (enc->codec_type);
 
   GST_INFO_OBJECT (enc, "create codec of type %s: %dx%d",
-      enc->codec_type->droid, enc->in_state->info.width,
-      enc->in_state->info.height);
-  md.parent.type = enc->codec_type->droid;
+      droid, enc->in_state->info.width, enc->in_state->info.height);
+  md.parent.type = droid;
   md.parent.width = enc->in_state->info.width;
   md.parent.height = enc->in_state->info.height;
   md.parent.fps = enc->in_state->info.fps_n / enc->in_state->info.fps_d;        // TODO: bad
@@ -423,7 +423,10 @@ gst_droidenc_stop (GstVideoEncoder * encoder)
     enc->out_state = NULL;
   }
 
-  enc->codec_type = NULL;
+  if (enc->codec_type) {
+    gst_droid_codec_free (enc->codec_type);
+    enc->codec_type = NULL;
+  }
 
   return TRUE;
 }

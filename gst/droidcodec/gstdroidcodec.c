@@ -33,8 +33,6 @@
 #endif /* GST_USE_UNSTABLE_API */
 #include <gst/codecparsers/gsth264parser.h>
 
-GST_DEFINE_MINI_OBJECT_TYPE (GstDroidCodec, gst_droid_codec);
-
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_codec_debug);
 #define GST_CAT_DEFAULT gst_droid_codec_debug
 
@@ -60,11 +58,29 @@ typedef struct
   GstVideoCodecFrame *frame;
 } GstDroidCodecFrameReleaseData;
 
+struct _GstDroidCodecInfo
+{
+  GstDroidCodecType type;
+  const gchar *mime;
+  const gchar *droid;
+  const gchar *caps;
+
+    gboolean (*validate_structure) (const GstStructure * s);
+  void (*complement_caps) (GstCaps * caps);
+  GstBuffer *(*create_encoder_codec_data) (DroidMediaData * data);
+    gboolean (*process_encoder_data) (DroidMediaData * in,
+      DroidMediaData * out);
+    gboolean (*create_decoder_codec_data) (GstBuffer * data,
+      DroidMediaData * out, gpointer * codec_type_data);
+    gboolean (*process_decoder_data) (GstBuffer * buffer,
+      gpointer codec_type_data, DroidMediaData * out);
+};
+
 /* codecs */
 #define CAPS_FRAGMENT \
   " , width = (int) [1, MAX], height = (int)[1, MAX], framerate = (fraction)[1/MAX, MAX]"
 
-static GstDroidCodec codecs[] = {
+static GstDroidCodecInfo codecs[] = {
   /* decoders */
   {GST_DROID_CODEC_DECODER, "video/mpeg", "video/mp4v-es",
         "video/mpeg, mpegversion=4" CAPS_FRAGMENT,
@@ -109,7 +125,9 @@ gst_droid_codec_get_from_caps (GstCaps * caps, GstDroidCodecType type)
     }
 
     if (!codecs[x].validate_structure || codecs[x].validate_structure (s)) {
-      return &codecs[x];
+      GstDroidCodec *codec = g_slice_new (GstDroidCodec);
+      codec->info = &codecs[x];
+      return codec;
     }
   }
 
@@ -137,25 +155,37 @@ gst_droid_codec_get_all_caps (GstDroidCodecType type)
   return caps;
 }
 
+const gchar *
+gst_droid_codec_get_droid_type (GstDroidCodec * codec)
+{
+  return codec->info->droid;
+}
+
+void
+gst_droid_codec_free (GstDroidCodec * codec)
+{
+  g_slice_free (GstDroidCodec, codec);
+}
+
 void
 gst_droid_codec_complement_caps (GstDroidCodec * codec, GstCaps * caps)
 {
-  if (codec->complement_caps)
-    codec->complement_caps (caps);
+  if (codec->info->complement_caps)
+    codec->info->complement_caps (caps);
 }
 
 GstBuffer *
 gst_droid_codec_create_encoder_codec_data (GstDroidCodec * codec,
     DroidMediaData * data)
 {
-  return codec->create_encoder_codec_data (data);
+  return codec->info->create_encoder_codec_data (data);
 }
 
 gboolean
 gst_droid_codec_create_decoder_codec_data (GstDroidCodec * codec,
     GstBuffer * data, DroidMediaData * out, gpointer * codec_type_data)
 {
-  return codec->create_decoder_codec_data (data, out, codec_type_data);
+  return codec->info->create_decoder_codec_data (data, out, codec_type_data);
 }
 
 gboolean
@@ -174,9 +204,9 @@ gst_droid_codec_prepare_decoder_frame (GstDroidCodec * codec,
    * so we will just copy everything and optimize later if we find issues.
    */
 
-  if (codec->process_decoder_data) {
-    if (!codec->process_decoder_data (frame->input_buffer, codec_type_data,
-            data)) {
+  if (codec->info->process_decoder_data) {
+    if (!codec->info->process_decoder_data (frame->input_buffer,
+            codec_type_data, data)) {
       return FALSE;
     }
   } else {
@@ -202,9 +232,9 @@ gst_droid_codec_prepare_encoded_data (GstDroidCodec * codec,
 {
   GstBuffer *buffer;
 
-  if (codec->process_encoder_data) {
+  if (codec->info->process_encoder_data) {
     DroidMediaData out;
-    if (!codec->process_encoder_data (in, &out)) {
+    if (!codec->info->process_encoder_data (in, &out)) {
       buffer = NULL;
     } else {
       buffer = gst_buffer_new_wrapped (out.data, out.size);
