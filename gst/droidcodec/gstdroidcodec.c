@@ -38,8 +38,20 @@ GST_DEFINE_MINI_OBJECT_TYPE (GstDroidCodec, gst_droid_codec);
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_codec_debug);
 #define GST_CAT_DEFAULT gst_droid_codec_debug
 
-static GstBuffer *mpeg4venc_create_codec_data (DroidMediaData * data);
-static GstBuffer *h264enc_create_codec_data (DroidMediaData * data);
+static GstBuffer *create_mpeg4venc_codec_data (DroidMediaData * data);
+static GstBuffer *create_h264enc_codec_data (DroidMediaData * data);
+static gboolean create_mpeg4vdec_codec_data (GstBuffer * data,
+    DroidMediaData * out, gpointer * codec_type_data);
+static gboolean create_h264dec_codec_data (GstBuffer * data,
+    DroidMediaData * out, gpointer * codec_type_data);
+static gboolean process_h264dec_data (GstBuffer * buffer,
+    gpointer codec_type_data, DroidMediaData * out);
+static gboolean is_mpeg4v (const GstStructure * s);
+static gboolean is_h264_dec (const GstStructure * s);
+static gboolean is_h264_enc (const GstStructure * s);
+static void h264enc_complement (GstCaps * caps);
+static gboolean process_h264enc_data (DroidMediaData * in,
+    DroidMediaData * out);
 
 typedef struct
 {
@@ -153,272 +165,16 @@ gst_droid_codec_consume_frame2 (DroidMediaCodec * codec,
 /* codecs */
 #define CAPS_FRAGMENT " , width = (int) [1, MAX], height = (int)[1, MAX], framerate = (fraction)[1/MAX, MAX]"
 
-static gboolean
-is_mpeg4v (const GstStructure * s)
-{
-  gint val;
-
-  return gst_structure_get_int (s, "mpegversion", &val) && val == 4;
-}
-
-static gboolean
-is_h264_dec (const GstStructure * s)
-{
-  const char *alignment = gst_structure_get_string (s, "alignment");
-  const char *format = gst_structure_get_string (s, "stream-format");
-
-  /* Enforce alignment and format */
-  return alignment && format && !g_strcmp0 (alignment, "au")
-      && !g_strcmp0 (format, "avc");
-}
-
-static gboolean
-is_h264_enc (const GstStructure * s)
-{
-  const char *alignment = gst_structure_get_string (s, "alignment");
-  const char *format = gst_structure_get_string (s, "stream-format");
-
-  /* We can accept caps without alignment or format and will add them later on */
-  if (alignment && g_strcmp0 (alignment, "au")) {
-    return FALSE;
-  }
-
-  if (format && g_strcmp0 (format, "avc")) {
-    return FALSE;
-  }
-
-  return TRUE;
-}
-
-static void
-h264_complement (GstCaps * caps)
-{
-  gst_caps_set_simple (caps, "alignment", G_TYPE_STRING, "au",
-      "stream-format", G_TYPE_STRING, "avc", NULL);
-}
-
-static gboolean
-construct_h264enc_data (DroidMediaData * in, DroidMediaData * out)
-{
-  guint32 size;
-  guint8 *data;
-
-  if (in->size >= 4 && memcmp (in->data, "\x00\x00\x00\x01", 4) == 0) {
-    /* We will replace the first 4 bytes with the NAL size */
-    out->size = in->size;
-    data = in->data + 4;
-  } else {
-    /* We don't have the NAL prefix so we add 4 bytes for the NAL size */
-    out->size = in->size + 4;
-    data = in->data;
-  }
-
-  size = GUINT32_TO_BE (out->size - 4);
-  out->data = g_malloc (out->size);
-  if (!out->data) {
-    return FALSE;
-  }
-
-  memcpy (out->data, &size, sizeof (size));
-  memcpy (out->data + 4, data, out->size - 4);
-
-  return TRUE;
-}
-
-static gboolean
-construct_mpeg4_esds (GstBuffer * data, DroidMediaData * out,
-    gpointer * codec_type_data)
-{
-  /*
-   * If there are things which I hate the most, this function will be among them
-   * http://xhelmboyx.tripod.com/formats/mp4-layout.txt
-   */
-  GstMapInfo info;
-  GstByteWriter *writer = NULL;
-  *codec_type_data = NULL;
-
-  if (!gst_buffer_map (data, &info, GST_MAP_READ)) {
-    GST_ERROR ("failed to map buffer");
-    return FALSE;
-  }
-
-  writer = gst_byte_writer_new_with_size (info.size + 29 - 4, FALSE);
-#if 0                           /* stagefright ESDS parser does not like us when we have the first 4 bytes */
-  gst_byte_writer_put_uint32_be (writer, 0);    /* version and flags */
-#endif
-  gst_byte_writer_put_uint8 (writer, 0x03);     /* ES descriptor type tag */
-  gst_byte_writer_put_uint8 (writer, 23 + info.size);   /* size */
-  gst_byte_writer_put_uint16_be (writer, 0);    /* ES ID */
-  gst_byte_writer_put_uint8 (writer, 0x1f);     /* priority */
-  gst_byte_writer_put_uint8 (writer, 0x04);     /* decoder config descriptor type tag */
-  gst_byte_writer_put_uint8 (writer, 15 + info.size);
-  gst_byte_writer_put_uint8 (writer, 0x20);     /* object type: MPEG4 video */
-  gst_byte_writer_put_uint8 (writer, 0x11);     /* stream type: visual stream */
-
-  /* buffer size db, average bit rate and max bit rate values are taken from stagefright MPEG4Writer */
-  gst_byte_writer_put_uint8 (writer, 0x01);     /* buffer size db: 1/3 */
-  gst_byte_writer_put_uint8 (writer, 0x77);     /* buffer size db: 2/3 */
-  gst_byte_writer_put_uint8 (writer, 0x00);     /* buffer size db: 3/3 */
-  gst_byte_writer_put_uint8 (writer, 0x00);     /* max bit rate: 1/4 */
-  gst_byte_writer_put_uint8 (writer, 0x03);     /* max bit rate: 2/4 */
-  gst_byte_writer_put_uint8 (writer, 0xe8);     /* max bit rate: 3/4 */
-  gst_byte_writer_put_uint8 (writer, 0x00);     /* max bit rate: 4/4 */
-
-  gst_byte_writer_put_uint8 (writer, 0x00);     /* average bit rate: 1/4 */
-  gst_byte_writer_put_uint8 (writer, 0x03);     /* average bit rate: 2/4 */
-  gst_byte_writer_put_uint8 (writer, 0xe8);     /* average bit rate: 3/4 */
-  gst_byte_writer_put_uint8 (writer, 0x00);     /* average bit rate: 4/4 */
-
-  gst_byte_writer_put_uint8 (writer, 0x05);     /* decoder specific descriptor type tag */
-  gst_byte_writer_put_uint8 (writer, info.size);        /* size */
-  gst_byte_writer_put_data (writer, info.data, info.size);      /* codec data */
-
-  gst_byte_writer_put_uint8 (writer, 0x06);     /* SL config descriptor type tag */
-  gst_byte_writer_put_uint8 (writer, 0x01);     /* descriptor type length */
-  gst_byte_writer_put_uint8 (writer, 0x02);     /* SL value */
-
-  out->size = gst_byte_writer_get_size (writer);
-  out->data = gst_byte_writer_free_and_get_data (writer);
-
-  gst_buffer_unmap (data, &info);
-
-  return TRUE;
-}
-
-static gboolean
-construct_h264dec_codec_data (GstBuffer * data, DroidMediaData * out,
-    gpointer * codec_type_data)
-{
-  GstMapInfo info;
-  gboolean ret = FALSE;
-
-  if (!gst_buffer_map (data, &info, GST_MAP_READ)) {
-    GST_ERROR ("failed to map buffer");
-    return FALSE;
-  }
-
-  if (info.size < 7 || info.data[0] != 1) {
-    GST_ERROR ("malformed codec_data");
-    goto out;
-  }
-
-  *codec_type_data = GINT_TO_POINTER (1 + (info.data[4] & 3));
-
-  GST_INFO ("nal prefix length %d", GPOINTER_TO_INT (*codec_type_data));
-
-  out->size = info.size;
-  out->data = g_malloc (info.size);
-  memcpy (out->data, info.data, info.size);
-  ret = TRUE;
-
-out:
-  gst_buffer_unmap (data, &info);
-
-  return ret;
-}
-
-static gboolean
-construct_h264dec_data (GstBuffer * buffer, gpointer codec_type_data,
-    DroidMediaData * out)
-{
-  GstMapInfo info;
-  gboolean ret = FALSE;
-  gint nal_size = GPOINTER_TO_INT (codec_type_data);
-  guint8 *data;
-
-  if (!gst_buffer_map (buffer, &info, GST_MAP_READ)) {
-    GST_ERROR ("failed to map buffer");
-    return FALSE;
-  }
-
-  if (info.size < 4) {
-    GST_ERROR ("malformed data");
-    goto out;
-  }
-
-  switch (nal_size) {
-    case 4:
-      out->size = info.size;
-      out->data = g_malloc (info.size);
-      if (!out->data) {
-        goto out;
-      }
-
-      memcpy (out->data, info.data, info.size);
-
-      data = out->data;
-
-      data[0] = data[1] = data[2] = 0;
-      data[3] = 1;
-      ret = TRUE;
-      goto out;
-
-    case 3:
-      out->size = info.size + 1;
-      out->data = g_malloc (out->size);
-      if (!out->data) {
-        goto out;
-      }
-
-      data = out->data;
-      memcpy (&data[1], info.data, info.size);
-      data[0] = data[1] = data[2] = 0;
-      data[3] = 1;
-      ret = TRUE;
-      goto out;
-
-    case 2:
-      out->size = info.size + 2;
-      out->data = g_malloc (out->size);
-      if (!out->data) {
-        goto out;
-      }
-
-      data = out->data;
-      memcpy (&data[2], info.data, info.size);
-
-      data[0] = data[1] = data[2] = 0;
-      data[3] = 1;
-      ret = TRUE;
-      goto out;
-
-    case 1:
-      out->size = info.size + 3;
-      out->data = g_malloc (out->size);
-      if (!out->data) {
-        goto out;
-      }
-
-      data = out->data;
-      memcpy (&data[3], info.data, info.size);
-
-      data[0] = data[1] = data[2] = 0;
-      data[3] = 1;
-      ret = TRUE;
-      goto out;
-
-    default:
-      GST_ERROR ("unhandled nal prefix size %d", nal_size);
-
-      goto out;
-  }
-
-out:
-  gst_buffer_unmap (buffer, &info);
-
-  return ret;
-}
-
 static GstDroidCodec codecs[] = {
   /* decoders */
   {GST_DROID_CODEC_DECODER, "video/mpeg", "video/mp4v-es",
         "video/mpeg, mpegversion=4" CAPS_FRAGMENT,
-      is_mpeg4v, NULL, NULL, NULL, construct_mpeg4_esds, NULL},
+      is_mpeg4v, NULL, NULL, NULL, create_mpeg4vdec_codec_data, NULL},
 
   {GST_DROID_CODEC_DECODER, "video/x-h264", "video/avc",
         "video/x-h264, stream-format=avc,alignment=au" CAPS_FRAGMENT,
         is_h264_dec, NULL, NULL, NULL,
-      construct_h264dec_codec_data, construct_h264dec_data},
+      create_h264dec_codec_data, process_h264dec_data},
 
   {GST_DROID_CODEC_DECODER, "video/x-h263", "video/3gpp",
         "video/x-h263" CAPS_FRAGMENT, NULL,
@@ -427,12 +183,12 @@ static GstDroidCodec codecs[] = {
   /* encoders */
   {GST_DROID_CODEC_ENCODER, "video/mpeg", "video/mp4v-es",
         "video/mpeg, mpegversion=4, systemstream=false" CAPS_FRAGMENT,
-      is_mpeg4v, NULL, mpeg4venc_create_codec_data, NULL, NULL, NULL},
+      is_mpeg4v, NULL, create_mpeg4venc_codec_data, NULL, NULL, NULL},
 
   {GST_DROID_CODEC_ENCODER, "video/x-h264", "video/avc",
         "video/x-h264, stream-format=avc,alignment=au" CAPS_FRAGMENT,
-        is_h264_enc, h264_complement, h264enc_create_codec_data,
-      construct_h264enc_data, NULL, NULL},
+        is_h264_enc, h264enc_complement, create_h264enc_codec_data,
+      process_h264enc_data, NULL, NULL},
 };
 
 GstDroidCodec *
@@ -483,7 +239,7 @@ gst_droid_codec_get_all_caps (GstDroidCodecType type)
 }
 
 static GstBuffer *
-mpeg4venc_create_codec_data (DroidMediaData * data)
+create_mpeg4venc_codec_data (DroidMediaData * data)
 {
   GstBuffer *codec_data = gst_buffer_new_allocate (NULL, data->size, NULL);
 
@@ -500,7 +256,7 @@ mpeg4venc_create_codec_data (DroidMediaData * data)
 }
 
 static GstBuffer *
-h264enc_create_codec_data (DroidMediaData * data)
+create_h264enc_codec_data (DroidMediaData * data)
 {
   GstH264NalParser *parser = gst_h264_nal_parser_new ();
   gsize offset = 0;
@@ -634,4 +390,260 @@ out:
   }
 
   return codec_data;
+}
+
+static gboolean
+is_mpeg4v (const GstStructure * s)
+{
+  gint val;
+
+  return gst_structure_get_int (s, "mpegversion", &val) && val == 4;
+}
+
+static gboolean
+is_h264_dec (const GstStructure * s)
+{
+  const char *alignment = gst_structure_get_string (s, "alignment");
+  const char *format = gst_structure_get_string (s, "stream-format");
+
+  /* Enforce alignment and format */
+  return alignment && format && !g_strcmp0 (alignment, "au")
+      && !g_strcmp0 (format, "avc");
+}
+
+static gboolean
+is_h264_enc (const GstStructure * s)
+{
+  const char *alignment = gst_structure_get_string (s, "alignment");
+  const char *format = gst_structure_get_string (s, "stream-format");
+
+  /* We can accept caps without alignment or format and will add them later on */
+  if (alignment && g_strcmp0 (alignment, "au")) {
+    return FALSE;
+  }
+
+  if (format && g_strcmp0 (format, "avc")) {
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+static void
+h264enc_complement (GstCaps * caps)
+{
+  gst_caps_set_simple (caps, "alignment", G_TYPE_STRING, "au",
+      "stream-format", G_TYPE_STRING, "avc", NULL);
+}
+
+static gboolean
+create_mpeg4vdec_codec_data (GstBuffer * data, DroidMediaData * out,
+    gpointer * codec_type_data)
+{
+  /*
+   * If there are things which I hate the most, this function will be among them
+   * http://xhelmboyx.tripod.com/formats/mp4-layout.txt
+   */
+  GstMapInfo info;
+  GstByteWriter *writer = NULL;
+  *codec_type_data = NULL;
+
+  if (!gst_buffer_map (data, &info, GST_MAP_READ)) {
+    GST_ERROR ("failed to map buffer");
+    return FALSE;
+  }
+
+  writer = gst_byte_writer_new_with_size (info.size + 29 - 4, FALSE);
+#if 0                           /* stagefright ESDS parser does not like us when we have the first 4 bytes */
+  gst_byte_writer_put_uint32_be (writer, 0);    /* version and flags */
+#endif
+  gst_byte_writer_put_uint8 (writer, 0x03);     /* ES descriptor type tag */
+  gst_byte_writer_put_uint8 (writer, 23 + info.size);   /* size */
+  gst_byte_writer_put_uint16_be (writer, 0);    /* ES ID */
+  gst_byte_writer_put_uint8 (writer, 0x1f);     /* priority */
+  gst_byte_writer_put_uint8 (writer, 0x04);     /* decoder config descriptor type tag */
+  gst_byte_writer_put_uint8 (writer, 15 + info.size);
+  gst_byte_writer_put_uint8 (writer, 0x20);     /* object type: MPEG4 video */
+  gst_byte_writer_put_uint8 (writer, 0x11);     /* stream type: visual stream */
+
+  /* buffer size db, average bit rate and max bit rate values are taken from stagefright MPEG4Writer */
+  gst_byte_writer_put_uint8 (writer, 0x01);     /* buffer size db: 1/3 */
+  gst_byte_writer_put_uint8 (writer, 0x77);     /* buffer size db: 2/3 */
+  gst_byte_writer_put_uint8 (writer, 0x00);     /* buffer size db: 3/3 */
+  gst_byte_writer_put_uint8 (writer, 0x00);     /* max bit rate: 1/4 */
+  gst_byte_writer_put_uint8 (writer, 0x03);     /* max bit rate: 2/4 */
+  gst_byte_writer_put_uint8 (writer, 0xe8);     /* max bit rate: 3/4 */
+  gst_byte_writer_put_uint8 (writer, 0x00);     /* max bit rate: 4/4 */
+
+  gst_byte_writer_put_uint8 (writer, 0x00);     /* average bit rate: 1/4 */
+  gst_byte_writer_put_uint8 (writer, 0x03);     /* average bit rate: 2/4 */
+  gst_byte_writer_put_uint8 (writer, 0xe8);     /* average bit rate: 3/4 */
+  gst_byte_writer_put_uint8 (writer, 0x00);     /* average bit rate: 4/4 */
+
+  gst_byte_writer_put_uint8 (writer, 0x05);     /* decoder specific descriptor type tag */
+  gst_byte_writer_put_uint8 (writer, info.size);        /* size */
+  gst_byte_writer_put_data (writer, info.data, info.size);      /* codec data */
+
+  gst_byte_writer_put_uint8 (writer, 0x06);     /* SL config descriptor type tag */
+  gst_byte_writer_put_uint8 (writer, 0x01);     /* descriptor type length */
+  gst_byte_writer_put_uint8 (writer, 0x02);     /* SL value */
+
+  out->size = gst_byte_writer_get_size (writer);
+  out->data = gst_byte_writer_free_and_get_data (writer);
+
+  gst_buffer_unmap (data, &info);
+
+  return TRUE;
+}
+
+static gboolean
+create_h264dec_codec_data (GstBuffer * data, DroidMediaData * out,
+    gpointer * codec_type_data)
+{
+  GstMapInfo info;
+  gboolean ret = FALSE;
+
+  if (!gst_buffer_map (data, &info, GST_MAP_READ)) {
+    GST_ERROR ("failed to map buffer");
+    return FALSE;
+  }
+
+  if (info.size < 7 || info.data[0] != 1) {
+    GST_ERROR ("malformed codec_data");
+    goto out;
+  }
+
+  *codec_type_data = GINT_TO_POINTER (1 + (info.data[4] & 3));
+
+  GST_INFO ("nal prefix length %d", GPOINTER_TO_INT (*codec_type_data));
+
+  out->size = info.size;
+  out->data = g_malloc (info.size);
+  memcpy (out->data, info.data, info.size);
+  ret = TRUE;
+
+out:
+  gst_buffer_unmap (data, &info);
+
+  return ret;
+}
+
+static gboolean
+process_h264dec_data (GstBuffer * buffer, gpointer codec_type_data,
+    DroidMediaData * out)
+{
+  GstMapInfo info;
+  gboolean ret = FALSE;
+  gint nal_size = GPOINTER_TO_INT (codec_type_data);
+  guint8 *data;
+
+  if (!gst_buffer_map (buffer, &info, GST_MAP_READ)) {
+    GST_ERROR ("failed to map buffer");
+    return FALSE;
+  }
+
+  if (info.size < 4) {
+    GST_ERROR ("malformed data");
+    goto out;
+  }
+
+  switch (nal_size) {
+    case 4:
+      out->size = info.size;
+      out->data = g_malloc (info.size);
+      if (!out->data) {
+        goto out;
+      }
+
+      memcpy (out->data, info.data, info.size);
+
+      data = out->data;
+
+      data[0] = data[1] = data[2] = 0;
+      data[3] = 1;
+      ret = TRUE;
+      goto out;
+
+    case 3:
+      out->size = info.size + 1;
+      out->data = g_malloc (out->size);
+      if (!out->data) {
+        goto out;
+      }
+
+      data = out->data;
+      memcpy (&data[1], info.data, info.size);
+      data[0] = data[1] = data[2] = 0;
+      data[3] = 1;
+      ret = TRUE;
+      goto out;
+
+    case 2:
+      out->size = info.size + 2;
+      out->data = g_malloc (out->size);
+      if (!out->data) {
+        goto out;
+      }
+
+      data = out->data;
+      memcpy (&data[2], info.data, info.size);
+
+      data[0] = data[1] = data[2] = 0;
+      data[3] = 1;
+      ret = TRUE;
+      goto out;
+
+    case 1:
+      out->size = info.size + 3;
+      out->data = g_malloc (out->size);
+      if (!out->data) {
+        goto out;
+      }
+
+      data = out->data;
+      memcpy (&data[3], info.data, info.size);
+
+      data[0] = data[1] = data[2] = 0;
+      data[3] = 1;
+      ret = TRUE;
+      goto out;
+
+    default:
+      GST_ERROR ("unhandled nal prefix size %d", nal_size);
+
+      goto out;
+  }
+
+out:
+  gst_buffer_unmap (buffer, &info);
+
+  return ret;
+}
+
+static gboolean
+process_h264enc_data (DroidMediaData * in, DroidMediaData * out)
+{
+  guint32 size;
+  guint8 *data;
+
+  if (in->size >= 4 && memcmp (in->data, "\x00\x00\x00\x01", 4) == 0) {
+    /* We will replace the first 4 bytes with the NAL size */
+    out->size = in->size;
+    data = in->data + 4;
+  } else {
+    /* We don't have the NAL prefix so we add 4 bytes for the NAL size */
+    out->size = in->size + 4;
+    data = in->data;
+  }
+
+  size = GUINT32_TO_BE (out->size - 4);
+  out->data = g_malloc (out->size);
+  if (!out->data) {
+    return FALSE;
+  }
+
+  memcpy (out->data, &size, sizeof (size));
+  memcpy (out->data + 4, data, out->size - 4);
+
+  return TRUE;
 }
