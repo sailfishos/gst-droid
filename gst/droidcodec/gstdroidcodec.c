@@ -187,7 +187,7 @@ is_h264_enc (const GstStructure * s)
 }
 
 static void
-h264_compliment (GstCaps * caps)
+h264_complement (GstCaps * caps)
 {
   gst_caps_set_simple (caps, "alignment", G_TYPE_STRING, "au",
       "stream-format", G_TYPE_STRING, "avc", NULL);
@@ -575,7 +575,7 @@ static GstDroidCodec codecs[] = {
         NULL, "video/mpeg, mpegversion=4, systemstream=false" CAPS_FRAGMENT,
       construct_normal_codec_data, NULL, NULL, NULL},
   {GST_DROID_CODEC_ENCODER, "video/x-h264", "video/avc",
-        is_h264_enc, h264_compliment,
+        is_h264_enc, h264_complement,
         "video/x-h264, stream-format=avc,alignment=au" CAPS_FRAGMENT,
       construct_h264enc_codec_data, construct_h264enc_data, NULL, NULL},
 };

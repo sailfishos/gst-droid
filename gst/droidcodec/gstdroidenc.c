@@ -283,8 +283,8 @@ gst_droidenc_configure_state (GstDroidEnc * enc, GstCaps * caps)
 
   caps = gst_caps_fixate (caps);
 
-  if (enc->codec_type->compliment) {
-    enc->codec_type->compliment (caps);
+  if (enc->codec_type->complement) {
+    enc->codec_type->complement (caps);
   }
 
   out = gst_video_encoder_set_output_state (GST_VIDEO_ENCODER (enc),

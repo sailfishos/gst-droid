@@ -38,7 +38,7 @@ typedef struct {
   const gchar *mime;
   const gchar *droid;
   gboolean (*verify) (const GstStructure * s);
-  void (*compliment)(GstCaps * caps);
+  void (*complement)(GstCaps * caps);
   const gchar *caps;
   gboolean (*construct_encoder_codec_data) (gpointer data, gsize size, GstBuffer **buffer);
   gboolean (*process_encoder_data) (DroidMediaData *in, DroidMediaData *out);
