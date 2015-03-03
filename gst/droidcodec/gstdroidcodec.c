@@ -1,7 +1,8 @@
 /*
  * gst-droid
  *
- * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2014-2015 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2015 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -598,7 +599,7 @@ gst_droid_codec_get_from_caps (GstCaps * caps, GstDroidCodecType type)
       continue;
     }
 
-    if (!codecs[x].verify || codecs[x].verify (s)) {
+    if (!codecs[x].validate_structure || codecs[x].validate_structure (s)) {
       return &codecs[x];
     }
   }

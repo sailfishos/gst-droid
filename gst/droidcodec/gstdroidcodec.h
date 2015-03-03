@@ -1,7 +1,8 @@
 /*
  * gst-droid
  *
- * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2014-2015 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2015 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -37,12 +38,12 @@ typedef struct {
   GstDroidCodecType type;
   const gchar *mime;
   const gchar *droid;
-  gboolean (*verify) (const GstStructure * s);
-  void (*complement)(GstCaps * caps);
+  gboolean (*validate_structure) (const GstStructure * s);
+  void (*complement_caps)(GstCaps * caps);
   const gchar *caps;
-  gboolean (*construct_encoder_codec_data) (gpointer data, gsize size, GstBuffer **buffer);
+  gboolean (*create_encoder_codec_data) (gpointer data, gsize size, GstBuffer **buffer);
   gboolean (*process_encoder_data) (DroidMediaData *in, DroidMediaData *out);
-  gboolean (*construct_decoder_codec_data) (GstBuffer *data, DroidMediaData *out,
+  gboolean (*create_decoder_codec_data) (GstBuffer *data, DroidMediaData *out,
 					    gpointer *codec_type_data);
   gboolean (*process_decoder_data) (GstBuffer *buffer, gpointer codec_type_data,
 				    DroidMediaData *out);

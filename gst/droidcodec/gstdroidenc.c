@@ -203,11 +203,9 @@ gst_droidenc_data_available (void *data, DroidMediaCodecData * encoded)
   if (encoded->codec_config) {
     GstBuffer *codec_data = NULL;
 
-    g_assert (enc->codec_type->construct_encoder_codec_data);
-
     GST_INFO_OBJECT (enc, "received codec_data");
 
-    if (!enc->codec_type->construct_encoder_codec_data (encoded->data.data,
+    if (!enc->codec_type->create_encoder_codec_data (encoded->data.data,
             encoded->data.size, &codec_data)) {
 
       GST_ELEMENT_ERROR (enc, STREAM, FORMAT, (NULL),
@@ -283,8 +281,8 @@ gst_droidenc_configure_state (GstDroidEnc * enc, GstCaps * caps)
 
   caps = gst_caps_fixate (caps);
 
-  if (enc->codec_type->complement) {
-    enc->codec_type->complement (caps);
+  if (enc->codec_type->complement_caps) {
+    enc->codec_type->complement_caps (caps);
   }
 
   out = gst_video_encoder_set_output_state (GST_VIDEO_ENCODER (enc),

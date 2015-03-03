@@ -69,12 +69,10 @@ gst_droiddec_create_codec (GstDroidDec * dec)
   md.codec_data.size = 0;
 
   if (dec->codec_data) {
-    g_assert (dec->codec_type->construct_decoder_codec_data);
-
-    if (!dec->codec_type->construct_decoder_codec_data (dec->codec_data,
+    if (!dec->codec_type->create_decoder_codec_data (dec->codec_data,
             &md.codec_data, &dec->codec_type_data)) {
       GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
-          ("Failed to construct codec_data."));
+          ("Failed to create codec_data."));
 
       return FALSE;
     }
