@@ -52,118 +52,17 @@ static gboolean is_h264_enc (const GstStructure * s);
 static void h264enc_complement (GstCaps * caps);
 static gboolean process_h264enc_data (DroidMediaData * in,
     DroidMediaData * out);
-
-typedef struct
-{
-  GstBuffer *buffer;
-  GstMapInfo info;
-  GstVideoCodecFrame *frame;
-} DroidBufferCallbackMapInfo;
+static void gst_droid_codec_release_input_frame (void *data);
 
 typedef struct
 {
   gpointer data;
   GstVideoCodecFrame *frame;
-} DroidBufferCallbackMapInfo2;
-
-static void
-gst_droid_codec_release_buffer (void *data)
-{
-  DroidBufferCallbackMapInfo *info = (DroidBufferCallbackMapInfo *) data;
-
-  GST_DEBUG ("release buffer");
-  gst_buffer_unmap (info->buffer, &info->info);
-  gst_buffer_unref (info->buffer);
-
-  /* We need to release the input buffer */
-  gst_buffer_unref (info->frame->input_buffer);
-  info->frame->input_buffer = NULL;
-
-  gst_video_codec_frame_unref (info->frame);
-  g_slice_free (DroidBufferCallbackMapInfo, info);
-}
-
-static void
-gst_droid_codec_release_buffer2 (void *data)
-{
-  DroidBufferCallbackMapInfo2 *info = (DroidBufferCallbackMapInfo2 *) data;
-
-  GST_DEBUG ("release buffer");
-
-  gst_video_codec_frame_unref (info->frame);
-  g_free (info->data);
-
-  g_slice_free (DroidBufferCallbackMapInfo2, info);
-}
-
-gboolean
-gst_droid_codec_consume_frame (DroidMediaCodec * codec,
-    GstVideoCodecFrame * frame, GstClockTime ts)
-{
-  DroidMediaCodecData data;
-  GstMapInfo info;
-  DroidMediaBufferCallbacks cb;
-  DroidBufferCallbackMapInfo *buffer_data;
-
-  GST_DEBUG ("consume frame");
-
-  data.sync = GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame) ? true : false;
-  data.ts = GST_TIME_AS_USECONDS (ts);
-
-  if (!gst_buffer_map (frame->input_buffer, &info, GST_MAP_READ)) {
-    GST_ERROR ("failed to map buffer");
-    return FALSE;
-  }
-
-  data.data.size = info.size;
-  data.data.data = info.data;
-
-  GST_LOG ("Consuming frame of size %d", data.data.size);
-
-  buffer_data = g_slice_new (DroidBufferCallbackMapInfo);
-
-  cb.unref = gst_droid_codec_release_buffer;
-  cb.data = buffer_data;
-
-  buffer_data->buffer = gst_buffer_ref (frame->input_buffer);
-  buffer_data->info = info;
-  buffer_data->frame = frame;   /* We have a ref already */
-
-  droid_media_codec_queue (codec, &data, &cb);
-
-  GST_DEBUG ("frame consumed");
-
-  return TRUE;
-}
-
-gboolean
-gst_droid_codec_consume_frame2 (DroidMediaCodec * codec,
-    GstVideoCodecFrame * frame, DroidMediaCodecData * data)
-{
-  DroidMediaBufferCallbacks cb;
-  DroidBufferCallbackMapInfo2 *buffer_data;
-
-  GST_DEBUG ("consume frame");
-
-  GST_LOG ("Consuming frame of size %d", data->data.size);
-
-  buffer_data = g_slice_new (DroidBufferCallbackMapInfo2);
-
-  cb.unref = gst_droid_codec_release_buffer2;
-  cb.data = buffer_data;
-
-  buffer_data->data = data->data.data;
-  buffer_data->frame = frame;   /* We have a ref already */
-
-  droid_media_codec_queue (codec, data, &cb);
-
-  GST_DEBUG ("frame consumed");
-
-  return TRUE;
-}
+} GstDroidCodecFrameReleaseData;
 
 /* codecs */
-#define CAPS_FRAGMENT " , width = (int) [1, MAX], height = (int)[1, MAX], framerate = (fraction)[1/MAX, MAX]"
+#define CAPS_FRAGMENT \
+  " , width = (int) [1, MAX], height = (int)[1, MAX], framerate = (fraction)[1/MAX, MAX]"
 
 static GstDroidCodec codecs[] = {
   /* decoders */
@@ -267,18 +166,11 @@ gst_droid_codec_create_decoder_codec_data (GstDroidCodec * codec,
 }
 
 gboolean
-gst_droid_codec_process_decoder_data (GstDroidCodec * codec, GstBuffer * buffer,
-    gpointer codec_type_data, DroidMediaData * out)
-{
-  return codec->process_decoder_data (buffer, codec_type_data, out);
-}
-
-gboolean
 gst_droid_codec_prepare_decoder_frame (GstDroidCodec * codec,
     GstVideoCodecFrame * frame, DroidMediaData * data,
     DroidMediaBufferCallbacks * cb, gpointer codec_type_data)
 {
-  DroidBufferCallbackMapInfo2 *release_data;
+  GstDroidCodecFrameReleaseData *release_data;
 
   /*
    * We have multiple cases.
@@ -300,12 +192,12 @@ gst_droid_codec_prepare_decoder_frame (GstDroidCodec * codec,
     gst_buffer_extract (frame->input_buffer, 0, data->data, data->size);
   }
 
-  release_data = g_slice_new (DroidBufferCallbackMapInfo2);
+  release_data = g_slice_new (GstDroidCodecFrameReleaseData);
 
   release_data->data = data->data;
   release_data->frame = gst_video_codec_frame_ref (frame);
 
-  cb->unref = gst_droid_codec_release_buffer2;
+  cb->unref = gst_droid_codec_release_input_frame;
   cb->data = release_data;
 
   return TRUE;
@@ -719,4 +611,15 @@ process_h264enc_data (DroidMediaData * in, DroidMediaData * out)
   memcpy (out->data + 4, data, out->size - 4);
 
   return TRUE;
+}
+
+static void
+gst_droid_codec_release_input_frame (void *data)
+{
+  GstDroidCodecFrameReleaseData *info = (GstDroidCodecFrameReleaseData *) data;
+
+  gst_video_codec_frame_unref (info->frame);
+  g_free (info->data);
+
+  g_slice_free (GstDroidCodecFrameReleaseData, info);
 }
