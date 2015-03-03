@@ -303,7 +303,7 @@ gst_droid_codec_prepare_decoder_frame (GstDroidCodec * codec,
   release_data = g_slice_new (DroidBufferCallbackMapInfo2);
 
   release_data->data = data->data;
-  release_data->frame = frame;
+  release_data->frame = gst_video_codec_frame_ref (frame);
 
   cb->unref = gst_droid_codec_release_buffer2;
   cb->data = release_data;

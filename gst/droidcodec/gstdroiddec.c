@@ -208,6 +208,9 @@ gst_droiddec_frame_available (void *user)
 
   flow_ret = gst_video_decoder_finish_frame (GST_VIDEO_DECODER (dec), frame);
 
+  /* we still have a ref */
+  gst_video_codec_frame_unref (frame);
+
   if (flow_ret == GST_FLOW_OK || flow_ret == GST_FLOW_FLUSHING) {
     goto out;
   } else if (flow_ret == GST_FLOW_EOS) {
