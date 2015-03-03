@@ -205,17 +205,20 @@ gst_droidenc_data_available (void *data, DroidMediaCodecData * encoded)
 
     GST_INFO_OBJECT (enc, "received codec_data");
 
-    if (!enc->codec_type->create_encoder_codec_data (encoded->data.data,
-            encoded->data.size, &codec_data)) {
+    codec_data = enc->codec_type->create_encoder_codec_data (&encoded->data);
+
+    if (!codec_data) {
+      enc->downstream_flow_ret = GST_FLOW_ERROR;
+
+      GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
 
       GST_ELEMENT_ERROR (enc, STREAM, FORMAT, (NULL),
           ("Failed to construct codec_data. Expect corrupted stream"));
+
+      return;
     }
 
-    if (codec_data) {
-      /* encoder is allowed to return a NULL codec_data */
-      gst_buffer_replace (&enc->out_state->codec_data, codec_data);
-    }
+    gst_buffer_replace (&enc->out_state->codec_data, codec_data);
 
     GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
     return;

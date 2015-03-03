@@ -41,10 +41,10 @@ typedef struct {
   gboolean (*validate_structure) (const GstStructure * s);
   void (*complement_caps)(GstCaps * caps);
   const gchar *caps;
-  gboolean (*create_encoder_codec_data) (gpointer data, gsize size, GstBuffer **buffer);
+  GstBuffer *(*create_encoder_codec_data) (DroidMediaData *data);
   gboolean (*process_encoder_data) (DroidMediaData *in, DroidMediaData *out);
   gboolean (*create_decoder_codec_data) (GstBuffer *data, DroidMediaData *out,
-					    gpointer *codec_type_data);
+					 gpointer *codec_type_data);
   gboolean (*process_decoder_data) (GstBuffer *buffer, gpointer codec_type_data,
 				    DroidMediaData *out);
 } GstDroidCodec;

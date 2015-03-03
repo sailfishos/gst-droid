@@ -38,6 +38,9 @@ GST_DEFINE_MINI_OBJECT_TYPE (GstDroidCodec, gst_droid_codec);
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_codec_debug);
 #define GST_CAT_DEFAULT gst_droid_codec_debug
 
+static GstBuffer *mpeg4venc_create_codec_data (DroidMediaData * data);
+static GstBuffer *h264enc_create_codec_data (DroidMediaData * data);
+
 typedef struct
 {
   GstBuffer *buffer;
@@ -192,159 +195,6 @@ h264_complement (GstCaps * caps)
 {
   gst_caps_set_simple (caps, "alignment", G_TYPE_STRING, "au",
       "stream-format", G_TYPE_STRING, "avc", NULL);
-}
-
-static gboolean
-construct_normal_codec_data (gpointer data, gsize size, GstBuffer ** buffer)
-{
-  GstBuffer *codec_data = gst_buffer_new_allocate (NULL, size, NULL);
-
-  gst_buffer_fill (codec_data, 0, data, size);
-
-  GST_BUFFER_OFFSET (codec_data) = 0;
-  GST_BUFFER_OFFSET_END (codec_data) = 0;
-  GST_BUFFER_PTS (codec_data) = GST_CLOCK_TIME_NONE;
-  GST_BUFFER_DTS (codec_data) = GST_CLOCK_TIME_NONE;
-  GST_BUFFER_DURATION (codec_data) = GST_CLOCK_TIME_NONE;
-  GST_BUFFER_FLAG_SET (codec_data, GST_BUFFER_FLAG_HEADER);
-
-  *buffer = codec_data;
-
-  return TRUE;
-}
-
-static gboolean
-construct_h264enc_codec_data (gpointer data, gsize size, GstBuffer ** buffer)
-{
-  GstH264NalParser *parser = gst_h264_nal_parser_new ();
-  gsize offset = 0;
-  gboolean ret = FALSE;
-  GSList *sps = NULL, *pps = NULL;
-  gsize sps_size = 0, pps_size = 0;
-  gint num_sps = 0, num_pps = 0;
-  GstByteWriter *writer = NULL;
-  guint8 profile_idc = 0, profile_comp = 0, level_idc = 0;
-  gboolean idc_found = FALSE;
-  GstH264NalUnit nal;
-  GstH264ParserResult res;
-  int x;
-
-  res = gst_h264_parser_identify_nalu (parser, data, offset, size, &nal);
-
-  while (res == GST_H264_PARSER_OK || res == GST_H264_PARSER_NO_NAL_END) {
-    GstBuffer *buffer = gst_buffer_new_allocate (NULL, nal.size, NULL);
-    gst_buffer_fill (buffer, 0, nal.data + nal.offset, nal.size);
-
-    offset += (nal.size + nal.offset);
-
-    if (nal.type == GST_H264_NAL_SPS) {
-      if (nal.size >= 4 && !idc_found) {
-        idc_found = TRUE;
-
-        profile_idc = nal.data[1];
-        profile_comp = nal.data[2];
-        level_idc = nal.data[3];
-      } else if (nal.size >= 4) {
-        if (profile_idc != nal.data[1] || profile_comp != nal.data[2] ||
-            level_idc != nal.data[3]) {
-          GST_ERROR ("Inconsistency in SPS");
-          goto out;
-        }
-      } else {
-        GST_ERROR ("malformed SPS");
-        goto out;
-      }
-
-      GST_MEMDUMP ("Found SPS", nal.data + nal.offset, nal.size);
-
-      sps = g_slist_append (sps, buffer);
-      sps_size += (nal.size + 2);
-    } else if (nal.type == GST_H264_NAL_PPS) {
-      GST_MEMDUMP ("Found PPS", nal.data + nal.offset, nal.size);
-      pps = g_slist_append (pps, buffer);
-      pps_size += (nal.size + 2);
-    } else {
-      GST_LOG ("NAL is neither SPS nor PPS");
-      gst_buffer_unref (buffer);
-    }
-
-    if (gst_h264_parser_parse_nal (parser, &nal) != GST_H264_PARSER_OK) {
-      GST_ERROR ("malformed NAL");
-      goto out;
-    }
-
-    res = gst_h264_parser_identify_nalu (parser, data, offset, size, &nal);
-  }
-
-  if (G_UNLIKELY (!idc_found)) {
-    GST_ERROR ("missing codec parameters");
-    goto out;
-  }
-
-  num_sps = g_slist_length (sps);
-  if (G_UNLIKELY (num_sps < 1 || num_sps >= GST_H264_MAX_SPS_COUNT)) {
-    GST_ERROR ("No SPS found");
-    goto out;
-  }
-
-  num_pps = g_slist_length (pps);
-  if (G_UNLIKELY (num_pps < 1 || num_pps >= GST_H264_MAX_PPS_COUNT)) {
-    GST_ERROR ("No PPS found");
-    goto out;
-  }
-
-  GST_INFO ("SPS found: %d, PPS found: %d", num_sps, num_pps);
-
-  writer = gst_byte_writer_new_with_size (sps_size + pps_size + 7, FALSE);
-  gst_byte_writer_put_uint8 (writer, 1);        /* AVC decoder configuration version 1 */
-  gst_byte_writer_put_uint8 (writer, profile_idc);      /* profile idc */
-  gst_byte_writer_put_uint8 (writer, profile_comp);     /* profile compatibility */
-  gst_byte_writer_put_uint8 (writer, level_idc);        /* level idc */
-  gst_byte_writer_put_uint8 (writer, (0xfc | (4 - 1))); /* nal length size - 1 */
-  gst_byte_writer_put_uint8 (writer, 0xe0 | num_sps);   /* number of sps */
-
-  /* SPS */
-  for (x = 0; x < num_sps; x++) {
-    GstBuffer *buf = g_slist_nth_data (sps, x);
-    GstMapInfo info;
-    gst_buffer_map (buf, &info, GST_MAP_READ);
-    gst_byte_writer_put_uint8 (writer, info.size >> 8);
-    gst_byte_writer_put_uint8 (writer, info.size & 0xff);
-    gst_byte_writer_put_data (writer, info.data, info.size);
-    gst_buffer_unmap (buf, &info);
-  }
-
-  gst_byte_writer_put_uint8 (writer, num_pps);  /* number of pps */
-
-  /* PPS */
-  for (x = 0; x < num_pps; x++) {
-    GstBuffer *buf = g_slist_nth_data (pps, x);
-    GstMapInfo info;
-    gst_buffer_map (buf, &info, GST_MAP_READ);
-    gst_byte_writer_put_uint8 (writer, info.size >> 8);
-    gst_byte_writer_put_uint8 (writer, info.size & 0xff);
-    gst_byte_writer_put_data (writer, info.data, info.size);
-    gst_buffer_unmap (buf, &info);
-  }
-
-  *buffer = gst_byte_writer_free_and_get_buffer (writer);
-  writer = NULL;
-  ret = TRUE;
-
-out:
-  if (sps) {
-    g_slist_free_full (sps, (GDestroyNotify) gst_buffer_unref);
-  }
-
-  if (pps) {
-    g_slist_free_full (pps, (GDestroyNotify) gst_buffer_unref);
-  }
-
-  if (parser) {
-    gst_h264_nal_parser_free (parser);
-  }
-
-  return ret;
 }
 
 static gboolean
@@ -574,11 +424,11 @@ static GstDroidCodec codecs[] = {
   /* encoders */
   {GST_DROID_CODEC_ENCODER, "video/mpeg", "video/mp4v-es", is_mpeg4v,
         NULL, "video/mpeg, mpegversion=4, systemstream=false" CAPS_FRAGMENT,
-      construct_normal_codec_data, NULL, NULL, NULL},
+      mpeg4venc_create_codec_data, NULL, NULL, NULL},
   {GST_DROID_CODEC_ENCODER, "video/x-h264", "video/avc",
         is_h264_enc, h264_complement,
         "video/x-h264, stream-format=avc,alignment=au" CAPS_FRAGMENT,
-      construct_h264enc_codec_data, construct_h264enc_data, NULL, NULL},
+      h264enc_create_codec_data, construct_h264enc_data, NULL, NULL},
 };
 
 GstDroidCodec *
@@ -626,4 +476,158 @@ gst_droid_codec_get_all_caps (GstDroidCodecType type)
   GST_INFO ("caps %" GST_PTR_FORMAT, caps);
 
   return caps;
+}
+
+static GstBuffer *
+mpeg4venc_create_codec_data (DroidMediaData * data)
+{
+  GstBuffer *codec_data = gst_buffer_new_allocate (NULL, data->size, NULL);
+
+  gst_buffer_fill (codec_data, 0, data->data, data->size);
+
+  GST_BUFFER_OFFSET (codec_data) = 0;
+  GST_BUFFER_OFFSET_END (codec_data) = 0;
+  GST_BUFFER_PTS (codec_data) = GST_CLOCK_TIME_NONE;
+  GST_BUFFER_DTS (codec_data) = GST_CLOCK_TIME_NONE;
+  GST_BUFFER_DURATION (codec_data) = GST_CLOCK_TIME_NONE;
+  GST_BUFFER_FLAG_SET (codec_data, GST_BUFFER_FLAG_HEADER);
+
+  return codec_data;
+}
+
+static GstBuffer *
+h264enc_create_codec_data (DroidMediaData * data)
+{
+  GstH264NalParser *parser = gst_h264_nal_parser_new ();
+  gsize offset = 0;
+  GSList *sps = NULL, *pps = NULL;
+  gsize sps_size = 0, pps_size = 0;
+  gint num_sps = 0, num_pps = 0;
+  GstByteWriter *writer = NULL;
+  guint8 profile_idc = 0, profile_comp = 0, level_idc = 0;
+  gboolean idc_found = FALSE;
+  GstBuffer *codec_data = NULL;
+  GstH264NalUnit nal;
+  GstH264ParserResult res;
+  int x;
+
+  res =
+      gst_h264_parser_identify_nalu (parser, data->data, offset, data->size,
+      &nal);
+
+  while (res == GST_H264_PARSER_OK || res == GST_H264_PARSER_NO_NAL_END) {
+    GstBuffer *buffer = gst_buffer_new_allocate (NULL, nal.size, NULL);
+    gst_buffer_fill (buffer, 0, nal.data + nal.offset, nal.size);
+
+    offset += (nal.size + nal.offset);
+
+    if (nal.type == GST_H264_NAL_SPS) {
+      if (nal.size >= 4 && !idc_found) {
+        idc_found = TRUE;
+
+        profile_idc = nal.data[1];
+        profile_comp = nal.data[2];
+        level_idc = nal.data[3];
+      } else if (nal.size >= 4) {
+        if (profile_idc != nal.data[1] || profile_comp != nal.data[2] ||
+            level_idc != nal.data[3]) {
+          GST_ERROR ("Inconsistency in SPS");
+          goto out;
+        }
+      } else {
+        GST_ERROR ("malformed SPS");
+        goto out;
+      }
+
+      GST_MEMDUMP ("Found SPS", nal.data + nal.offset, nal.size);
+
+      sps = g_slist_append (sps, buffer);
+      sps_size += (nal.size + 2);
+    } else if (nal.type == GST_H264_NAL_PPS) {
+      GST_MEMDUMP ("Found PPS", nal.data + nal.offset, nal.size);
+      pps = g_slist_append (pps, buffer);
+      pps_size += (nal.size + 2);
+    } else {
+      GST_LOG ("NAL is neither SPS nor PPS");
+      gst_buffer_unref (buffer);
+    }
+
+    if (gst_h264_parser_parse_nal (parser, &nal) != GST_H264_PARSER_OK) {
+      GST_ERROR ("malformed NAL");
+      goto out;
+    }
+
+    res =
+        gst_h264_parser_identify_nalu (parser, data->data, offset, data->size,
+        &nal);
+  }
+
+  if (G_UNLIKELY (!idc_found)) {
+    GST_ERROR ("missing codec parameters");
+    goto out;
+  }
+
+  num_sps = g_slist_length (sps);
+  if (G_UNLIKELY (num_sps < 1 || num_sps >= GST_H264_MAX_SPS_COUNT)) {
+    GST_ERROR ("No SPS found");
+    goto out;
+  }
+
+  num_pps = g_slist_length (pps);
+  if (G_UNLIKELY (num_pps < 1 || num_pps >= GST_H264_MAX_PPS_COUNT)) {
+    GST_ERROR ("No PPS found");
+    goto out;
+  }
+
+  GST_INFO ("SPS found: %d, PPS found: %d", num_sps, num_pps);
+
+  writer = gst_byte_writer_new_with_size (sps_size + pps_size + 7, FALSE);
+  gst_byte_writer_put_uint8 (writer, 1);        /* AVC decoder configuration version 1 */
+  gst_byte_writer_put_uint8 (writer, profile_idc);      /* profile idc */
+  gst_byte_writer_put_uint8 (writer, profile_comp);     /* profile compatibility */
+  gst_byte_writer_put_uint8 (writer, level_idc);        /* level idc */
+  gst_byte_writer_put_uint8 (writer, (0xfc | (4 - 1))); /* nal length size - 1 */
+  gst_byte_writer_put_uint8 (writer, 0xe0 | num_sps);   /* number of sps */
+
+  /* SPS */
+  for (x = 0; x < num_sps; x++) {
+    GstBuffer *buf = g_slist_nth_data (sps, x);
+    GstMapInfo info;
+    gst_buffer_map (buf, &info, GST_MAP_READ);
+    gst_byte_writer_put_uint8 (writer, info.size >> 8);
+    gst_byte_writer_put_uint8 (writer, info.size & 0xff);
+    gst_byte_writer_put_data (writer, info.data, info.size);
+    gst_buffer_unmap (buf, &info);
+  }
+
+  gst_byte_writer_put_uint8 (writer, num_pps);  /* number of pps */
+
+  /* PPS */
+  for (x = 0; x < num_pps; x++) {
+    GstBuffer *buf = g_slist_nth_data (pps, x);
+    GstMapInfo info;
+    gst_buffer_map (buf, &info, GST_MAP_READ);
+    gst_byte_writer_put_uint8 (writer, info.size >> 8);
+    gst_byte_writer_put_uint8 (writer, info.size & 0xff);
+    gst_byte_writer_put_data (writer, info.data, info.size);
+    gst_buffer_unmap (buf, &info);
+  }
+
+  codec_data = gst_byte_writer_free_and_get_buffer (writer);
+  writer = NULL;
+
+out:
+  if (sps) {
+    g_slist_free_full (sps, (GDestroyNotify) gst_buffer_unref);
+  }
+
+  if (pps) {
+    g_slist_free_full (pps, (GDestroyNotify) gst_buffer_unref);
+  }
+
+  if (parser) {
+    gst_h264_nal_parser_free (parser);
+  }
+
+  return codec_data;
 }
