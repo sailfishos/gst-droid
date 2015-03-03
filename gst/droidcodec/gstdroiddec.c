@@ -521,6 +521,7 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   GstDroidDec *dec = GST_DROIDDEC (decoder);
   GstFlowReturn ret;
   DroidMediaCodecData data;
+  DroidMediaBufferCallbacks cb;
 
   GST_DEBUG_OBJECT (dec, "handle frame");
 
@@ -556,18 +557,11 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     dec->dirty = FALSE;
   }
 
-  if (dec->codec_type->process_decoder_data) {
-    if (!gst_droid_codec_process_decoder_data (dec->codec_type,
-            frame->input_buffer, dec->codec_type_data, &data.data)) {
-      GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
-          ("Failed to process data"));
-      ret = GST_FLOW_ERROR;
-      goto error;
-    }
-  } else {
-    data.data.size = gst_buffer_get_size (frame->input_buffer);
-    data.data.data = g_malloc (data.data.size);
-    gst_buffer_extract (frame->input_buffer, 0, data.data.data, data.data.size);
+  if (!gst_droid_codec_prepare_decoder_frame (dec->codec_type, frame,
+          &data.data, &cb, dec->codec_type_data)) {
+    GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
+        ("Failed to prepare data for decoding"));
+    goto error;
   }
 
   data.ts = GST_TIME_AS_USECONDS (frame->dts);
@@ -580,14 +574,8 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
    * to call get_oldest_frame() which acquires the stream lock the base class
    * is holding before calling us
    */
-
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
-  if (!gst_droid_codec_consume_frame2 (dec->codec, frame, &data)) {
-    GST_VIDEO_DECODER_STREAM_LOCK (decoder);
-    ret = GST_FLOW_ERROR;
-    g_free (data.data.data);
-    goto error;
-  }
+  droid_media_codec_queue (dec->codec, &data, &cb);
   GST_VIDEO_DECODER_STREAM_LOCK (decoder);
 
   /* from now on decoder owns a frame reference so we cannot use the out label otherwise

@@ -64,6 +64,11 @@ gboolean gst_droid_codec_process_decoder_data (GstDroidCodec *codec, GstBuffer *
 					       gpointer codec_type_data,
 					       DroidMediaData *out);
 
+gboolean gst_droid_codec_prepare_decoder_frame (GstDroidCodec * codec, GstVideoCodecFrame * frame,
+						DroidMediaData * data,
+						DroidMediaBufferCallbacks *cb,
+						gpointer codec_type_data);
+
 gboolean gst_droid_codec_consume_frame (DroidMediaCodec * codec, GstVideoCodecFrame * frame,
 					GstClockTime ts);
 gboolean gst_droid_codec_consume_frame2 (DroidMediaCodec * codec, GstVideoCodecFrame * frame,

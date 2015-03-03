@@ -273,6 +273,44 @@ gst_droid_codec_process_decoder_data (GstDroidCodec * codec, GstBuffer * buffer,
   return codec->process_decoder_data (buffer, codec_type_data, out);
 }
 
+gboolean
+gst_droid_codec_prepare_decoder_frame (GstDroidCodec * codec,
+    GstVideoCodecFrame * frame, DroidMediaData * data,
+    DroidMediaBufferCallbacks * cb, gpointer codec_type_data)
+{
+  DroidBufferCallbackMapInfo2 *release_data;
+
+  /*
+   * We have multiple cases.
+   * H264 nal prefix size 4 -> map the buffer writable, fix up and proceed
+   * H264 nal prefix size != 4 -> copy data and fix up.
+   * The rest -> map buffer read only and proceed
+   * However as I do not believe that the memcpy() is that expensive
+   * so we will just copy everything and optimize later if we find issues.
+   */
+
+  if (codec->process_decoder_data) {
+    if (!codec->process_decoder_data (frame->input_buffer, codec_type_data,
+            data)) {
+      return FALSE;
+    }
+  } else {
+    data->size = gst_buffer_get_size (frame->input_buffer);
+    data->data = g_malloc (data->size);
+    gst_buffer_extract (frame->input_buffer, 0, data->data, data->size);
+  }
+
+  release_data = g_slice_new (DroidBufferCallbackMapInfo2);
+
+  release_data->data = data->data;
+  release_data->frame = frame;
+
+  cb->unref = gst_droid_codec_release_buffer2;
+  cb->data = release_data;
+
+  return TRUE;
+}
+
 static GstBuffer *
 create_mpeg4venc_codec_data (DroidMediaData * data)
 {
