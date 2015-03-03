@@ -238,6 +238,41 @@ gst_droid_codec_get_all_caps (GstDroidCodecType type)
   return caps;
 }
 
+void
+gst_droid_codec_complement_caps (GstDroidCodec * codec, GstCaps * caps)
+{
+  if (codec->complement_caps)
+    codec->complement_caps (caps);
+}
+
+GstBuffer *
+gst_droid_codec_create_encoder_codec_data (GstDroidCodec * codec,
+    DroidMediaData * data)
+{
+  return codec->create_encoder_codec_data (data);
+}
+
+gboolean
+gst_droid_codec_process_encoder_data (GstDroidCodec * codec,
+    DroidMediaData * in, DroidMediaData * out)
+{
+  return codec->process_encoder_data (in, out);
+}
+
+gboolean
+gst_droid_codec_create_decoder_codec_data (GstDroidCodec * codec,
+    GstBuffer * data, DroidMediaData * out, gpointer * codec_type_data)
+{
+  return codec->create_decoder_codec_data (data, out, codec_type_data);
+}
+
+gboolean
+gst_droid_codec_process_decoder_data (GstDroidCodec * codec, GstBuffer * buffer,
+    gpointer codec_type_data, DroidMediaData * out)
+{
+  return codec->process_decoder_data (buffer, codec_type_data, out);
+}
+
 static GstBuffer *
 create_mpeg4venc_codec_data (DroidMediaData * data)
 {

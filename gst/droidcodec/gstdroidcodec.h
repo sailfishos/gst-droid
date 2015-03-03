@@ -39,6 +39,7 @@ typedef struct {
   const gchar *mime;
   const gchar *droid;
   const gchar *caps;
+
   gboolean (*validate_structure) (const GstStructure * s);
   void (*complement_caps)(GstCaps * caps);
   GstBuffer *(*create_encoder_codec_data) (DroidMediaData *data);
@@ -51,6 +52,18 @@ typedef struct {
 
 GstDroidCodec *gst_droid_codec_get_from_caps (GstCaps * caps, GstDroidCodecType type);
 GstCaps *gst_droid_codec_get_all_caps (GstDroidCodecType type);
+
+void gst_droid_codec_complement_caps (GstDroidCodec *codec, GstCaps * caps);
+GstBuffer *gst_droid_codec_create_encoder_codec_data (GstDroidCodec *codec, DroidMediaData *data);
+gboolean gst_droid_codec_process_encoder_data (GstDroidCodec *codec, DroidMediaData *in,
+					       DroidMediaData *out);
+gboolean gst_droid_codec_create_decoder_codec_data (GstDroidCodec *codec, GstBuffer *data,
+						    DroidMediaData *out,
+						    gpointer *codec_type_data);
+gboolean gst_droid_codec_process_decoder_data (GstDroidCodec *codec, GstBuffer *buffer,
+					       gpointer codec_type_data,
+					       DroidMediaData *out);
+
 gboolean gst_droid_codec_consume_frame (DroidMediaCodec * codec, GstVideoCodecFrame * frame,
 					GstClockTime ts);
 gboolean gst_droid_codec_consume_frame2 (DroidMediaCodec * codec, GstVideoCodecFrame * frame,

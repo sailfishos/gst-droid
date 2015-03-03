@@ -69,8 +69,8 @@ gst_droiddec_create_codec (GstDroidDec * dec)
   md.codec_data.size = 0;
 
   if (dec->codec_data) {
-    if (!dec->codec_type->create_decoder_codec_data (dec->codec_data,
-            &md.codec_data, &dec->codec_type_data)) {
+    if (!gst_droid_codec_create_decoder_codec_data (dec->codec_type,
+            dec->codec_data, &md.codec_data, &dec->codec_type_data)) {
       GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
           ("Failed to create codec_data."));
 
@@ -557,8 +557,8 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
   }
 
   if (dec->codec_type->process_decoder_data) {
-    if (!dec->codec_type->process_decoder_data (frame->input_buffer,
-            dec->codec_type_data, &data.data)) {
+    if (!gst_droid_codec_process_decoder_data (dec->codec_type,
+            frame->input_buffer, dec->codec_type_data, &data.data)) {
       GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
           ("Failed to process data"));
       ret = GST_FLOW_ERROR;
