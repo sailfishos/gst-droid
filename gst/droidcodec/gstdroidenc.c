@@ -50,12 +50,36 @@ enum
 
 #define GST_DROID_ENC_TARGET_BITRATE_DEFAULT 192000
 
+typedef struct
+{
+  GstMapInfo info;
+  GstVideoCodecFrame *frame;
+} GstDroidEncFrameReleaseData;
+
 static GstVideoCodecState *gst_droidenc_configure_state (GstDroidEnc * enc,
     GstCaps * caps);
 static void gst_droidenc_signal_eos (void *data);
 static void gst_droidenc_error (void *data, int err);
 static void
 gst_droidenc_data_available (void *data, DroidMediaCodecData * encoded);
+static void gst_droidenc_release_input_frame (void *data);
+
+static void
+gst_droidenc_release_input_frame (void *data)
+{
+  GstDroidEncFrameReleaseData *release_data =
+      (GstDroidEncFrameReleaseData *) data;
+
+  gst_buffer_unmap (release_data->frame->input_buffer, &release_data->info);
+
+  /* We need to release the input buffer */
+  gst_buffer_unref (release_data->frame->input_buffer);
+  release_data->frame->input_buffer = NULL;
+
+  gst_video_codec_frame_unref (release_data->frame);
+
+  g_slice_free (GstDroidEncFrameReleaseData, release_data);
+}
 
 static gboolean
 gst_droidenc_negotiate_src_caps (GstDroidEnc * enc)
@@ -263,6 +287,8 @@ gst_droidenc_data_available (void *data, DroidMediaCodecData * encoded)
   }
 
   flow_ret = gst_video_encoder_finish_frame (GST_VIDEO_ENCODER (enc), frame);
+  /* release our ref */
+  gst_video_codec_frame_unref (frame);
 
   if (flow_ret == GST_FLOW_OK || flow_ret == GST_FLOW_FLUSHING) {
     goto out;
@@ -489,6 +515,10 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
 {
   GstDroidEnc *enc = GST_DROIDENC (encoder);
   GstFlowReturn ret = GST_FLOW_ERROR;
+  DroidMediaCodecData data;
+  GstMapInfo info;
+  DroidMediaBufferCallbacks cb;
+  GstDroidEncFrameReleaseData *release_data;
 
   GST_DEBUG_OBJECT (enc, "handle frame");
 
@@ -513,6 +543,19 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
   }
   g_mutex_unlock (&enc->eos_lock);
 
+  gst_buffer_map (frame->input_buffer, &info, GST_MAP_READ);
+  data.data.size = info.size;
+  data.data.data = info.data;
+  data.sync = false;
+  data.ts = GST_TIME_AS_USECONDS (frame->pts);
+
+  release_data = g_slice_new (GstDroidEncFrameReleaseData);
+  release_data->info = info;
+  release_data->frame = gst_video_codec_frame_ref (frame);
+
+  cb.unref = gst_droidenc_release_input_frame;
+  cb.data = release_data;
+
   /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
    * cannot write the input buffer. We end up waiting for the write operation
    * which does not happen because stagefright needs us to provide
@@ -521,11 +564,7 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
    * is holding before calling us
    */
   GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
-  if (!gst_droid_codec_consume_frame (enc->codec, frame, frame->pts)) {
-    ret = GST_FLOW_ERROR;
-    GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
-    goto error;
-  }
+  droid_media_codec_queue (enc->codec, &data, &cb);
   GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
 
   if (enc->downstream_flow_ret != GST_FLOW_OK) {
