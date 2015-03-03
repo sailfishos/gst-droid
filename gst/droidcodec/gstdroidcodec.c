@@ -511,7 +511,7 @@ construct_h264dec_data (GstBuffer * buffer, gpointer codec_type_data,
       }
 
       data = out->data;
-      memcpy (data[1], info.data, info.size);
+      memcpy (&data[1], info.data, info.size);
       data[0] = data[1] = data[2] = 0;
       data[3] = 1;
       ret = TRUE;
