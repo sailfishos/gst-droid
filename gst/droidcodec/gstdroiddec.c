@@ -555,6 +555,7 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     }
 
     if (!gst_droiddec_create_codec (dec)) {
+      ret = GST_FLOW_ERROR;
       goto error;
     }
 
