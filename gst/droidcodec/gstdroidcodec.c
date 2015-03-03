@@ -38,12 +38,12 @@ GST_DEBUG_CATEGORY_EXTERN (gst_droid_codec_debug);
 
 static GstBuffer *create_mpeg4venc_codec_data (DroidMediaData * data);
 static GstBuffer *create_h264enc_codec_data (DroidMediaData * data);
-static gboolean create_mpeg4vdec_codec_data (GstBuffer * data,
-    DroidMediaData * out, gpointer * codec_type_data);
-static gboolean create_h264dec_codec_data (GstBuffer * data,
-    DroidMediaData * out, gpointer * codec_type_data);
-static gboolean process_h264dec_data (GstBuffer * buffer,
-    gpointer codec_type_data, DroidMediaData * out);
+static gboolean create_mpeg4vdec_codec_data (GstDroidCodec * codec,
+    GstBuffer * data, DroidMediaData * out);
+static gboolean create_h264dec_codec_data (GstDroidCodec * codec,
+    GstBuffer * data, DroidMediaData * out);
+static gboolean process_h264dec_data (GstDroidCodec * codec, GstBuffer * buffer,
+    DroidMediaData * out);
 static gboolean is_mpeg4v (const GstStructure * s);
 static gboolean is_h264_dec (const GstStructure * s);
 static gboolean is_h264_enc (const GstStructure * s);
@@ -58,6 +58,11 @@ typedef struct
   GstVideoCodecFrame *frame;
 } GstDroidCodecFrameReleaseData;
 
+struct _GstDroidCodecPrivate
+{
+  gint h264_nal;
+};
+
 struct _GstDroidCodecInfo
 {
   GstDroidCodecType type;
@@ -70,10 +75,10 @@ struct _GstDroidCodecInfo
   GstBuffer *(*create_encoder_codec_data) (DroidMediaData * data);
     gboolean (*process_encoder_data) (DroidMediaData * in,
       DroidMediaData * out);
-    gboolean (*create_decoder_codec_data) (GstBuffer * data,
-      DroidMediaData * out, gpointer * codec_type_data);
-    gboolean (*process_decoder_data) (GstBuffer * buffer,
-      gpointer codec_type_data, DroidMediaData * out);
+    gboolean (*create_decoder_codec_data) (GstDroidCodec * codec,
+      GstBuffer * data, DroidMediaData * out);
+    gboolean (*process_decoder_data) (GstDroidCodec * codec, GstBuffer * buffer,
+      DroidMediaData * out);
 };
 
 /* codecs */
@@ -127,6 +132,7 @@ gst_droid_codec_get_from_caps (GstCaps * caps, GstDroidCodecType type)
     if (!codecs[x].validate_structure || codecs[x].validate_structure (s)) {
       GstDroidCodec *codec = g_slice_new (GstDroidCodec);
       codec->info = &codecs[x];
+      codec->data = g_slice_new0 (GstDroidCodecPrivate);
       return codec;
     }
   }
@@ -164,6 +170,7 @@ gst_droid_codec_get_droid_type (GstDroidCodec * codec)
 void
 gst_droid_codec_free (GstDroidCodec * codec)
 {
+  g_slice_free (GstDroidCodecPrivate, codec->data);
   g_slice_free (GstDroidCodec, codec);
 }
 
@@ -183,15 +190,15 @@ gst_droid_codec_create_encoder_codec_data (GstDroidCodec * codec,
 
 gboolean
 gst_droid_codec_create_decoder_codec_data (GstDroidCodec * codec,
-    GstBuffer * data, DroidMediaData * out, gpointer * codec_type_data)
+    GstBuffer * data, DroidMediaData * out)
 {
-  return codec->info->create_decoder_codec_data (data, out, codec_type_data);
+  return codec->info->create_decoder_codec_data (codec, data, out);
 }
 
 gboolean
 gst_droid_codec_prepare_decoder_frame (GstDroidCodec * codec,
     GstVideoCodecFrame * frame, DroidMediaData * data,
-    DroidMediaBufferCallbacks * cb, gpointer codec_type_data)
+    DroidMediaBufferCallbacks * cb)
 {
   GstDroidCodecFrameReleaseData *release_data;
 
@@ -205,8 +212,7 @@ gst_droid_codec_prepare_decoder_frame (GstDroidCodec * codec,
    */
 
   if (codec->info->process_decoder_data) {
-    if (!codec->info->process_decoder_data (frame->input_buffer,
-            codec_type_data, data)) {
+    if (!codec->info->process_decoder_data (codec, frame->input_buffer, data)) {
       return FALSE;
     }
   } else {
@@ -446,8 +452,8 @@ h264enc_complement (GstCaps * caps)
 }
 
 static gboolean
-create_mpeg4vdec_codec_data (GstBuffer * data, DroidMediaData * out,
-    gpointer * codec_type_data)
+create_mpeg4vdec_codec_data (GstDroidCodec * codec G_GNUC_UNUSED,
+    GstBuffer * data, DroidMediaData * out)
 {
   /*
    * If there are things which I hate the most, this function will be among them
@@ -455,7 +461,7 @@ create_mpeg4vdec_codec_data (GstBuffer * data, DroidMediaData * out,
    */
   GstMapInfo info;
   GstByteWriter *writer = NULL;
-  *codec_type_data = NULL;
+  codec->data->h264_nal = 0;
 
   if (!gst_buffer_map (data, &info, GST_MAP_READ)) {
     GST_ERROR ("failed to map buffer");
@@ -506,8 +512,8 @@ create_mpeg4vdec_codec_data (GstBuffer * data, DroidMediaData * out,
 }
 
 static gboolean
-create_h264dec_codec_data (GstBuffer * data, DroidMediaData * out,
-    gpointer * codec_type_data)
+create_h264dec_codec_data (GstDroidCodec * codec, GstBuffer * data,
+    DroidMediaData * out)
 {
   GstMapInfo info;
   gboolean ret = FALSE;
@@ -522,9 +528,9 @@ create_h264dec_codec_data (GstBuffer * data, DroidMediaData * out,
     goto out;
   }
 
-  *codec_type_data = GINT_TO_POINTER (1 + (info.data[4] & 3));
+  codec->data->h264_nal = (1 + (info.data[4] & 3));
 
-  GST_INFO ("nal prefix length %d", GPOINTER_TO_INT (*codec_type_data));
+  GST_INFO ("nal prefix length %d", codec->data->h264_nal);
 
   out->size = info.size;
   out->data = g_malloc (info.size);
@@ -538,12 +544,11 @@ out:
 }
 
 static gboolean
-process_h264dec_data (GstBuffer * buffer, gpointer codec_type_data,
+process_h264dec_data (GstDroidCodec * codec, GstBuffer * buffer,
     DroidMediaData * out)
 {
   GstMapInfo info;
   gboolean ret = FALSE;
-  gint nal_size = GPOINTER_TO_INT (codec_type_data);
   guint8 *data;
 
   if (!gst_buffer_map (buffer, &info, GST_MAP_READ)) {
@@ -551,12 +556,12 @@ process_h264dec_data (GstBuffer * buffer, gpointer codec_type_data,
     return FALSE;
   }
 
-  if (info.size < 4) {
+  if (info.size < codec->data->h264_nal) {
     GST_ERROR ("malformed data");
     goto out;
   }
 
-  switch (nal_size) {
+  switch (codec->data->h264_nal) {
     case 4:
       out->size = info.size;
       out->data = g_malloc (info.size);
@@ -618,7 +623,8 @@ process_h264dec_data (GstBuffer * buffer, gpointer codec_type_data,
       goto out;
 
     default:
-      GST_ERROR ("unhandled nal prefix size %d", nal_size);
+      /* no way to hit that */
+      GST_ERROR ("unhandled nal prefix size %d", codec->data->h264_nal);
 
       goto out;
   }
