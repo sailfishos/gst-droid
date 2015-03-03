@@ -411,24 +411,28 @@ out:
 
 static GstDroidCodec codecs[] = {
   /* decoders */
-  {GST_DROID_CODEC_DECODER, "video/mpeg", "video/mp4v-es", is_mpeg4v, NULL,
-        "video/mpeg, mpegversion=4" CAPS_FRAGMENT, NULL, NULL,
-      construct_mpeg4_esds, NULL},
-  {GST_DROID_CODEC_DECODER, "video/x-h264", "video/avc", is_h264_dec,
-        NULL, "video/x-h264, stream-format=avc,alignment=au" CAPS_FRAGMENT,
-        NULL, NULL,
+  {GST_DROID_CODEC_DECODER, "video/mpeg", "video/mp4v-es",
+        "video/mpeg, mpegversion=4" CAPS_FRAGMENT,
+      is_mpeg4v, NULL, NULL, NULL, construct_mpeg4_esds, NULL},
+
+  {GST_DROID_CODEC_DECODER, "video/x-h264", "video/avc",
+        "video/x-h264, stream-format=avc,alignment=au" CAPS_FRAGMENT,
+        is_h264_dec, NULL, NULL, NULL,
       construct_h264dec_codec_data, construct_h264dec_data},
-  {GST_DROID_CODEC_DECODER, "video/x-h263", "video/3gpp", NULL,
-      NULL, "video/x-h263" CAPS_FRAGMENT, NULL, NULL, NULL, NULL},
+
+  {GST_DROID_CODEC_DECODER, "video/x-h263", "video/3gpp",
+        "video/x-h263" CAPS_FRAGMENT, NULL,
+      NULL, NULL, NULL, NULL, NULL},
 
   /* encoders */
-  {GST_DROID_CODEC_ENCODER, "video/mpeg", "video/mp4v-es", is_mpeg4v,
-        NULL, "video/mpeg, mpegversion=4, systemstream=false" CAPS_FRAGMENT,
-      mpeg4venc_create_codec_data, NULL, NULL, NULL},
+  {GST_DROID_CODEC_ENCODER, "video/mpeg", "video/mp4v-es",
+        "video/mpeg, mpegversion=4, systemstream=false" CAPS_FRAGMENT,
+      is_mpeg4v, NULL, mpeg4venc_create_codec_data, NULL, NULL, NULL},
+
   {GST_DROID_CODEC_ENCODER, "video/x-h264", "video/avc",
-        is_h264_enc, h264_complement,
         "video/x-h264, stream-format=avc,alignment=au" CAPS_FRAGMENT,
-      h264enc_create_codec_data, construct_h264enc_data, NULL, NULL},
+        is_h264_enc, h264_complement, h264enc_create_codec_data,
+      construct_h264enc_data, NULL, NULL},
 };
 
 GstDroidCodec *

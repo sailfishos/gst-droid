@@ -38,9 +38,9 @@ typedef struct {
   GstDroidCodecType type;
   const gchar *mime;
   const gchar *droid;
+  const gchar *caps;
   gboolean (*validate_structure) (const GstStructure * s);
   void (*complement_caps)(GstCaps * caps);
-  const gchar *caps;
   GstBuffer *(*create_encoder_codec_data) (DroidMediaData *data);
   gboolean (*process_encoder_data) (DroidMediaData *in, DroidMediaData *out);
   gboolean (*create_decoder_codec_data) (GstBuffer *data, DroidMediaData *out,
