@@ -55,8 +55,7 @@ GstCaps *gst_droid_codec_get_all_caps (GstDroidCodecType type);
 
 void gst_droid_codec_complement_caps (GstDroidCodec *codec, GstCaps * caps);
 GstBuffer *gst_droid_codec_create_encoder_codec_data (GstDroidCodec *codec, DroidMediaData *data);
-gboolean gst_droid_codec_process_encoder_data (GstDroidCodec *codec, DroidMediaData *in,
-					       DroidMediaData *out);
+
 gboolean gst_droid_codec_create_decoder_codec_data (GstDroidCodec *codec, GstBuffer *data,
 						    DroidMediaData *out,
 						    gpointer *codec_type_data);
@@ -65,6 +64,8 @@ gboolean gst_droid_codec_prepare_decoder_frame (GstDroidCodec * codec, GstVideoC
 						DroidMediaData * data,
 						DroidMediaBufferCallbacks *cb,
 						gpointer codec_type_data);
+
+GstBuffer *gst_droid_codec_prepare_encoded_data (GstDroidCodec * codec, DroidMediaData * in);
 
 G_END_DECLS
 

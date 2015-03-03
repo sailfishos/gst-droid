@@ -152,13 +152,6 @@ gst_droid_codec_create_encoder_codec_data (GstDroidCodec * codec,
 }
 
 gboolean
-gst_droid_codec_process_encoder_data (GstDroidCodec * codec,
-    DroidMediaData * in, DroidMediaData * out)
-{
-  return codec->process_encoder_data (in, out);
-}
-
-gboolean
 gst_droid_codec_create_decoder_codec_data (GstDroidCodec * codec,
     GstBuffer * data, DroidMediaData * out, gpointer * codec_type_data)
 {
@@ -201,6 +194,27 @@ gst_droid_codec_prepare_decoder_frame (GstDroidCodec * codec,
   cb->data = release_data;
 
   return TRUE;
+}
+
+GstBuffer *
+gst_droid_codec_prepare_encoded_data (GstDroidCodec * codec,
+    DroidMediaData * in)
+{
+  GstBuffer *buffer;
+
+  if (codec->process_encoder_data) {
+    DroidMediaData out;
+    if (!codec->process_encoder_data (in, &out)) {
+      buffer = NULL;
+    } else {
+      buffer = gst_buffer_new_wrapped (out.data, out.size);
+    }
+  } else {
+    buffer = gst_buffer_new_allocate (NULL, in->size, NULL);
+    gst_buffer_fill (buffer, 0, in->data, in->size);
+  }
+
+  return buffer;
 }
 
 static GstBuffer *

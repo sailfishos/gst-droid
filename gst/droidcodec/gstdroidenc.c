@@ -259,24 +259,15 @@ gst_droidenc_data_available (void *data, DroidMediaCodecData * encoded)
     return;
   }
 
-  if (enc->codec_type->process_encoder_data) {
-    if (!gst_droid_codec_process_encoder_data (enc->codec_type,
-            &(encoded->data), &out)) {
-      GST_ELEMENT_ERROR (enc, LIBRARY, ENCODE, (NULL),
-          ("failed to process data"));
-      gst_video_codec_frame_unref (frame);
-      enc->downstream_flow_ret = GST_FLOW_ERROR;
-      GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
-      return;
-    } else {
-      frame->output_buffer = gst_buffer_new_wrapped (out.data, out.size);
-    }
-  } else {
-    frame->output_buffer =
-        gst_video_encoder_allocate_output_buffer (GST_VIDEO_ENCODER (enc),
-        encoded->data.size);
-    gst_buffer_fill (frame->output_buffer, 0, encoded->data.data,
-        encoded->data.size);
+  frame->output_buffer =
+      gst_droid_codec_prepare_encoded_data (enc->codec_type, &encoded->data);
+  if (!frame->output_buffer) {
+    GST_ELEMENT_ERROR (enc, LIBRARY, ENCODE, (NULL),
+        ("failed to process encoded data"));
+    gst_video_codec_frame_unref (frame);
+    enc->downstream_flow_ret = GST_FLOW_ERROR;
+    GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
+    return;
   }
 
   GST_BUFFER_PTS (frame->output_buffer) = encoded->ts;
