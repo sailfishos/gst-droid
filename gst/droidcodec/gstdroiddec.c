@@ -550,6 +550,12 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
    * This is a bad situation. TODO: fix it
    */
   if (G_UNLIKELY (dec->dirty)) {
+    if (!GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame)) {
+      ret = GST_FLOW_OK;
+      gst_video_decoder_drop_frame (decoder, frame);
+      goto out;
+    }
+
     if (dec->codec) {
       gst_droiddec_finish (decoder);
     }
