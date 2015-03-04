@@ -60,7 +60,7 @@ typedef struct
 
 struct _GstDroidCodecPrivate
 {
-  gint h264_nal;
+  guint h264_nal;
 };
 
 struct _GstDroidCodecInfo

@@ -215,7 +215,6 @@ static void
 gst_droidenc_data_available (void *data, DroidMediaCodecData * encoded)
 {
   GstVideoCodecFrame *frame;
-  DroidMediaData out;
   GstFlowReturn flow_ret;
   GstDroidEnc *enc = (GstDroidEnc *) data;
   GstVideoEncoder *encoder = GST_VIDEO_ENCODER (enc);
