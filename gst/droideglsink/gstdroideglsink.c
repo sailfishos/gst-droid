@@ -450,8 +450,8 @@ gst_droideglsink_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
     goto free_and_out;
   }
 
-  cb.ref = gst_buffer_ref;
-  cb.unref = gst_buffer_unref;
+  cb.ref = (DroidMediaCallback) gst_buffer_ref;
+  cb.unref = (DroidMediaCallback) gst_buffer_unref;
   cb.data = buff;
 
   data.size = info.size;

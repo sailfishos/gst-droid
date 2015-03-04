@@ -159,8 +159,8 @@ gst_droiddec_frame_available (void *user)
 
   buff = gst_buffer_new ();
 
-  cb.ref = gst_buffer_ref;
-  cb.unref = gst_buffer_unref;
+  cb.ref = (DroidMediaCallback) gst_buffer_ref;
+  cb.unref = (DroidMediaCallback) gst_buffer_unref;
   cb.data = buff;
 
   mem =
