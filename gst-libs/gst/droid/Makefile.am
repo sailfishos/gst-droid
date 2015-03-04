@@ -16,8 +16,10 @@ noinst_HEADERS =
 libgstdroid_@GST_API_VERSION@_la_SOURCES = \
 	gstwrappedmemory.c \
 	gstdroidmediabuffer.c \
+	gstdroidbufferpool.c \
 	$(top_builddir)/gst-libs/ext/droidmedia/hybris.c
 
 libgstdroid_@GST_API_VERSION@_la_include_HEADERS = \
 	gstwrappedmemory.h \
-	gstdroidmediabuffer.h
+	gstdroidmediabuffer.h \
+	gstdroidbufferpool.h
