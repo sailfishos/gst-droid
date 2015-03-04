@@ -570,6 +570,7 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
 
   if (!gst_droid_codec_prepare_decoder_frame (dec->codec_type, frame,
           &data.data, &cb)) {
+    ret = GST_FLOW_ERROR;
     GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
         ("Failed to prepare data for decoding"));
     goto error;
