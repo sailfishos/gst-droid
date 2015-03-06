@@ -41,13 +41,26 @@ enum _GstDroidCodecType
 };
 
 struct _GstDroidCodec {
+  GstMiniObject parent;
+
   GstDroidCodecInfo *info;
 
   GstDroidCodecPrivate *data;
 };
 
-GstDroidCodec *gst_droid_codec_get_from_caps (GstCaps * caps, GstDroidCodecType type);
-void gst_droid_codec_free (GstDroidCodec * codec);
+GType gst_droid_codec_get_type (void);
+
+static inline GstDroidCodec *gst_droid_codec_ref (GstDroidCodec * codec)
+{
+  return (GstDroidCodec *) gst_mini_object_ref (GST_MINI_OBJECT_CAST (codec));
+}
+
+static inline void gst_droid_codec_unref (GstDroidCodec * codec)
+{
+  gst_mini_object_unref (GST_MINI_OBJECT_CAST (codec));
+}
+
+GstDroidCodec *gst_droid_codec_new_from_caps (GstCaps * caps, GstDroidCodecType type);
 
 GstCaps *gst_droid_codec_get_all_caps (GstDroidCodecType type);
 const gchar *gst_droid_codec_get_droid_type (GstDroidCodec * codec);

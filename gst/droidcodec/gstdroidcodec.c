@@ -51,6 +51,9 @@ static void h264enc_complement (GstCaps * caps);
 static gboolean process_h264enc_data (DroidMediaData * in,
     DroidMediaData * out);
 static void gst_droid_codec_release_input_frame (void *data);
+static void gst_droid_codec_free (GstDroidCodec * codec);
+
+GST_DEFINE_MINI_OBJECT_TYPE (GstDroidCodec, gst_droid_codec);
 
 typedef struct
 {
@@ -112,7 +115,7 @@ static GstDroidCodecInfo codecs[] = {
 };
 
 GstDroidCodec *
-gst_droid_codec_get_from_caps (GstCaps * caps, GstDroidCodecType type)
+gst_droid_codec_new_from_caps (GstCaps * caps, GstDroidCodecType type)
 {
   int x = 0;
   int len = G_N_ELEMENTS (codecs);
@@ -133,6 +136,10 @@ gst_droid_codec_get_from_caps (GstCaps * caps, GstDroidCodecType type)
       GstDroidCodec *codec = g_slice_new (GstDroidCodec);
       codec->info = &codecs[x];
       codec->data = g_slice_new0 (GstDroidCodecPrivate);
+
+      gst_mini_object_init (GST_MINI_OBJECT_CAST (codec), 0,
+          gst_droid_codec_get_type (), NULL, NULL,
+          (GstMiniObjectFreeFunction) gst_droid_codec_free);
       return codec;
     }
   }

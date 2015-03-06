@@ -360,7 +360,7 @@ gst_droiddec_stop (GstVideoDecoder * decoder)
   gst_buffer_replace (&dec->codec_data, NULL);
 
   if (dec->codec_type) {
-    gst_droid_codec_free (dec->codec_type);
+    gst_droid_codec_unref (dec->codec_type);
     dec->codec_type = NULL;
   }
 
@@ -443,7 +443,7 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   }
 
   dec->codec_type =
-      gst_droid_codec_get_from_caps (state->caps, GST_DROID_CODEC_DECODER);
+      gst_droid_codec_new_from_caps (state->caps, GST_DROID_CODEC_DECODER);
   if (!dec->codec_type) {
     GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, (NULL),
         ("Unknown codec type for caps %" GST_PTR_FORMAT, state->caps));
