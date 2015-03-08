@@ -1168,6 +1168,7 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
   gboolean ret = FALSE;
   GstDroidCamSrcPad *data = gst_pad_get_element_private (pad);
   GstCaps *caps = NULL;
+  GstCaps *filter = NULL;
   GstCaps *query_caps = NULL;
 
   GST_DEBUG_OBJECT (src, "pad %s %" GST_PTR_FORMAT, GST_PAD_NAME (pad), query);
@@ -1228,18 +1229,41 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
 
 
     case GST_QUERY_CAPS:
-      caps = gst_pad_get_pad_template_caps (data->pad);
+      /* if we have a device already, return the caps supported by HAL otherwise
+       * just return the pad template */
+      g_rec_mutex_lock (&src->dev_lock);
+      if (src->dev) {
+        if (data == src->vfsrc) {
+          caps = gst_droidcamsrc_params_get_viewfinder_caps (src->dev->params);
+        } else if (data == src->imgsrc) {
+          caps = gst_droidcamsrc_params_get_image_caps (src->dev->params);
+        } else if (data == src->vidsrc) {
+          caps = gst_droidcamsrc_params_get_video_caps (src->dev->params);
+        }
+      } else {
+        caps = gst_pad_get_pad_template_caps (data->pad);
+      }
+      g_rec_mutex_unlock (&src->dev_lock);
+
+      gst_query_parse_caps (query, &filter);
+      if (caps && filter) {
+        GstCaps *intersection =
+            gst_caps_intersect_full (filter, caps, GST_CAPS_INTERSECT_FIRST);
+        gst_caps_unref (caps);
+        caps = intersection;
+      }
+
       if (caps) {
         gst_query_set_caps_result (query, caps);
         ret = TRUE;
       } else {
-        caps =
-            gst_caps_make_writable (gst_pad_get_pad_template_caps (data->pad));
-        gst_query_set_caps_result (query, caps);
-        ret = TRUE;
+        ret = FALSE;
       }
 
-      gst_caps_unref (caps);
+      if (caps) {
+        gst_caps_unref (caps);
+      }
+
       break;
   }
 
