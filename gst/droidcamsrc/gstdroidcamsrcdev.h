@@ -50,6 +50,7 @@ struct _GstDroidCamSrcDev
   GstDroidCamSrcCamInfo *info;
   GstDroidCamSrcImageCaptureState *img;
   GstDroidCamSrcVideoCaptureState *vid;
+  GstBufferPool *pool;
 };
 
 GstDroidCamSrcDev *gst_droidcamsrc_dev_new (GstDroidCamSrcPad *vfsrc,
