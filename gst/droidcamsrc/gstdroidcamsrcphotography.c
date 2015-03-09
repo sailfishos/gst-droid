@@ -25,7 +25,8 @@
 
 #include "gstdroidcamsrcphotography.h"
 #include "gstdroidcamsrc.h"
-#include <stdlib.h>
+#include <stdlib.h>             /* atoi() */
+#include <string.h>             /* memcpy() */
 #ifndef GST_USE_UNSTABLE_API
 #define GST_USE_UNSTABLE_API
 #endif /* GST_USE_UNSTABLE_API */

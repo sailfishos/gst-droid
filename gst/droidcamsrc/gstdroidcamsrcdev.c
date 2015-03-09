@@ -30,7 +30,8 @@
 #include "gst/droid/gstdroidmediabuffer.h"
 #include "gst/droid/gstwrappedmemory.h"
 #include "gst/droid/gstdroidbufferpool.h"
-#include <unistd.h>
+#include <unistd.h>             /* usleep() */
+#include <string.h>             /* memcpy() */
 #ifndef GST_USE_UNSTABLE_API
 #define GST_USE_UNSTABLE_API
 #endif /* GST_USE_UNSTABLE_API */
