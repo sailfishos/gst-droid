@@ -227,13 +227,10 @@ out:
   return;
 
 acquire_and_release:
-  mem =
-      gst_droid_media_buffer_allocator_alloc (dec->allocator, dec->queue, &cb);
+  /* we can not use our cb struct here so ask droidmedia to do
+   * the work instead */
+  droid_media_buffer_queue_acquire_and_release (dec->queue);
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
-
-  if (mem) {
-    gst_memory_unref (mem);
-  }
 }
 
 static void
