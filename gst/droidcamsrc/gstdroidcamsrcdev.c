@@ -444,8 +444,8 @@ gst_droidcamsrc_dev_frame_available (void *user)
     goto acquire_and_release;
   }
 
-  cb.ref = gst_buffer_ref;
-  cb.unref = gst_buffer_unref;
+  cb.ref = (DroidMediaCallback) gst_buffer_ref;
+  cb.unref = (DroidMediaCallback) gst_buffer_unref;
   cb.data = buff;
 
   mem =
