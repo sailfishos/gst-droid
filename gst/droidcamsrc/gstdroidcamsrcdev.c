@@ -30,7 +30,6 @@
 #include "gst/droid/gstdroidmediabuffer.h"
 #include "gst/droid/gstwrappedmemory.h"
 #include "gst/droid/gstdroidbufferpool.h"
-#include <system/camera.h>
 #include <unistd.h>
 #ifndef GST_USE_UNSTABLE_API
 #define GST_USE_UNSTABLE_API
@@ -525,6 +524,8 @@ gst_droidcamsrc_dev_new (GstDroidCamSrcPad * vfsrc,
 
   dev->pool = gst_droid_buffer_pool_new ();
 
+  droid_media_camera_constants_init (&dev->c);
+
   return dev;
 }
 
@@ -561,8 +562,8 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
   }
 
   /* disable shutter sound */
-  droid_media_camera_send_command (dev->cam, CAMERA_CMD_ENABLE_SHUTTER_SOUND, 0,
-      0);
+  droid_media_camera_send_command (dev->cam,
+      dev->c.CAMERA_CMD_ENABLE_SHUTTER_SOUND, 0, 0);
 
   g_rec_mutex_unlock (dev->lock);
 
@@ -708,7 +709,7 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
 
   /* We don't want the preview frame. We will render it using the GraphicBuffers we get */
   droid_media_camera_set_preview_callback_flags (dev->cam,
-      CAMERA_FRAME_CALLBACK_FLAG_NOOP);
+      dev->c.CAMERA_FRAME_CALLBACK_FLAG_NOOP);
   if (!droid_media_camera_start_preview (dev->cam)) {
     GST_ERROR_OBJECT (src, "error starting preview");
     goto out;
@@ -791,8 +792,8 @@ gboolean
 gst_droidcamsrc_dev_capture_image (GstDroidCamSrcDev * dev)
 {
   gboolean ret = FALSE;
-  int msg_type = CAMERA_MSG_SHUTTER | CAMERA_MSG_RAW_IMAGE
-      | CAMERA_MSG_POSTVIEW_FRAME | CAMERA_MSG_COMPRESSED_IMAGE;
+  int msg_type = dev->c.CAMERA_MSG_SHUTTER | dev->c.CAMERA_MSG_RAW_IMAGE
+      | dev->c.CAMERA_MSG_POSTVIEW_FRAME | dev->c.CAMERA_MSG_COMPRESSED_IMAGE;
 
   GST_DEBUG ("dev capture image");
 

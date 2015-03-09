@@ -96,28 +96,6 @@ PKG_CHECK_MODULES(NGM, [
   ])
 ])
 
-PKG_CHECK_MODULES(DROID, [
-  android-headers
-], [
-  AC_SUBST(DROID_CFLAGS)
-  AC_SUBST(DROID_LIBS)
-], [
-  AC_MSG_ERROR([
-      android-headers not found
-  ])
-])
-
-PKG_CHECK_MODULES(HARDWARE, [
-  libhardware
-], [
-  AC_SUBST(HARDWARE_CFLAGS)
-  AC_SUBST(HARDWARE_LIBS)
-], [
-  AC_MSG_ERROR([
-      libhardware not found
-  ])
-])
-
 PKG_CHECK_MODULES(EGL, [
   egl
 ], [
