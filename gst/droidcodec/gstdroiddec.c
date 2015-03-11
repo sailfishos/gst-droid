@@ -224,7 +224,8 @@ gst_droiddec_frame_available (void *user)
   height = droid_media_buffer_get_height (buffer);
 
   gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE,
-      GST_VIDEO_FORMAT_YV12, width, height);
+      dec->convert ? GST_VIDEO_FORMAT_I420 : GST_VIDEO_FORMAT_YV12, width,
+      height);
 
   frame = gst_video_decoder_get_oldest_frame (GST_VIDEO_DECODER (dec));
 
