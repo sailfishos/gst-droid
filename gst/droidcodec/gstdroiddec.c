@@ -143,6 +143,7 @@ gst_droiddec_frame_available (void *user)
   GstVideoCropMeta *crop_meta;
   DroidMediaBufferCallbacks cb;
   GstFlowReturn flow_ret;
+  int64_t ts;
 
   GST_DEBUG_OBJECT (dec, "frame available");
 
@@ -180,6 +181,10 @@ gst_droiddec_frame_available (void *user)
   }
 
   buffer = gst_droid_media_buffer_memory_get_buffer (mem);
+  width = droid_media_buffer_get_width (buffer);
+  height = droid_media_buffer_get_height (buffer);
+  rect = droid_media_buffer_get_crop_rect (buffer);
+  ts = droid_media_buffer_get_timestamp (buffer);
 
   if (dec->convert) {
     GstMapInfo info;
@@ -189,6 +194,7 @@ gst_droiddec_frame_available (void *user)
       gst_memory_unref (mem);
       mem = NULL;
       gst_buffer_unref (buff);
+      buffer = NULL;
 
       goto out;
     }
@@ -201,6 +207,7 @@ gst_droiddec_frame_available (void *user)
       gst_memory_unref (mem);
       mem = NULL;
       gst_buffer_unref (buff);
+      buffer = NULL;
 
       goto out;
     }
@@ -208,20 +215,17 @@ gst_droiddec_frame_available (void *user)
     gst_buffer_unmap (buff, &info);
     gst_memory_unref (mem);
     mem = NULL;
+    buffer = NULL;
   } else {
     gst_buffer_insert_memory (buff, 0, mem);
   }
 
 
-  rect = droid_media_buffer_get_crop_rect (buffer);
   crop_meta = gst_buffer_add_video_crop_meta (buff);
   crop_meta->x = rect.left;
   crop_meta->y = rect.top;
   crop_meta->width = rect.right - rect.left;
   crop_meta->height = rect.bottom - rect.top;
-
-  width = droid_media_buffer_get_width (buffer);
-  height = droid_media_buffer_get_height (buffer);
 
   gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE,
       dec->convert ? GST_VIDEO_FORMAT_I420 : GST_VIDEO_FORMAT_YV12, width,
@@ -240,7 +244,7 @@ gst_droiddec_frame_available (void *user)
   frame->output_buffer = buff;
 
   /* We get the timestamp in ns already */
-  frame->pts = droid_media_buffer_get_timestamp (buffer);
+  frame->pts = ts;
 
   flow_ret = gst_video_decoder_finish_frame (GST_VIDEO_DECODER (dec), frame);
 
