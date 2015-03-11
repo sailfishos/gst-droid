@@ -556,7 +556,8 @@ process_h264dec_data (GstDroidCodec * codec, GstBuffer * buffer,
 {
   GstMapInfo info;
   gboolean ret = FALSE;
-  guint8 *data;
+  GstByteReader reader;
+  GstByteWriter *writer = NULL;
 
   if (!gst_buffer_map (buffer, &info, GST_MAP_READ)) {
     GST_ERROR ("failed to map buffer");
@@ -568,75 +569,89 @@ process_h264dec_data (GstDroidCodec * codec, GstBuffer * buffer,
     goto out;
   }
 
+  /* initial validation */
   switch (codec->data->h264_nal) {
     case 4:
-      out->size = info.size;
-      out->data = g_malloc (info.size);
-      if (!out->data) {
-        goto out;
-      }
-
-      memcpy (out->data, info.data, info.size);
-
-      data = out->data;
-
-      data[0] = data[1] = data[2] = 0;
-      data[3] = 1;
-      ret = TRUE;
-      goto out;
-
-    case 3:
-      out->size = info.size + 1;
-      out->data = g_malloc (out->size);
-      if (!out->data) {
-        goto out;
-      }
-
-      data = out->data;
-      memcpy (&data[1], info.data, info.size);
-      data[0] = data[1] = data[2] = 0;
-      data[3] = 1;
-      ret = TRUE;
-      goto out;
-
     case 2:
-      out->size = info.size + 2;
-      out->data = g_malloc (out->size);
-      if (!out->data) {
-        goto out;
-      }
-
-      data = out->data;
-      memcpy (&data[2], info.data, info.size);
-
-      data[0] = data[1] = data[2] = 0;
-      data[3] = 1;
-      ret = TRUE;
-      goto out;
-
+    case 3:
     case 1:
-      out->size = info.size + 3;
-      out->data = g_malloc (out->size);
-      if (!out->data) {
-        goto out;
-      }
-
-      data = out->data;
-      memcpy (&data[3], info.data, info.size);
-
-      data[0] = data[1] = data[2] = 0;
-      data[3] = 1;
-      ret = TRUE;
-      goto out;
+      break;
 
     default:
-      /* no way to hit that */
       GST_ERROR ("unhandled nal prefix size %d", codec->data->h264_nal);
-
       goto out;
   }
 
+  gst_byte_reader_init (&reader, info.data, info.size);
+
+  /* info.size is our best estimate and should be correct if nal prefix is 4 bytes which is most of the cases */
+  writer = gst_byte_writer_new_with_size (info.size, FALSE);
+
+  while (gst_byte_reader_get_pos (&reader) < info.size) {
+    guint len = 0;
+    guint16 len16 = 0;
+    guint8 len8 = 0;
+    gboolean success = FALSE;
+    const guint8 *data = NULL;
+
+    switch (codec->data->h264_nal) {
+      case 4:
+        success = gst_byte_reader_get_uint32_be (&reader, &len);
+        break;
+
+      case 3:
+        success = gst_byte_reader_get_uint24_be (&reader, &len);
+        break;
+
+      case 2:
+        success = gst_byte_reader_get_uint16_be (&reader, &len16);
+        len = len16;
+        break;
+
+      case 1:
+        success = gst_byte_reader_get_uint8 (&reader, &len8);
+        len = len8;
+        break;
+
+      default:
+        g_assert_not_reached ();
+        break;
+    }
+
+    if (!success) {
+      GST_ERROR ("malformed NAL");
+      goto out;
+    }
+
+    if (!gst_byte_writer_put_data (writer, (guint8 *) "\x00\x00\x00\x01", 4)) {
+      GST_ERROR ("failed to write NAL prefix");
+      goto out;
+    }
+
+    if (!gst_byte_reader_get_data (&reader, len, &data)) {
+      GST_ERROR ("failed to read NAL");
+      goto out;
+    }
+
+    if (!gst_byte_writer_put_data (writer, data, len)) {
+      GST_ERROR ("failed to write NAL");
+      goto out;
+    }
+
+    GST_LOG ("parsed nal unit of size %d", len);
+  }
+
+  out->size = gst_byte_writer_get_size (writer);
+  out->data = gst_byte_writer_free_and_get_data (writer);
+  writer = NULL;
+  ret = TRUE;
+
 out:
+  if (writer) {
+    gst_byte_writer_free (writer);
+    writer = NULL;
+  }
+
   gst_buffer_unmap (buffer, &info);
 
   return ret;
