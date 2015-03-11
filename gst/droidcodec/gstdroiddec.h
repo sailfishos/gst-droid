@@ -26,6 +26,7 @@
 #include <gst/gst.h>
 #include <gst/video/gstvideodecoder.h>
 #include "gstdroidcodec.h"
+#include "droidmediaconvert.h"
 
 G_BEGIN_DECLS
 
@@ -63,6 +64,7 @@ struct _GstDroidDec
 
   GstVideoCodecState *in_state;
   GstVideoCodecState *out_state;
+  DroidMediaConvert *convert;
 };
 
 struct _GstDroidDecClass
