@@ -30,6 +30,12 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
+#ifdef HAVE_ORC
+#include <orc/orc.h>
+#else
+#define orc_memcpy memcpy
+#endif
+
 #define gst_droiddec_parent_class parent_class
 G_DEFINE_TYPE (GstDroidDec, gst_droiddec, GST_TYPE_VIDEO_DECODER);
 
@@ -53,7 +59,7 @@ static void gst_droiddec_signal_eos (void *data);
 static void gst_droiddec_buffers_released (void *user);
 static void gst_droiddec_frame_available (void *user);
 static gboolean gst_droiddec_convert_buffer (GstDroidDec * dec,
-    DroidMediaBuffer * in, GstBuffer * out);
+    DroidMediaBuffer * in, GstBuffer * out, GstVideoInfo * info);
 
 static gboolean
 gst_droiddec_create_codec (GstDroidDec * dec)
@@ -133,29 +139,78 @@ gst_droiddec_buffers_released (G_GNUC_UNUSED void *user)
 
 static gboolean
 gst_droiddec_convert_buffer (GstDroidDec * dec, DroidMediaBuffer * in,
-    GstBuffer * out)
+    GstBuffer * out, GstVideoInfo * info)
 {
-  GstMapInfo info;
+  GstMapInfo map_info;
+  gpointer data;
+  gboolean fix = FALSE;
+  gboolean ret = FALSE;
+  gsize width;
+  gsize height = info->height;
 
   GST_DEBUG_OBJECT (dec, "convert buffer");
 
-  if (!gst_buffer_map (out, &info, GST_MAP_WRITE)) {
+  width = droid_media_buffer_get_width (in);
+
+  if (!gst_buffer_map (out, &map_info, GST_MAP_WRITE)) {
     GST_ERROR_OBJECT (dec, "failed to map buffer");
     return FALSE;
   }
 
-  if (droid_media_convert_to_i420 (dec->convert, in, info.data) != true) {
+  data = map_info.data;
+
+  if (GST_VIDEO_INFO_COMP_STRIDE (info, 0) != width) {
+    fix = TRUE;
+    /* This is probably larger than we need but I don't know of a way to
+     * calculate a proper size */
+    data = g_malloc (gst_buffer_get_size (out));
+  }
+
+  if (droid_media_convert_to_i420 (dec->convert, in, data) != true) {
     GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, (NULL),
         ("failed to convert frame"));
 
-    gst_buffer_unmap (out, &info);
-
-    return FALSE;
+    goto out;
   }
 
-  gst_buffer_unmap (out, &info);
+  if (fix) {
+    /* copy the data */
+    /* based on gst-colorconv commit 16fbaa7770f36d94163a9cac62b7bcbd7f9dda91 */
 
-  return TRUE;
+    gint stride = GST_VIDEO_INFO_COMP_STRIDE (info, 0);
+    gint strideUV = GST_VIDEO_INFO_COMP_STRIDE (info, 1);
+    guint8 *p = data;
+    guint8 *dst = map_info.data;
+    int i;
+    int x;
+
+    /* Y */
+    for (i = height; i > 0; i--) {
+      orc_memcpy (dst, p, width);
+      dst += stride;
+      p += width;
+    }
+
+    /* U and V */
+    for (x = 0; x < 2; x++) {
+      for (i = height / 2; i > 0; i--) {
+        orc_memcpy (dst, p, width / 2);
+        dst += strideUV;
+        p += width / 2;
+      }
+    }
+  }
+
+  ret = TRUE;
+
+out:
+  if (fix) {
+    g_free (data);
+  }
+
+  gst_buffer_unmap (out, &map_info);
+
+  return ret;
 }
 
 static void
@@ -216,7 +271,8 @@ gst_droiddec_frame_available (void *user)
   ts = droid_media_buffer_get_timestamp (buffer);
 
   if (dec->convert) {
-    gboolean result = gst_droiddec_convert_buffer (dec, buffer, buff);
+    gboolean result =
+        gst_droiddec_convert_buffer (dec, buffer, buff, &dec->out_state->info);
 
     gst_memory_unref (mem);
     mem = NULL;
