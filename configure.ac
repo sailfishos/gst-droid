@@ -122,6 +122,9 @@ AC_SEARCH_LIBS([android_dlopen], [hybris-common], [ ],
   AC_MSG_ERROR([libhybris not found])
 )
 
+dnl Orc
+ORC_CHECK([0.4.17])
+
 dnl check if compiler understands -Wall (if yes, add -Wall to GST_CFLAGS)
 AC_MSG_CHECKING([to see if compiler understands -Wall])
 save_CFLAGS="$CFLAGS"
