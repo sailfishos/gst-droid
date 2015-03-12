@@ -52,6 +52,8 @@ static int gst_droiddec_size_changed (void *data, int32_t width,
 static void gst_droiddec_signal_eos (void *data);
 static void gst_droiddec_buffers_released (void *user);
 static void gst_droiddec_frame_available (void *user);
+static gboolean gst_droiddec_convert_buffer (GstDroidDec * dec,
+    DroidMediaBuffer * in, GstBuffer * out);
 
 static gboolean
 gst_droiddec_create_codec (GstDroidDec * dec)
@@ -129,6 +131,33 @@ gst_droiddec_buffers_released (G_GNUC_UNUSED void *user)
   GST_FIXME ("Not sure what to do here really");
 }
 
+static gboolean
+gst_droiddec_convert_buffer (GstDroidDec * dec, DroidMediaBuffer * in,
+    GstBuffer * out)
+{
+  GstMapInfo info;
+
+  GST_DEBUG_OBJECT (dec, "convert buffer");
+
+  if (!gst_buffer_map (out, &info, GST_MAP_WRITE)) {
+    GST_ERROR_OBJECT (dec, "failed to map buffer");
+    return FALSE;
+  }
+
+  if (droid_media_convert_to_i420 (dec->convert, in, info.data) != true) {
+    GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, (NULL),
+        ("failed to convert frame"));
+
+    gst_buffer_unmap (out, &info);
+
+    return FALSE;
+  }
+
+  gst_buffer_unmap (out, &info);
+
+  return TRUE;
+}
+
 static void
 gst_droiddec_frame_available (void *user)
 {
@@ -187,39 +216,24 @@ gst_droiddec_frame_available (void *user)
   ts = droid_media_buffer_get_timestamp (buffer);
 
   if (dec->convert) {
-    GstMapInfo info;
-    if (!gst_buffer_map (buff, &info, GST_MAP_WRITE)) {
-      GST_ERROR_OBJECT (dec, "failed to map buffer");
-      flow_ret = GST_FLOW_ERROR;
-      gst_memory_unref (mem);
-      mem = NULL;
-      gst_buffer_unref (buff);
-      buffer = NULL;
+    gboolean result = gst_droiddec_convert_buffer (dec, buffer, buff);
 
-      goto out;
-    }
-
-    if (droid_media_convert_to_i420 (dec->convert, buffer, info.data) != true) {
-      GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, (NULL),
-          ("failed to convert frame"));
-      flow_ret = GST_FLOW_ERROR;
-      gst_buffer_unmap (buff, &info);
-      gst_memory_unref (mem);
-      mem = NULL;
-      gst_buffer_unref (buff);
-      buffer = NULL;
-
-      goto out;
-    }
-
-    gst_buffer_unmap (buff, &info);
     gst_memory_unref (mem);
     mem = NULL;
     buffer = NULL;
+
+    if (!result) {
+      flow_ret = GST_FLOW_ERROR;
+      gst_buffer_unref (buff);
+      goto out;
+    }
   } else {
     gst_buffer_insert_memory (buff, 0, mem);
   }
 
+  /* we don't want to access the memory afterwards */
+  mem = NULL;
+  buffer = NULL;
 
   crop_meta = gst_buffer_add_video_crop_meta (buff);
   crop_meta->x = rect.left;
