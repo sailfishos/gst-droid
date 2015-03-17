@@ -3,4 +3,4 @@
 	url = git://anongit.freedesktop.org/gstreamer/common
 [submodule "gst-libs/ext/droidmedia"]
 	path = gst-libs/ext/droidmedia
-	url = git@github.com:sailfishos/droidmedia.git
+	url = https://github.com/sailfishos/droidmedia.git
