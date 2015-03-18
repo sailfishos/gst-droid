@@ -1,4 +1,7 @@
-Name:           gst-droid
+%define majorminor 1.0
+%define gstreamer gstreamer
+
+Name:           %{gstreamer}%{majorminor}-droid
 Summary:        GStreamer droid plug-in contains elements using the Android HAL
 Version:        1.0.0
 Release:        1
@@ -6,13 +9,14 @@ Group:          Applications/Multimedia
 License:        LGPL2.1+
 URL:            https://github.com/foolab/gst-droid
 Source0:        %{name}-%{version}.tar.gz
+BuildRequires:  pkgconfig(egl)
 BuildRequires:  pkgconfig(gstreamer-plugins-base-1.0)
 BuildRequires:  pkgconfig(gstreamer-1.0)
 BuildRequires:  pkgconfig(gstreamer-base-1.0)
 BuildRequires:  pkgconfig(gstreamer-video-1.0)
 BuildRequires:  pkgconfig(gstreamer-plugins-bad-1.0)
 BuildRequires:  pkgconfig(gstreamer-tag-1.0)
-BuildRequires:  nemo-gstreamer1.0-interfaces-devel
+BuildRequires:  pkgconfig(nemo-gstreamer-interfaces-1.0)
 BuildRequires:  pkgconfig(libexif)
 BuildRequires:  libtool
 BuildRequires:  gettext
@@ -20,34 +24,39 @@ BuildRequires:  gettext
 %description
 GStreamer droid plug-in contains elements using the Android HAL
 
-%package -n devel
-Summary: gstreamer interface used for video rendering devel package
+%package devel
+Summary: GStreamer droid plug-in contains elements using the Android HAL devel package
 Group: Applications/Multimedia
-Requires:  gst-droid = %{version}-%{release}
+Requires:  %{gstreamer}%{majorminor}-droid = %{version}-%{release}
 
-%description -n devel
+%description devel
 %{summary}
 
 %prep
 %setup -q
 
 %build
-./autogen.sh
-./configure --disable-static --prefix=%_prefix --sysconfdir=%{_sysconfdir}
-make
+NOCONFIGURE=1 ./autogen.sh
+%configure --disable-static --prefix=%_prefix --sysconfdir=%{_sysconfdir}
+make %{?jobs:-j%jobs}
 
 %install
-find . -name "*.la" -exec rm -f {} \;
 %make_install
+
+# Clean out files that should not be part of the rpm.
+rm -rf $RPM_BUILD_ROOT%{_sysconfdir}/gst-droid
+
+%post -p /sbin/ldconfig
+
+%postun -p /sbin/ldconfig
 
 %files
 %defattr(-,root,root,-)
-%{_libdir}/gstreamer-1.0/*.so
+%{_libdir}/gstreamer-%{majorminor}/*.so
 %{_libdir}/*.so.*
-%{_sysconfdir}/%name/
 
-%files -n devel
+%files devel
 %defattr(-,root,root,-)
-%{_includedir}/gstreamer-1.0/gst/
+%{_includedir}/gstreamer-%{majorminor}/gst/
 %{_libdir}/*.so
 
