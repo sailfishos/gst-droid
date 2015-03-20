@@ -121,7 +121,6 @@ gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
   g_cond_init (&pad->cond);
   pad->queue = g_queue_new ();
   pad->running = FALSE;
-  pad->send_flush_stop = FALSE;
   pad->negotiate = NULL;
   pad->capture_pad = capture_pad;
   pad->pushed_buffers = 0;
@@ -952,16 +951,6 @@ exit:
   return;
 
 out:
-  if (G_UNLIKELY (data->send_flush_stop)) {
-    GST_DEBUG_OBJECT (src, "sending FLUSH_STOP");
-
-    if (!gst_pad_push_event (data->pad, gst_event_new_flush_stop (TRUE))) {
-      GST_ERROR_OBJECT (src, "failed to push FLUSH_STOP event");
-    }
-
-    data->send_flush_stop = FALSE;
-  }
-
   /* segment */
   if (G_UNLIKELY (data->open_segment)) {
     GstEvent *event;
@@ -1548,7 +1537,14 @@ gst_droidcamsrc_start_video_recording_locked (GstDroidCamSrc * src)
 
   /* TODO: is is that safe to do this? the assumption is _loop () is sleeping */
   src->vidsrc->open_segment = TRUE;
-  src->vidsrc->send_flush_stop = TRUE;
+
+  /* camerabin will push application tags when we return which will fail
+   * because the pipeline is flushing so we just do it here
+   */
+  GST_DEBUG_OBJECT (src, "sending FLUSH_STOP");
+  if (!gst_pad_push_event (src->vidsrc->pad, gst_event_new_flush_stop (TRUE))) {
+    GST_ERROR_OBJECT (src, "failed to push FLUSH_STOP event");
+  }
 
   if (!gst_droidcamsrc_dev_start_video_recording (src->dev)) {
     GST_ERROR_OBJECT (src, "failed to start image capture");
@@ -1588,6 +1584,13 @@ gst_droidcamsrc_start_capture (GstDroidCamSrc * src)
     goto out;
   }
 
+  /* This is needed to allow camerabin to switch filesink to PLAYING */
+
+  ++src->captures;
+  g_mutex_unlock (&src->capture_lock);
+  g_object_notify (G_OBJECT (src), "ready-for-capture");
+  g_mutex_lock (&src->capture_lock);
+
   if (src->mode == MODE_IMAGE) {
     started = gst_droidcamsrc_start_image_capture_locked (src);
   } else {
@@ -1595,17 +1598,16 @@ gst_droidcamsrc_start_capture (GstDroidCamSrc * src)
   }
 
   if (!started) {
+    /* post a warning so camerabin can fix itself up */
     GST_ELEMENT_WARNING (src, RESOURCE, FAILED, (NULL), (NULL));
-  } else {
-    ++src->captures;
+    --src->captures;
+    g_mutex_unlock (&src->capture_lock);
+    g_object_notify (G_OBJECT (src), "ready-for-capture");
+    return;
   }
 
 out:
   g_mutex_unlock (&src->capture_lock);
-
-  if (started) {
-    g_object_notify (G_OBJECT (src), "ready-for-capture");
-  }
 }
 
 static void
