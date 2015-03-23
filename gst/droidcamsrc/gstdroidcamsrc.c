@@ -991,10 +991,17 @@ out:
   /* finally we can push our buffer */
   ret = gst_pad_push (data->pad, buffer);
 
-  if (ret != GST_FLOW_OK) {
-    /* TODO: */
-    GST_ERROR_OBJECT (src, "error %s pushing buffer through pad %s",
+  if (G_UNLIKELY (ret != GST_FLOW_OK)) {
+    GST_INFO_OBJECT (src, "error %s pushing buffer through pad %s",
         gst_flow_get_name (ret), GST_PAD_NAME (data->pad));
+
+    if (ret == GST_FLOW_EOS) {
+      gst_pad_push_event (data->pad, gst_event_new_eos ());
+    } else if (ret < GST_FLOW_OK && ret != GST_FLOW_FLUSHING) {
+      GST_ELEMENT_ERROR (src, STREAM, FAILED,
+          ("Internal data stream error."), ("stream stopped, reason %s",
+              gst_flow_get_name (ret)));
+    }
   }
 
   g_mutex_lock (&data->lock);
