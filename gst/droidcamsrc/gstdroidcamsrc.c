@@ -1617,6 +1617,8 @@ gst_droidcamsrc_start_capture (GstDroidCamSrc * src)
 
 out:
   g_mutex_unlock (&src->capture_lock);
+
+  GST_DEBUG_OBJECT (src, "started capture");
 }
 
 static void
@@ -1650,6 +1652,8 @@ out:
   if (notify) {
     g_object_notify (G_OBJECT (src), "ready-for-capture");
   }
+
+  GST_DEBUG_OBJECT (src, "stopped capture");
 }
 
 void
