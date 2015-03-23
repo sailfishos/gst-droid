@@ -983,6 +983,8 @@ out:
     GList *tmp;
     for (tmp = events; tmp; tmp = g_list_next (tmp)) {
       GstEvent *ev = (GstEvent *) tmp->data;
+      GST_LOG_OBJECT (src, "pad: %s pushing pending event %" GST_PTR_FORMAT,
+          GST_PAD_NAME (data->pad), ev);
       gst_pad_push_event (data->pad, ev);
     }
     g_list_free (events);
