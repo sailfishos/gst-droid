@@ -721,7 +721,7 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     goto error;
   }
 
-  data.ts = GST_TIME_AS_USECONDS (frame->dts);
+  data.ts = GST_TIME_AS_USECONDS (frame->pts);
   data.sync = GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame) ? true : false;
 
   /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
