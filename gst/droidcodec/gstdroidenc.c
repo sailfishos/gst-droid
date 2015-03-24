@@ -395,6 +395,7 @@ gst_droidenc_start (GstVideoEncoder * encoder)
 
   enc->eos = FALSE;
   enc->downstream_flow_ret = GST_FLOW_OK;
+  enc->dirty = TRUE;
 
   return TRUE;
 }
@@ -410,6 +411,7 @@ gst_droidenc_stop (GstVideoEncoder * encoder)
     droid_media_codec_stop (enc->codec);
     droid_media_codec_destroy (enc->codec);
     enc->codec = NULL;
+    enc->dirty = TRUE;
   }
 
   if (enc->in_state) {
@@ -452,9 +454,8 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
     goto error;
   }
 
-  if (!gst_droidenc_create_codec (enc)) {
-    goto error;
-  }
+  /* handle_frame will create the codec */
+  enc->dirty = TRUE;
 
   return TRUE;
 
@@ -515,11 +516,6 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
 
   GST_DEBUG_OBJECT (enc, "handle frame");
 
-  if (!enc->codec) {
-    GST_ERROR_OBJECT (enc, "component not initialized");
-    goto error;
-  }
-
   if (enc->downstream_flow_ret != GST_FLOW_OK) {
     GST_WARNING_OBJECT (enc, "not handling frame in error state: %s",
         gst_flow_get_name (enc->downstream_flow_ret));
@@ -535,6 +531,17 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
     goto error;
   }
   g_mutex_unlock (&enc->eos_lock);
+
+  /* Now we create the actual codec */
+  if (G_UNLIKELY (enc->dirty)) {
+    g_assert (enc->codec == NULL);
+
+    if (!gst_droidenc_create_codec (enc)) {
+      goto error;
+    }
+
+    enc->dirty = FALSE;
+  }
 
   gst_buffer_map (frame->input_buffer, &info, GST_MAP_READ);
   data.data.size = info.size;

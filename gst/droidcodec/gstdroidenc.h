@@ -59,6 +59,7 @@ struct _GstDroidEnc
 
   /* protected by decoder stream lock */
   GstFlowReturn downstream_flow_ret;
+  gboolean dirty;
 };
 
 struct _GstDroidEncClass
