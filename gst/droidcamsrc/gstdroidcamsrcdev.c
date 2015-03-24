@@ -59,6 +59,7 @@ struct _GstDroidCamSrcVideoCaptureState
   gboolean running;
   gboolean eos_sent;
   GMutex lock;
+  GCond cond;
 };
 
 typedef struct _GstDroidCamSrcDevVideoData
@@ -326,6 +327,8 @@ gst_droidcamsrc_dev_video_frame_callback (void *user,
   }
 
 unlock_and_out:
+  /* in case stop_video_recording() is waiting for us */
+  g_cond_signal (&dev->vid->cond);
   g_mutex_unlock (&dev->vid->lock);
 }
 
@@ -514,6 +517,7 @@ gst_droidcamsrc_dev_new (GstDroidCamSrcPad * vfsrc,
   dev->vid = g_slice_new0 (GstDroidCamSrcVideoCaptureState);
 
   g_mutex_init (&dev->vid->lock);
+  g_cond_init (&dev->vid->cond);
 
   dev->wrap_allocator = gst_wrapped_memory_allocator_new ();
   dev->media_allocator = gst_droid_media_buffer_allocator_new ();
@@ -602,6 +606,7 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
   dev->media_allocator = NULL;
 
   g_mutex_clear (&dev->vid->lock);
+  g_cond_clear (&dev->vid->cond);
 
   gst_object_unref (dev->pool);
 
@@ -862,16 +867,12 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
 
   gst_buffer_pool_set_flushing (dev->pool, TRUE);
 
-  /* TODO: review all those locks */
   /* We need to make sure that some buffers have been pushed */
-  g_mutex_lock (&dev->vidsrc->lock);
+  g_mutex_lock (&dev->vid->lock);
   while (dev->vid->video_frames <= 4) {
-    g_mutex_unlock (&dev->vidsrc->lock);
-    usleep (30000);             /* TODO: bad */
-    g_mutex_lock (&dev->vidsrc->lock);
+    g_cond_wait (&dev->vid->cond, &dev->vid->lock);
   }
-
-  g_mutex_unlock (&dev->vidsrc->lock);
+  g_mutex_unlock (&dev->vid->lock);
 
   /* Now stop pushing to the pad */
   g_rec_mutex_lock (dev->lock);
