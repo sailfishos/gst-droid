@@ -858,14 +858,16 @@ gst_droidcamsrc_loop (gpointer user_data)
   GstDroidCamSrcPad *data = (GstDroidCamSrcPad *) user_data;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (data->pad));
   GstBuffer *buffer = NULL;
+  GstPad *pad = data->pad;
+
   GList *events;
 
-  GST_LOG_OBJECT (src, "loop %s", GST_PAD_NAME (data->pad));
+  GST_LOG_OBJECT (pad, "loop");
 
   g_mutex_lock (&data->lock);
 
   if (!data->running) {
-    GST_DEBUG_OBJECT (src, "%s task is not running", GST_PAD_NAME (data->pad));
+    GST_DEBUG_OBJECT (pad, "task is not running");
     g_mutex_unlock (&data->lock);
     goto exit;
   }
@@ -881,8 +883,7 @@ gst_droidcamsrc_loop (gpointer user_data)
         gst_pad_create_stream_id (data->pad, GST_ELEMENT_CAST (src),
         GST_PAD_NAME (data->pad));
 
-    GST_DEBUG_OBJECT (src, "Pushing STREAM_START for pad %s",
-        GST_PAD_NAME (data->pad));
+    GST_DEBUG_OBJECT (pad, "Pushing STREAM_START for pad");
     event = gst_event_new_stream_start (stream_id);
     gst_event_set_group_id (event, gst_util_group_id_next ());
     if (!gst_pad_push_event (data->pad, event)) {
@@ -897,8 +898,7 @@ gst_droidcamsrc_loop (gpointer user_data)
   if (G_UNLIKELY (gst_pad_check_reconfigure (data->pad))) {
     gboolean res = FALSE;
 
-    GST_DEBUG_OBJECT (src, "pad %s needs negotiation",
-        GST_PAD_NAME (data->pad));
+    GST_DEBUG_OBJECT (pad, "pad needs negotiation");
     res = data->negotiate (data);
 
     if (!res) {
@@ -917,7 +917,7 @@ gst_droidcamsrc_loop (gpointer user_data)
   g_mutex_lock (&data->lock);
 
   if (!data->running) {
-    GST_DEBUG_OBJECT (src, "%s task is not running", GST_PAD_NAME (data->pad));
+    GST_DEBUG_OBJECT (pad, "task is not running");
     g_mutex_unlock (&data->lock);
     goto exit;
   }
@@ -955,7 +955,7 @@ out:
   if (G_UNLIKELY (data->open_segment)) {
     GstEvent *event;
 
-    GST_DEBUG_OBJECT (src, "Pushing SEGMENT");
+    GST_DEBUG_OBJECT (pad, "Pushing SEGMENT");
 
     if (data->adjust_segment) {
       data->segment.start = GST_BUFFER_TIMESTAMP (buffer);
@@ -983,8 +983,7 @@ out:
     GList *tmp;
     for (tmp = events; tmp; tmp = g_list_next (tmp)) {
       GstEvent *ev = (GstEvent *) tmp->data;
-      GST_LOG_OBJECT (src, "pad: %s pushing pending event %" GST_PTR_FORMAT,
-          GST_PAD_NAME (data->pad), ev);
+      GST_LOG_OBJECT (pad, "pushing pending event %" GST_PTR_FORMAT, ev);
       gst_pad_push_event (data->pad, ev);
     }
     g_list_free (events);
