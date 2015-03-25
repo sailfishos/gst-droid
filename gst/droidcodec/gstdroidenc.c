@@ -121,8 +121,10 @@ gst_droidenc_create_codec (GstDroidEnc * enc)
   DroidMediaCodecEncoderMetaData md;
   const gchar *droid = gst_droid_codec_get_droid_type (enc->codec_type);
 
-  GST_INFO_OBJECT (enc, "create codec of type %s: %dx%d",
-      droid, enc->in_state->info.width, enc->in_state->info.height);
+  GST_INFO_OBJECT (enc,
+      "create codec of type: %s resolution: %dx%d bitrate: %d", droid,
+      enc->in_state->info.width, enc->in_state->info.height,
+      enc->target_bitrate);
   md.parent.type = droid;
   md.parent.width = enc->in_state->info.width;
   md.parent.height = enc->in_state->info.height;
