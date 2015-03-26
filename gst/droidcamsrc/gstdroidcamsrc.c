@@ -1540,12 +1540,34 @@ gst_droidcamsrc_start_image_capture_locked (GstDroidCamSrc * src)
 }
 
 static gboolean
+_remove_eos_and_tag (GstPad * pad, GstEvent ** event, gpointer user_data)
+{
+  if (*event && (GST_EVENT_TYPE (*event) == GST_EVENT_EOS
+          || GST_EVENT_TYPE (*event) == GST_EVENT_TAG)) {
+    GST_INFO_OBJECT (pad, "removed %" GST_PTR_FORMAT, *event);
+    gst_event_unref (*event);
+    *event = NULL;
+  }
+
+  return TRUE;
+}
+
+static gboolean
 gst_droidcamsrc_start_video_recording_locked (GstDroidCamSrc * src)
 {
   GST_DEBUG_OBJECT (src, "start video recording");
 
   /* TODO: is is that safe to do this? the assumption is _loop () is sleeping */
   src->vidsrc->open_segment = TRUE;
+
+  /*
+   * remove EOS and old tags. camerabin will push the new tags after we
+   * start recording.
+   * As for EOS, it's not needed and there is a race condition somewhere in the pipeline
+   * that causes recording to break. It seems that flush-stop can travel faster than eos
+   * which needs to be debugged more.
+   */
+  gst_pad_sticky_events_foreach (src->vidsrc->pad, _remove_eos_and_tag, NULL);
 
   /* camerabin will push application tags when we return which will fail
    * because the pipeline is flushing so we just do it here
