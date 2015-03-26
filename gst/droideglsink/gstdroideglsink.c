@@ -239,6 +239,9 @@ gst_droideglsink_show_frame (GstVideoSink * vsink, GstBuffer * buf)
     return GST_FLOW_OK;
   }
 
+  GST_LOG_OBJECT (sink, "replacing buffer %p with buffer %p", sink->last_buffer,
+      buf);
+
   gst_buffer_replace (&sink->last_buffer, buf);
 
   g_mutex_unlock (&sink->lock);

@@ -990,6 +990,7 @@ out:
   }
 
   /* finally we can push our buffer */
+  GST_LOG_OBJECT (pad, "pushing buffer %p", buffer);
   ret = gst_pad_push (data->pad, buffer);
 
   if (G_UNLIKELY (ret != GST_FLOW_OK)) {
