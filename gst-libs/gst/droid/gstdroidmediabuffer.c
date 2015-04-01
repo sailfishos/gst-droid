@@ -104,6 +104,7 @@ gst_droid_media_buffer_allocator_alloc (GstAllocator * allocator,
 {
   GstDroidMediaBufferMemory *mem;
   DroidMediaBuffer *buffer;
+  gsize size;
 
   if (!GST_IS_DROID_MEDIA_BUFFER_ALLOCATOR (allocator)) {
     GST_WARNING_OBJECT (allocator,
@@ -122,9 +123,12 @@ gst_droid_media_buffer_allocator_alloc (GstAllocator * allocator,
 
   mem->buffer = buffer;
 
+  /* This is not the correct size of the underlying buffer but there is no way to get that */
+  size = sizeof (buffer);
+
   gst_memory_init (GST_MEMORY_CAST (mem),
       GST_MEMORY_FLAG_NO_SHARE | GST_MEMORY_FLAG_NOT_MAPPABLE, allocator, NULL,
-      0, 0, 0, 0);
+      size, 0, 0, size);
 
   GST_DEBUG_OBJECT (allocator, "alloc %p", mem);
 
