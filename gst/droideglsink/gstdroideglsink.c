@@ -226,10 +226,19 @@ static GstFlowReturn
 gst_droideglsink_show_frame (GstVideoSink * vsink, GstBuffer * buf)
 {
   GstDroidEglSink *sink;
+  gint n_memory;
 
   sink = GST_DROIDEGLSINK (vsink);
 
   GST_DEBUG_OBJECT (sink, "show frame");
+
+  n_memory = gst_buffer_n_memory (buf);
+
+  if (G_UNLIKELY (n_memory == 0)) {
+    GST_WARNING_OBJECT (sink, "received an empty buffer");
+    /* we will just drop the buffer without errors */
+    return GST_FLOW_OK;
+  }
 
   g_mutex_lock (&sink->lock);
   if (sink->acquired_buffer) {
