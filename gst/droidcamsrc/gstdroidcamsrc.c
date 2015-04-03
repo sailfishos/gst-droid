@@ -1230,7 +1230,7 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
       /* if we have a device already, return the caps supported by HAL otherwise
        * just return the pad template */
       g_rec_mutex_lock (&src->dev_lock);
-      if (src->dev) {
+      if (src->dev && src->dev->params) {
         if (data == src->vfsrc) {
           caps = gst_droidcamsrc_params_get_viewfinder_caps (src->dev->params);
         } else if (data == src->imgsrc) {
