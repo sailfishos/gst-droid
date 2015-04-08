@@ -337,6 +337,9 @@ gst_droidcamsrc_finalize (GObject * object)
 
   GST_DEBUG_OBJECT (src, "finalize");
 
+  gst_droid_cam_src_mode_free (src->image);
+  gst_droid_cam_src_mode_free (src->video);
+
   gst_droidcamsrc_destroy_pad (src->vfsrc);
   gst_droidcamsrc_destroy_pad (src->imgsrc);
   gst_droidcamsrc_destroy_pad (src->vidsrc);
