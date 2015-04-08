@@ -729,7 +729,15 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
     goto error;
   }
 
-  data.ts = GST_TIME_AS_USECONDS (frame->pts);
+  /*
+   * try to use dts if pts is not valid.
+   * on one of the test streams we get the first PTS set to GST_CLOCK_TIME_NONE
+   * which breaks timestamping.
+   */
+  data.ts =
+      GST_CLOCK_TIME_IS_VALID (frame->
+      pts) ? GST_TIME_AS_USECONDS (frame->pts) : GST_TIME_AS_USECONDS (frame->
+      dts);
   data.sync = GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame) ? true : false;
 
   /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
