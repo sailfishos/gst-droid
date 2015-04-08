@@ -33,6 +33,7 @@
 #include <gst/basecamerabinsrc/gstcamerabin-enum.h>
 #include <gst/basecamerabinsrc/gstbasecamerasrc.h>
 #include "droidmediacamera.h"
+#include "gstdroidcamsrcmode.h"
 
 G_BEGIN_DECLS
 
@@ -98,6 +99,10 @@ struct _GstDroidCamSrc
   GstDroidCamSrcPad *imgsrc;
   GstDroidCamSrcPad *vidsrc;
 
+  GstDroidCamSrcMode *image;
+  GstDroidCamSrcMode *video;
+  GstDroidCamSrcMode *active_mode;
+
   GstDroidCamSrcCameraDevice camera_device;
   GstCameraBinMode mode;
 
@@ -131,6 +136,7 @@ void gst_droidcamsrc_post_message (GstDroidCamSrc * src, GstStructure * s);
 void gst_droidcamsrc_timestamp (GstDroidCamSrc * src, GstBuffer * buffer);
 gboolean gst_droidcamsrc_apply_params (GstDroidCamSrc * src);
 void gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src, GstDroidCamSrcApplyType type);
+void gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src);
 
 G_END_DECLS
 

@@ -18,7 +18,8 @@ libgstdroidcamsrc_la_SOURCES = \
 	gstdroidcamsrcenums.c \
 	gstdroidcamsrcphotography.c \
 	gstdroidcamsrcquirks.c \
-	gstdroidcamsrcexif.c
+	gstdroidcamsrcexif.c \
+	gstdroidcamsrcmode.c
 
 noinst_HEADERS = \
 	gstdroidcamsrc.h \
@@ -27,4 +28,5 @@ noinst_HEADERS = \
 	gstdroidcamsrcenums.h \
 	gstdroidcamsrcphotography.h \
 	gstdroidcamsrcquirks.h \
-	gstdroidcamsrcexif.h
+	gstdroidcamsrcexif.h \
+	gstdroidcamsrcmode.h

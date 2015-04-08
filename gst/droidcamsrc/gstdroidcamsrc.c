@@ -74,10 +74,11 @@ static gboolean gst_droidcamsrc_imgsrc_negotiate (GstDroidCamSrcPad * data);
 static gboolean gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data);
 static void gst_droidcamsrc_start_capture (GstDroidCamSrc * src);
 static void gst_droidcamsrc_stop_capture (GstDroidCamSrc * src);
-static void gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src);
 static void gst_droidcamsrc_update_ev_compensation_bounds (GstDroidCamSrc *
     src);
 static void gst_droidcamsrc_add_vfsrc_orientation_tag (GstDroidCamSrc * src);
+static gboolean gst_droid_cam_src_select_and_activate_mode (GstDroidCamSrc *
+    src);
 
 enum
 {
@@ -175,6 +176,11 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
       &vid_src_template_factory, GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME, TRUE);
   src->vidsrc->adjust_segment = TRUE;
   src->vidsrc->negotiate = gst_droidcamsrc_vidsrc_negotiate;
+
+  /* create the modes after we create the pads because the modes need the pads */
+  src->image = gst_droid_cam_src_mode_new_image (src);
+  src->video = gst_droid_cam_src_mode_new_video (src);
+  src->active_mode = NULL;
 
   GST_OBJECT_FLAG_SET (src, GST_ELEMENT_FLAG_SOURCE);
 }
@@ -282,9 +288,18 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
 
       g_mutex_unlock (&src->capture_lock);
 
+      /* deactivate old mode */
+      if (src->active_mode) {
+        gst_droid_cam_src_mode_deactivate (src->active_mode);
+        src->active_mode = NULL;
+      }
+
       src->mode = mode;
 
-      /* apply mode settings */
+      /* activate mode. */
+      gst_droid_cam_src_select_and_activate_mode (src);
+
+      /* set mode settings */
       gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
     }
 
@@ -488,6 +503,12 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       /* set initial photography parameters */
       gst_droidcamsrc_photography_apply (src, SET_ONLY);
 
+      /* activate mode */
+      if (!gst_droid_cam_src_select_and_activate_mode (src)) {
+        ret = GST_STATE_CHANGE_FAILURE;
+        break;
+      }
+
       /* apply mode settings */
       gst_droidcamsrc_apply_mode_settings (src, SET_ONLY);
 
@@ -520,6 +541,12 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       /* TODO: stop recording if we are recording */
       gst_droidcamsrc_dev_stop (src->dev);
       src->captures = 0;
+
+      /* deactivate mode */
+      if (src->active_mode) {
+        gst_droid_cam_src_mode_deactivate (src->active_mode);
+        src->active_mode = NULL;
+      }
 
       break;
 
@@ -895,25 +922,6 @@ gst_droidcamsrc_loop (gpointer user_data)
     data->open_stream = FALSE;
   }
 
-  if (G_UNLIKELY (gst_pad_check_reconfigure (data->pad))) {
-    gboolean res = FALSE;
-
-    GST_DEBUG_OBJECT (pad, "pad needs negotiation");
-    res = data->negotiate (data);
-
-    if (!res) {
-      GST_ELEMENT_ERROR (src, STREAM, FORMAT, (NULL),
-          ("failed to negotiate %s.", GST_PAD_NAME (data->pad)));
-      goto error;
-    }
-
-    /* toss our queue */
-    g_mutex_lock (&data->lock);
-    g_queue_foreach (data->queue, (GFunc) gst_buffer_unref, NULL);
-    g_queue_clear (data->queue);
-    g_mutex_unlock (&data->lock);
-  }
-
   g_mutex_lock (&data->lock);
 
   if (!data->running) {
@@ -943,9 +951,6 @@ gst_droidcamsrc_loop (gpointer user_data)
   }
 
   return;
-
-error:
-  gst_pad_pause_task (data->pad);
 
 exit:
   return;
@@ -1128,12 +1133,10 @@ gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent, GstEvent * event)
         GST_ERROR_OBJECT (src, "cannot reconfigure pad %s while capturing",
             GST_PAD_NAME (data->pad));
         ret = FALSE;
-      } else if (data->capture_pad) {
-        /* wake pad up to renegotiate */
-        g_mutex_lock (&data->lock);
-        g_cond_signal (&data->cond);
-        g_mutex_unlock (&data->lock);
-        ret = TRUE;
+      } else if (src->active_mode
+          && gst_droid_cam_src_mode_pad_is_significant (src->active_mode,
+              pad)) {
+        ret = gst_droid_cam_src_mode_negotiate (src->active_mode, pad);
       } else {
         /* pad will negotiate later */
         ret = TRUE;
@@ -1330,14 +1333,6 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   gst_droidcamsrc_params_set_string (src->dev->params, "preview-size", preview);
   g_free (preview);
 
-  if (!gst_droidcamsrc_apply_params (src)) {
-    goto out;
-  }
-
-  if (!gst_droidcamsrc_dev_restart (src->dev)) {
-    goto out;
-  }
-
   ret = TRUE;
 
 out:
@@ -1410,10 +1405,6 @@ gst_droidcamsrc_imgsrc_negotiate (GstDroidCamSrcPad * data)
   gst_droidcamsrc_params_set_string (src->dev->params, "picture-size", pic);
   g_free (pic);
 
-  if (!gst_droidcamsrc_apply_params (src)) {
-    goto out;
-  }
-
   ret = TRUE;
 
 out:
@@ -1485,14 +1476,6 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
   vid = g_strdup_printf ("%ix%i", info.width, info.height);
   gst_droidcamsrc_params_set_string (src->dev->params, "video-size", vid);
   g_free (vid);
-
-  if (!gst_droidcamsrc_apply_params (src)) {
-    goto out;
-  }
-
-  /* now update max-zoom that we have a preview size */
-  gst_droidcamsrc_dev_update_params (src->dev);
-  gst_droidcamsrc_update_max_zoom (src);
 
   ret = TRUE;
 
@@ -1724,7 +1707,7 @@ gst_droidcamsrc_timestamp (GstDroidCamSrc * src, GstBuffer * buffer)
   GST_BUFFER_PTS (buffer) = ts;
 }
 
-static void
+void
 gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src)
 {
   int max_zoom;
@@ -1937,4 +1920,29 @@ gst_droidcamsrc_add_vfsrc_orientation_tag (GstDroidCamSrc * src)
 
   GST_INFO_OBJECT (src, "added orientation tag event with orientation %s",
       orientation);
+}
+
+static gboolean
+gst_droid_cam_src_select_and_activate_mode (GstDroidCamSrc * src)
+{
+  switch (src->mode) {
+    case MODE_IMAGE:
+      src->active_mode = src->image;
+      break;
+
+    case MODE_VIDEO:
+      src->active_mode = src->video;
+      break;
+
+    default:
+      GST_ERROR_OBJECT (src, "unknown mode");
+      return FALSE;
+  }
+
+  if (!gst_droid_cam_src_mode_activate (src->active_mode)) {
+    GST_ERROR_OBJECT (src, "failed to activate mode");
+    return FALSE;
+  }
+
+  return TRUE;
 }
