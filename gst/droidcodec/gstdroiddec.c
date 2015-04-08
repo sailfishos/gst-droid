@@ -674,6 +674,14 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
 
   GST_DEBUG_OBJECT (dec, "handle frame");
 
+  if (!GST_CLOCK_TIME_IS_VALID (frame->dts)
+      && !GST_CLOCK_TIME_IS_VALID (frame->pts)) {
+    GST_WARNING_OBJECT (dec,
+        "dropping received frame with invalid timestamps.");
+    ret = GST_FLOW_OK;
+    goto error;
+  }
+
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
     GST_WARNING_OBJECT (dec, "not handling frame in error state: %s",
         gst_flow_get_name (dec->downstream_flow_ret));
