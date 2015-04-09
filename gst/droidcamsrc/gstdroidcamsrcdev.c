@@ -338,42 +338,26 @@ gst_droidcamsrc_dev_preview_metadata_callback (void *user,
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
-  int x;
   GstStructure *s;
-  int width = 0, height = 0;
+  gint width, height;
   GValue regions = G_VALUE_INIT;
+  gint i;
 
   GST_DEBUG_OBJECT (src, "dev preview metadata callback");
 
   GST_INFO_OBJECT (src, "camera detected %d faces", num_faces);
 
-#if 0
-
-  /*
-   * It should be safe to access window here
-   * We cannot really take dev->lock otherwise we might deadlock
-   * if we happen to try to acquire it while the device is being stopped.
-   * window gets destroyed when we destroy the whole device so it is
-   * not going anywhere.
-   */
-  if (dev->win) {
-    g_mutex_lock (&dev->win->lock);
-    width = dev->win->width;
-    height = dev->win->height;
-    g_mutex_unlock (&dev->win->lock);
-  }
-
-  if (!width || !height) {
-    GST_WARNING_OBJECT (src, "failed to get preview dimensions");
-    return;
-  }
+  GST_OBJECT_LOCK (src);
+  width = src->width;
+  height = src->height;
+  GST_OBJECT_UNLOCK (src);
 
   s = gst_structure_new ("regions-of-interest", "frame-width", G_TYPE_UINT,
       width, "frame-height", G_TYPE_UINT, height, NULL);
 
   g_value_init (&regions, GST_TYPE_LIST);
 
-  for (i = 0; i < metadata->number_of_faces; i++) {
+  for (i = 0; i < num_faces; i++) {
     GValue region = G_VALUE_INIT;
     int x, y, w, h, r, b;
     GstStructure *rs;
@@ -382,12 +366,11 @@ gst_droidcamsrc_dev_preview_metadata_callback (void *user,
 
     GST_DEBUG_OBJECT (src,
         "face %d: left = %d, top = %d, right = %d, bottom = %d", i,
-        metadata->faces->rect[0], metadata->faces->rect[1],
-        metadata->faces->rect[2], metadata->faces->rect[3]);
-    x = gst_util_uint64_scale (metadata->faces[i].rect[0] + 1000, width, 2000);
-    y = gst_util_uint64_scale (metadata->faces[i].rect[1] + 1000, height, 2000);
-    r = gst_util_uint64_scale (metadata->faces[i].rect[2] + 1000, width, 2000);
-    b = gst_util_uint64_scale (metadata->faces[i].rect[3] + 1000, height, 2000);
+        faces[i].left, faces[i].top, faces[i].right, faces[i].bottom);
+    x = gst_util_uint64_scale (faces[i].left + 1000, width, 2000);
+    y = gst_util_uint64_scale (faces[i].top + 1000, height, 2000);
+    r = gst_util_uint64_scale (faces[i].right + 1000, width, 2000);
+    b = gst_util_uint64_scale (faces[i].bottom + 1000, height, 2000);
     w = r - x;
     h = b - y;
     rs = gst_structure_new ("region-of-interest",
@@ -395,8 +378,8 @@ gst_droidcamsrc_dev_preview_metadata_callback (void *user,
         "region-y", G_TYPE_UINT, y,
         "region-w", G_TYPE_UINT, w,
         "region-h", G_TYPE_UINT, h,
-        "region-id", G_TYPE_INT, metadata->faces[i].id,
-        "region-score", G_TYPE_INT, metadata->faces[i].score, NULL);
+        "region-id", G_TYPE_INT, faces[i].id,
+        "region-score", G_TYPE_INT, faces[i].score, NULL);
 
     gst_value_set_structure (&region, rs);
     gst_structure_free (rs);
@@ -406,7 +389,6 @@ gst_droidcamsrc_dev_preview_metadata_callback (void *user,
 
   gst_structure_take_value (s, "regions", &regions);
   gst_droidcamsrc_post_message (src, s);
-#endif
 }
 
 static void
