@@ -118,6 +118,11 @@ struct _GstDroidCamSrc
   gfloat min_ev_compensation;
   gfloat max_ev_compensation;
   gfloat ev_step;
+
+  /* protected with OBJECT_LOCK */
+  gint width;
+  gint height;
+  gint fps_n, fps_d;
 };
 
 struct _GstDroidCamSrcClass

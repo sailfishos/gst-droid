@@ -161,6 +161,10 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   src->min_ev_compensation = DEFAULT_MIN_EV_COMPENSATION;
   src->max_ev_compensation = DEFAULT_MAX_EV_COMPENSATION;
   src->ev_step = 0.0f;
+  src->width = 0;
+  src->height = 0;
+  src->fps_n = 0;
+  src->fps_d = 1;
 
   gst_droidcamsrc_photography_init (src);
 
@@ -1331,6 +1335,13 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
     GST_ERROR_OBJECT (src, "failed to parse caps");
     goto out;
   }
+
+  GST_OBJECT_LOCK (src);
+  src->width = info.width;
+  src->height = info.height;
+  src->fps_n = info.fps_n;
+  src->fps_d = info.fps_d;
+  GST_OBJECT_UNLOCK (src);
 
   preview = g_strdup_printf ("%ix%i", info.width, info.height);
   gst_droidcamsrc_params_set_string (src->dev->params, "preview-size", preview);
