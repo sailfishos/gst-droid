@@ -47,10 +47,10 @@ GST_STATIC_PAD_TEMPLATE (GST_AUDIO_DECODER_SRC_NAME,
 #if 0
 static GstVideoCodecState *gst_droiddec_configure_state (GstVideoDecoder *
     decoder, gsize width, gsize height);
-static void gst_droiddec_error (void *data, int err);
-static int gst_droiddec_size_changed (void *data, int32_t width,
-    int32_t height);
-static void gst_droiddec_signal_eos (void *data);
+#endif
+static void gst_droidadec_error (void *data, int err);
+static void gst_droidadec_signal_eos (void *data);
+#if 0
 static void gst_droiddec_buffers_released (void *user);
 static void gst_droiddec_frame_available (void *user);
 #endif
@@ -60,6 +60,8 @@ static void gst_droidadec_data_available (void *data,
 static gboolean gst_droiddec_convert_buffer (GstDroidDec * dec,
     DroidMediaBuffer * in, GstBuffer * out, GstVideoInfo * info);
 #endif
+static GstFlowReturn gst_droidadec_finish (GstAudioDecoder * decoder);
+
 static gboolean
 gst_droidadec_create_codec (GstDroidADec * dec)
 {
@@ -100,13 +102,11 @@ gst_droidadec_create_codec (GstDroidADec * dec)
   dec->queue = droid_media_codec_get_buffer_queue (dec->codec);
 
   {
-    /*
-       DroidMediaCodecCallbacks cb;
-       cb.signal_eos = gst_droiddec_signal_eos;
-       cb.error = gst_droiddec_error;
-       cb.size_changed = gst_droiddec_size_changed;
-       droid_media_codec_set_callbacks (dec->codec, &cb, dec);
-     */
+    DroidMediaCodecCallbacks cb;
+    cb.signal_eos = gst_droidadec_signal_eos;
+    cb.error = gst_droidadec_error;
+    cb.size_changed = NULL;
+    droid_media_codec_set_callbacks (dec->codec, &cb, dec);
   }
 
   {
@@ -382,11 +382,12 @@ acquire_and_release:
   droid_media_buffer_queue_acquire_and_release (dec->queue);
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
 }
+#endif
 
 static void
-gst_droiddec_signal_eos (void *data)
+gst_droidadec_signal_eos (void *data)
 {
-  GstDroidDec *dec = (GstDroidDec *) data;
+  GstDroidADec *dec = (GstDroidADec *) data;
 
   GST_DEBUG_OBJECT (dec, "codec signaled EOS");
 
@@ -401,9 +402,9 @@ gst_droiddec_signal_eos (void *data)
 }
 
 static void
-gst_droiddec_error (void *data, int err)
+gst_droidadec_error (void *data, int err)
 {
-  GstDroidDec *dec = (GstDroidDec *) data;
+  GstDroidADec *dec = (GstDroidADec *) data;
 
   GST_DEBUG_OBJECT (dec, "codec error");
 
@@ -415,9 +416,9 @@ gst_droiddec_error (void *data, int err)
     goto out;
   }
 
-  GST_VIDEO_DECODER_STREAM_LOCK (dec);
+  GST_AUDIO_DECODER_STREAM_LOCK (dec);
   dec->downstream_flow_ret = GST_FLOW_ERROR;
-  GST_VIDEO_DECODER_STREAM_UNLOCK (dec);
+  GST_AUDIO_DECODER_STREAM_UNLOCK (dec);
 
   GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, NULL,
       ("error 0x%x from android codec", -err));
@@ -426,6 +427,7 @@ out:
   g_mutex_unlock (&dec->eos_lock);
 }
 
+#if 0
 static int
 gst_droiddec_size_changed (void *data, int32_t width, int32_t height)
 {
@@ -623,11 +625,10 @@ gst_droidadec_set_format (GstAudioDecoder * decoder, GstCaps * caps)
   return TRUE;
 }
 
-#if 0
 static GstFlowReturn
-gst_droiddec_finish (GstVideoDecoder * decoder)
+gst_droidadec_finish (GstAudioDecoder * decoder)
 {
-  GstDroidDec *dec = GST_DROIDDEC (decoder);
+  GstDroidADec *dec = GST_DROIDADEC (decoder);
 
   GST_DEBUG_OBJECT (dec, "finish");
 
@@ -640,11 +641,11 @@ gst_droiddec_finish (GstVideoDecoder * decoder)
     goto out;
   }
 
-  /* release the lock to allow _frame_available () to do its job */
-  GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
+  /* release the lock to allow _data_available () to do its job */
+  GST_AUDIO_DECODER_STREAM_UNLOCK (decoder);
   /* Now we wait for the codec to signal EOS */
   g_cond_wait (&dec->eos_cond, &dec->eos_lock);
-  GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+  GST_AUDIO_DECODER_STREAM_LOCK (decoder);
 
   /* We drained the codec. Better to recreate it. */
   if (dec->codec) {
@@ -663,7 +664,7 @@ out:
 
   return GST_FLOW_OK;
 }
-#endif
+
 static GstFlowReturn
 gst_droidadec_handle_frame (GstAudioDecoder * decoder, GstBuffer * buffer)
 {
@@ -676,7 +677,7 @@ gst_droidadec_handle_frame (GstAudioDecoder * decoder, GstBuffer * buffer)
   GST_DEBUG_OBJECT (dec, "handle frame");
 
   if (G_UNLIKELY (!buffer)) {
-    return GST_FLOW_OK;
+    return gst_droidadec_finish (decoder);
   }
 
   if (!GST_CLOCK_TIME_IS_VALID (buffer->dts)
@@ -735,8 +736,9 @@ gst_droidadec_handle_frame (GstAudioDecoder * decoder, GstBuffer * buffer)
    * which breaks timestamping.
    */
   data.ts =
-      GST_CLOCK_TIME_IS_VALID (buffer->pts) ? GST_TIME_AS_USECONDS (buffer->
-      pts) : GST_TIME_AS_USECONDS (buffer->dts);
+      GST_CLOCK_TIME_IS_VALID (buffer->
+      pts) ? GST_TIME_AS_USECONDS (buffer->pts) : GST_TIME_AS_USECONDS (buffer->
+      dts);
 
   data.sync = false;
 
@@ -862,9 +864,6 @@ gst_droidadec_class_init (GstDroidADecClass * klass)
   gstaudiodecoder_class->stop = GST_DEBUG_FUNCPTR (gst_droidadec_stop);
   gstaudiodecoder_class->set_format =
       GST_DEBUG_FUNCPTR (gst_droidadec_set_format);
-#if 0
-  gstaudiodecoder_class->finish = GST_DEBUG_FUNCPTR (gst_droiddec_finish);
-#endif
   gstaudiodecoder_class->handle_frame =
       GST_DEBUG_FUNCPTR (gst_droidadec_handle_frame);
 #if 0
