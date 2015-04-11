@@ -611,7 +611,6 @@ create_aacdec_codec_data (GstDroidCodec * codec,
     return FALSE;
   }
 
-  guint8 *cookie;
   int offset = 0;
   int decoder_specific_len = info.size;
   int config_len = 13 + 5 + decoder_specific_len;
