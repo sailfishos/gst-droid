@@ -119,7 +119,7 @@ static GstDroidCodecInfo codecs[] = {
         "video/x-h263" CAPS_FRAGMENT_VIDEO, NULL,
       NULL, NULL, NULL, NULL, NULL},
 
-  /* encoders */
+  /* video encoders */
   {GST_DROID_CODEC_ENCODER_VIDEO, "video/mpeg", "video/mp4v-es",
         "video/mpeg, mpegversion=4, systemstream=false" CAPS_FRAGMENT_VIDEO,
       is_mpeg4v, NULL, create_mpeg4venc_codec_data, NULL, NULL, NULL},

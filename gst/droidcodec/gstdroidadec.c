@@ -88,8 +88,6 @@ gst_droidadec_create_codec (GstDroidADec * dec)
     return FALSE;
   }
 
-  dec->queue = droid_media_codec_get_buffer_queue (dec->codec);
-
   {
     DroidMediaCodecCallbacks cb;
     cb.signal_eos = gst_droidadec_signal_eos;
@@ -110,7 +108,6 @@ gst_droidadec_create_codec (GstDroidADec * dec)
 
     droid_media_codec_destroy (dec->codec);
     dec->codec = NULL;
-    dec->queue = NULL;
 
     return FALSE;
   }
@@ -211,7 +208,6 @@ gst_droidadec_stop (GstAudioDecoder * decoder)
     droid_media_codec_stop (dec->codec);
     droid_media_codec_destroy (dec->codec);
     dec->codec = NULL;
-    dec->queue = NULL;
   }
 
   g_mutex_lock (&dec->eos_lock);
@@ -362,7 +358,6 @@ gst_droidadec_finish (GstAudioDecoder * decoder)
     droid_media_codec_stop (dec->codec);
     droid_media_codec_destroy (dec->codec);
     dec->codec = NULL;
-    dec->queue = NULL;
   }
 
   dec->dirty = TRUE;
@@ -527,7 +522,6 @@ gst_droidadec_init (GstDroidADec * dec)
   gst_audio_decoder_set_needs_format (GST_AUDIO_DECODER (dec), TRUE);
 
   dec->codec = NULL;
-  dec->queue = NULL;
   dec->codec_type = NULL;
   dec->downstream_flow_ret = GST_FLOW_OK;
   dec->eos = FALSE;
