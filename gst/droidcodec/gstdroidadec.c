@@ -419,9 +419,9 @@ gst_droidadec_handle_frame (GstAudioDecoder * decoder, GstBuffer * buffer)
    * This is a bad situation. TODO: fix it
    */
   if (G_UNLIKELY (dec->dirty)) {
-    //    if (dec->codec) {
-    //      gst_droidadec_finish (decoder);
-    //    }
+    if (dec->codec) {
+      gst_droidadec_finish (decoder);
+    }
 
     if (!gst_droidadec_create_codec (dec)) {
       ret = GST_FLOW_ERROR;
@@ -495,11 +495,10 @@ error:
   return ret;
 }
 
-#if 0
 static gboolean
-gst_droiddec_flush (GstVideoDecoder * decoder)
+gst_droidadec_flush (GstAudioDecoder * decoder)
 {
-  GstDroidDec *dec = GST_DROIDDEC (decoder);
+  GstDroidADec *dec = GST_DROIDADEC (decoder);
 
   GST_DEBUG_OBJECT (dec, "flush");
 
@@ -521,7 +520,6 @@ gst_droiddec_flush (GstVideoDecoder * decoder)
 
   return TRUE;
 }
-#endif
 
 static void
 gst_droidadec_init (GstDroidADec * dec)
@@ -576,7 +574,5 @@ gst_droidadec_class_init (GstDroidADecClass * klass)
       GST_DEBUG_FUNCPTR (gst_droidadec_set_format);
   gstaudiodecoder_class->handle_frame =
       GST_DEBUG_FUNCPTR (gst_droidadec_handle_frame);
-#if 0
-  gstaudiodecoder_class->flush = GST_DEBUG_FUNCPTR (gst_droiddec_flush);
-#endif
+  gstaudiodecoder_class->flush = GST_DEBUG_FUNCPTR (gst_droidadec_flush);
 }
