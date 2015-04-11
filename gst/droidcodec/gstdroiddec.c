@@ -667,7 +667,8 @@ gst_droiddec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   }
 
   dec->codec_type =
-      gst_droid_codec_new_from_caps (state->caps, GST_DROID_CODEC_DECODER);
+      gst_droid_codec_new_from_caps (state->caps,
+      GST_DROID_CODEC_DECODER_VIDEO);
   if (!dec->codec_type) {
     GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, (NULL),
         ("Unknown codec type for caps %" GST_PTR_FORMAT, state->caps));
@@ -836,9 +837,8 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
    * which breaks timestamping.
    */
   data.ts =
-      GST_CLOCK_TIME_IS_VALID (frame->
-      pts) ? GST_TIME_AS_USECONDS (frame->pts) : GST_TIME_AS_USECONDS (frame->
-      dts);
+      GST_CLOCK_TIME_IS_VALID (frame->pts) ? GST_TIME_AS_USECONDS (frame->
+      pts) : GST_TIME_AS_USECONDS (frame->dts);
   data.sync = GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame) ? true : false;
 
   /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
@@ -970,7 +970,7 @@ gst_droiddec_class_init (GstDroidDecClass * klass)
       "Video decoder", "Decoder/Video/Device",
       "Android HAL decoder", "Mohammed Sameer <msameer@foolab.org>");
 
-  caps = gst_droid_codec_get_all_caps (GST_DROID_CODEC_DECODER);
+  caps = gst_droid_codec_get_all_caps (GST_DROID_CODEC_DECODER_VIDEO);
   tpl = gst_pad_template_new (GST_VIDEO_DECODER_SINK_NAME,
       GST_PAD_SINK, GST_PAD_ALWAYS, caps);
   gst_element_class_add_pad_template (gstelement_class, tpl);
