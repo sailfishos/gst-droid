@@ -47,7 +47,6 @@ struct _GstDroidADec
 {
   GstVideoDecoder parent;
   DroidMediaCodec *codec;
-  DroidMediaBufferQueue *queue;
   GstDroidCodec *codec_type;
 
   gint channels;
