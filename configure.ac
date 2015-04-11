@@ -50,6 +50,7 @@ PKG_CHECK_MODULES(GST, [
   gstreamer-plugins-bad-1.0 >= $GST_REQUIRED
   gstreamer-tag-1.0 >= $GST_REQUIRED
   gstreamer-codecparsers-1.0 >= $GST_REQUIRED
+  gstreamer-audio-1.0 >= $GST_REQUIRED
 ], [
   AC_SUBST(GST_CFLAGS)
   AC_SUBST(GST_LIBS)
