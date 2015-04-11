@@ -315,6 +315,9 @@ gst_droidadec_set_format (GstAudioDecoder * decoder, GstCaps * caps)
     return FALSE;
   }
 
+  GST_INFO_OBJECT (dec, "configuring decoder. rate=%d, channels=%d", dec->rate,
+      dec->channels);
+
   gst_audio_info_init (&info);
   gst_audio_info_set_format (&info, GST_AUDIO_FORMAT_S16, dec->rate,
       dec->channels, NULL);
