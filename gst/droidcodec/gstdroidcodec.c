@@ -42,6 +42,8 @@ static gboolean create_mpeg4vdec_codec_data (GstDroidCodec * codec,
     GstBuffer * data, DroidMediaData * out);
 static gboolean create_h264dec_codec_data (GstDroidCodec * codec,
     GstBuffer * data, DroidMediaData * out);
+static gboolean create_aacdec_codec_data (GstDroidCodec * codec,
+    GstBuffer * data, DroidMediaData * out);
 static gboolean process_h264dec_data (GstDroidCodec * codec, GstBuffer * buffer,
     DroidMediaData * out);
 static gboolean is_mpeg4v (const GstStructure * s);
@@ -89,7 +91,12 @@ struct _GstDroidCodecInfo
   " , width = (int) [1, MAX], height = (int)[1, MAX], framerate = (fraction)[1/MAX, MAX]"
 
 static GstDroidCodecInfo codecs[] = {
-  /* decoders */
+  /* audio decoders */
+  {GST_DROID_CODEC_DECODER_AUDIO, "audio/mpeg", "audio/mp4a-latm",
+        "audio/mpeg, mpegversion=(int)4, stream-format=(string){raw}",
+      is_mpeg4v, NULL, NULL, NULL, create_aacdec_codec_data, NULL},
+
+  /* video decoders */
   {GST_DROID_CODEC_DECODER_VIDEO, "video/mpeg", "video/mp4v-es",
         "video/mpeg, mpegversion=4" CAPS_FRAGMENT_VIDEO,
       is_mpeg4v, NULL, NULL, NULL, create_mpeg4vdec_codec_data, NULL},
@@ -548,6 +555,100 @@ out:
   gst_buffer_unmap (data, &info);
 
   return ret;
+}
+
+static int
+write_len (guint8 * buf, int val)
+{
+  /* This is some sort of variable-length coding, but the quicktime
+   * file(s) I have here all just use a 4-byte version, so we'll do that.
+   * Return the number of bytes written;
+   */
+  buf[0] = ((val >> 21) & 0x7f) | 0x80;
+  buf[1] = ((val >> 14) & 0x7f) | 0x80;
+  buf[2] = ((val >> 7) & 0x7f) | 0x80;
+  buf[3] = ((val >> 0) & 0x7f);
+  return 4;
+}
+
+static gboolean
+create_aacdec_codec_data (GstDroidCodec * codec,
+    GstBuffer * data, DroidMediaData * out)
+{
+#define _QT_PUT(__data, __idx, __size, __shift, __num) \
+  (((guint8 *) (__data))[__idx] = (((guint##__size) __num) >> __shift) & 0xff)
+#define QT_WRITE_UINT24(data, num)      do {	\
+    _QT_PUT (data, 0, 32,  0, num); \
+    _QT_PUT (data, 1, 32,  8, num); \
+    _QT_PUT (data, 2, 32, 16, num); \
+} while (0)
+
+  /*
+   * blindly based on audiodecoders.c:make_aac_magic_cookie()
+   */
+  GstMapInfo info;
+
+  if (!gst_buffer_map (data, &info, GST_MAP_READ)) {
+    GST_ERROR ("failed to map buffer");
+    return FALSE;
+  }
+
+  guint8 *cookie;
+  int offset = 0;
+  int decoder_specific_len = info.size;
+  int config_len = 13 + 5 + decoder_specific_len;
+  int es_len = 3 + 5 + config_len + 5 + 1;
+  int total_len = es_len + 5;
+
+  out->size = total_len;
+  out->data = g_malloc0 (out->size);
+
+  /* Structured something like this:
+   * [ES Descriptor
+   *  [Config Descriptor
+   *   [Specific Descriptor]]
+   *  [Unknown]]
+   */
+
+  GST_WRITE_UINT8 (out->data + offset, 0x03);
+  offset += 1;                  /* ES Descriptor tag */
+  offset += write_len (out->data + offset, es_len);
+  GST_WRITE_UINT16_LE (out->data + offset, 0);
+  offset += 2;                  /* Track ID */
+  GST_WRITE_UINT8 (out->data + offset, 0);
+  offset += 1;                  /* Flags */
+
+  GST_WRITE_UINT8 (out->data + offset, 0x04);
+  offset += 1;                  /* Config Descriptor tag */
+  offset += write_len (out->data + offset, config_len);
+
+  /* TODO: Fix these up */
+  GST_WRITE_UINT8 (out->data + offset, 0x40);
+  offset += 1;                  /* object_type_id */
+  GST_WRITE_UINT8 (out->data + offset, 0x15);
+  offset += 1;                  /* stream_type */
+  QT_WRITE_UINT24 (out->data + offset, 0x1800);
+  offset += 3;                  /* buffer_size_db */
+  GST_WRITE_UINT32_LE (out->data + offset, 128000);
+  offset += 4;                  /* max_bitrate */
+  GST_WRITE_UINT32_LE (out->data + offset, 128000);
+  offset += 4;                  /* avg_bitrate */
+
+  GST_WRITE_UINT8 (out->data + offset, 0x05);
+  offset += 1;                  /* Specific Descriptor tag */
+  offset += write_len (out->data + offset, decoder_specific_len);
+  memcpy (out->data + offset, info.data, decoder_specific_len);
+  offset += decoder_specific_len;
+
+  /* TODO: What is this? 'SL descriptor' apparently, but what does that mean? */
+  GST_WRITE_UINT8 (out->data + offset, 0x06);
+  offset += 1;                  /* SL Descriptor tag */
+  offset += write_len (out->data + offset, 1);
+  GST_WRITE_UINT8 (out->data + offset, 2);
+  offset += 1;
+
+  gst_buffer_unmap (data, &info);
+  return TRUE;
 }
 
 static gboolean
