@@ -288,7 +288,7 @@ gst_droidadec_set_format (GstAudioDecoder * decoder, GstCaps * caps)
   GstDroidADec *dec = GST_DROIDADEC (decoder);
   GstStructure *str = gst_caps_get_structure (caps, 0);
   const GValue *value = gst_structure_get_value (str, "codec_data");
-  GstBuffer *codec_data = gst_value_get_buffer (value);
+  GstBuffer *codec_data = value ? gst_value_get_buffer (value) : NULL;
   GstAudioInfo info;
 
   /*
