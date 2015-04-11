@@ -694,6 +694,10 @@ gst_droidadec_handle_frame (GstAudioDecoder * decoder, GstBuffer * buffer)
 
   GST_DEBUG_OBJECT (dec, "handle frame");
 
+  if (G_UNLIKELY (!buffer)) {
+    return GST_FLOW_OK;
+  }
+
   if (!GST_CLOCK_TIME_IS_VALID (buffer->dts)
       && !GST_CLOCK_TIME_IS_VALID (buffer->pts)) {
     GST_WARNING_OBJECT (dec,
