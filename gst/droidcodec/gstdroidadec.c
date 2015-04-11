@@ -486,11 +486,12 @@ gst_droiddec_configure_state (GstVideoDecoder * decoder, gsize width,
 
   return out;
 }
+#endif
 
 static gboolean
-gst_droiddec_stop (GstVideoDecoder * decoder)
+gst_droidadec_stop (GstAudioDecoder * decoder)
 {
-  GstDroidDec *dec = GST_DROIDDEC (decoder);
+  GstDroidADec *dec = GST_DROIDADEC (decoder);
 
   GST_DEBUG_OBJECT (dec, "stop");
 
@@ -499,16 +500,6 @@ gst_droiddec_stop (GstVideoDecoder * decoder)
     droid_media_codec_destroy (dec->codec);
     dec->codec = NULL;
     dec->queue = NULL;
-  }
-
-  if (dec->in_state) {
-    gst_video_codec_state_unref (dec->in_state);
-    dec->in_state = NULL;
-  }
-
-  if (dec->out_state) {
-    gst_video_codec_state_unref (dec->out_state);
-    dec->out_state = NULL;
   }
 
   g_mutex_lock (&dec->eos_lock);
@@ -522,32 +513,23 @@ gst_droiddec_stop (GstVideoDecoder * decoder)
     dec->codec_type = NULL;
   }
 
-  if (dec->convert) {
-    droid_media_convert_destroy (dec->convert);
-    dec->convert = NULL;
-  }
-
   return TRUE;
 }
 
 static void
-gst_droiddec_finalize (GObject * object)
+gst_droidadec_finalize (GObject * object)
 {
-  GstDroidDec *dec = GST_DROIDDEC (object);
+  GstDroidADec *dec = GST_DROIDADEC (object);
 
   GST_DEBUG_OBJECT (dec, "finalize");
 
-  gst_droiddec_stop (GST_VIDEO_DECODER (dec));
-
-  gst_object_unref (dec->allocator);
-  dec->allocator = NULL;
+  gst_droidadec_stop (GST_AUDIO_DECODER (dec));
 
   g_mutex_clear (&dec->eos_lock);
   g_cond_clear (&dec->eos_cond);
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
-#endif
 
 static gboolean
 gst_droidadec_open (GstAudioDecoder * decoder)
@@ -573,11 +555,10 @@ gst_droidadec_close (GstAudioDecoder * decoder)
   return TRUE;
 }
 
-#if 0
 static gboolean
-gst_droiddec_start (GstVideoDecoder * decoder)
+gst_droidadec_start (GstAudioDecoder * decoder)
 {
-  GstDroidDec *dec = GST_DROIDDEC (decoder);
+  GstDroidADec *dec = GST_DROIDADEC (decoder);
 
   GST_DEBUG_OBJECT (dec, "start");
 
@@ -588,7 +569,7 @@ gst_droiddec_start (GstVideoDecoder * decoder)
 
   return TRUE;
 }
-#endif
+
 static gboolean
 gst_droidadec_set_format (GstAudioDecoder * decoder, GstCaps * caps)
 {
@@ -846,8 +827,6 @@ gst_droidadec_init (GstDroidADec * dec)
 
   g_mutex_init (&dec->eos_lock);
   g_cond_init (&dec->eos_cond);
-
-  dec->allocator = NULL;
 }
 
 static void
@@ -874,24 +853,21 @@ gst_droidadec_class_init (GstDroidADecClass * klass)
 
   gst_element_class_add_pad_template (gstelement_class,
       gst_static_pad_template_get (&gst_droidadec_src_template_factory));
-#if 0
-  gobject_class->finalize = gst_droiddec_finalize;
-#endif
+
+  gobject_class->finalize = gst_droidadec_finalize;
 
   gstaudiodecoder_class->open = GST_DEBUG_FUNCPTR (gst_droidadec_open);
   gstaudiodecoder_class->close = GST_DEBUG_FUNCPTR (gst_droidadec_close);
-#if 0
-  gstvideodecoder_class->start = GST_DEBUG_FUNCPTR (gst_droiddec_start);
-  gstvideodecoder_class->stop = GST_DEBUG_FUNCPTR (gst_droiddec_stop);
-#endif
+  gstaudiodecoder_class->start = GST_DEBUG_FUNCPTR (gst_droidadec_start);
+  gstaudiodecoder_class->stop = GST_DEBUG_FUNCPTR (gst_droidadec_stop);
   gstaudiodecoder_class->set_format =
       GST_DEBUG_FUNCPTR (gst_droidadec_set_format);
 #if 0
-  gstvideodecoder_class->finish = GST_DEBUG_FUNCPTR (gst_droiddec_finish);
+  gstaudiodecoder_class->finish = GST_DEBUG_FUNCPTR (gst_droiddec_finish);
 #endif
   gstaudiodecoder_class->handle_frame =
       GST_DEBUG_FUNCPTR (gst_droidadec_handle_frame);
 #if 0
-  gstvideodecoder_class->flush = GST_DEBUG_FUNCPTR (gst_droiddec_flush);
+  gstaudiodecoder_class->flush = GST_DEBUG_FUNCPTR (gst_droiddec_flush);
 #endif
 }
