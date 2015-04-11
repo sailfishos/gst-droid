@@ -131,7 +131,7 @@ gst_droidadec_data_available (void *data, DroidMediaCodecData * encoded)
   out = gst_audio_decoder_allocate_output_buffer (decoder, encoded->data.size);
 
   gst_buffer_map (out, &info, GST_MAP_READWRITE);
-  memcpy (info.data, encoded->data.data, encoded->data.size);
+  orc_memcpy (info.data, encoded->data.data, encoded->data.size);
   gst_buffer_unmap (out, &info);
 
   GST_BUFFER_PTS (out) = encoded->ts;
@@ -429,7 +429,7 @@ gst_droidadec_handle_frame (GstAudioDecoder * decoder, GstBuffer * buffer)
   gst_buffer_map (buffer, &info, GST_MAP_READ);
   data.data.size = info.size;
   data.data.data = g_malloc (info.size);
-  memcpy (data.data.data, info.data, info.size);
+  orc_memcpy (data.data.data, info.data, info.size);
   gst_buffer_unmap (buffer, &info);
 
   cb.unref = g_free;
