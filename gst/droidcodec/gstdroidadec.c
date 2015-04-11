@@ -490,12 +490,14 @@ error:
   return ret;
 }
 
-static gboolean
-gst_droidadec_flush (GstAudioDecoder * decoder)
+static void
+gst_droidadec_flush (GstAudioDecoder * decoder, gboolean hard)
 {
   GstDroidADec *dec = GST_DROIDADEC (decoder);
 
-  GST_DEBUG_OBJECT (dec, "flush");
+  GST_DEBUG_OBJECT (dec, "flush %d", hard);
+
+  /* TODO: handle non-hard flush */
 
   /* We cannot flush the frames being decoded from the decoder. There is simply no way
    * to do that. The best we can do is to clear the queue of frames to be encoded.
@@ -512,8 +514,6 @@ gst_droidadec_flush (GstAudioDecoder * decoder)
   g_mutex_lock (&dec->eos_lock);
   dec->eos = FALSE;
   g_mutex_unlock (&dec->eos_lock);
-
-  return TRUE;
 }
 
 static void
