@@ -45,7 +45,7 @@ typedef struct _GstDroidADecClass GstDroidADecClass;
 
 struct _GstDroidADec
 {
-  GstVideoDecoder parent;
+  GstAudioDecoder parent;
   DroidMediaCodec *codec;
   GstDroidCodec *codec_type;
 
@@ -65,7 +65,7 @@ struct _GstDroidADec
 
 struct _GstDroidADecClass
 {
-  GstVideoDecoderClass parent_class;
+  GstAudioDecoderClass parent_class;
 };
 
 GType gst_droidadec_get_type (void);
