@@ -360,6 +360,7 @@ gst_droidaenc_start (GstAudioEncoder * encoder)
   enc->eos = FALSE;
   enc->downstream_flow_ret = GST_FLOW_OK;
   enc->dirty = TRUE;
+  enc->finished = FALSE;
 
   return TRUE;
 }
@@ -438,6 +439,8 @@ gst_droidaenc_finish (GstAudioEncoder * encoder)
   g_cond_wait (&enc->eos_cond, &enc->eos_lock);
   GST_AUDIO_ENCODER_STREAM_LOCK (encoder);
 
+  enc->finished = TRUE;
+
 out:
   enc->eos = FALSE;
 
@@ -458,6 +461,10 @@ gst_droidaenc_handle_frame (GstAudioEncoder * encoder, GstBuffer * buffer)
   GST_DEBUG_OBJECT (enc, "handle frame");
 
   if (G_UNLIKELY (!buffer)) {
+    if (enc->finished) {
+      return GST_FLOW_OK;
+    }
+
     return gst_droidaenc_finish (encoder);
   }
 
@@ -487,6 +494,8 @@ gst_droidaenc_handle_frame (GstAudioEncoder * encoder, GstBuffer * buffer)
 
     enc->dirty = FALSE;
   }
+
+  enc->finished = FALSE;
 
   gst_buffer_map (buffer, &info, GST_MAP_READ);
   data.data.size = info.size;
@@ -567,6 +576,7 @@ gst_droidaenc_init (GstDroidAEnc * enc)
   enc->channels = 0;
   enc->rate = 0;
   enc->caps = NULL;
+  enc->finished = FALSE;
 
   g_mutex_init (&enc->eos_lock);
   g_cond_init (&enc->eos_cond);
