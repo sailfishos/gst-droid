@@ -30,6 +30,7 @@
 #include "gstdroiddec.h"
 #include "gstdroidenc.h"
 #include "gstdroidadec.h"
+#include "gstdroidaenc.h"
 #include "droidmedia.h"
 
 GST_DEBUG_CATEGORY (gst_droid_camsrc_debug);
@@ -69,6 +70,8 @@ plugin_init (GstPlugin * plugin)
       GST_TYPE_DROIDENC);
   ok &= gst_element_register (plugin, "droidadec", GST_RANK_PRIMARY + 1,
       GST_TYPE_DROIDADEC);
+  ok &= gst_element_register (plugin, "droidaenc", GST_RANK_PRIMARY + 1,
+      GST_TYPE_DROIDAENC);
 
   if (ok)
     droid_media_init ();
