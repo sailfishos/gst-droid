@@ -205,6 +205,16 @@ gst_droidaenc_data_available (void *data, DroidMediaCodecData * encoded)
 
     GST_INFO_OBJECT (enc, "received codec_data");
 
+    if (G_UNLIKELY (enc->first_frame_sent)) {
+      enc->downstream_flow_ret = GST_FLOW_ERROR;
+      GST_AUDIO_ENCODER_STREAM_UNLOCK (encoder);
+
+      GST_ELEMENT_ERROR (enc, STREAM, FORMAT, (NULL),
+          ("codec data received more than once"));
+
+      return;
+    }
+
     codec_data =
         gst_droid_codec_create_encoder_codec_data (enc->codec_type,
         &encoded->data);
@@ -220,10 +230,6 @@ gst_droidaenc_data_available (void *data, DroidMediaCodecData * encoded)
       return;
     }
 
-    if (enc->first_frame_sent != FALSE) {
-      // TODO: error
-    }
-
     enc->first_frame_sent = TRUE;
 
     gst_caps_set_simple (enc->caps,
@@ -232,8 +238,13 @@ gst_droidaenc_data_available (void *data, DroidMediaCodecData * encoded)
 
     if (!gst_audio_encoder_set_output_format (GST_AUDIO_ENCODER (enc),
             enc->caps)) {
-      // TODO: error
-      //      goto error;
+      enc->downstream_flow_ret = GST_FLOW_ERROR;
+
+      GST_AUDIO_ENCODER_STREAM_UNLOCK (encoder);
+
+      GST_ELEMENT_ERROR (enc, STREAM, FORMAT, (NULL),
+          ("failed to set output caps"));
+      return;
     }
 
     gst_caps_replace (&enc->caps, NULL);
