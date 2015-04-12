@@ -46,8 +46,7 @@ enum
   PROP_TARGET_BITRATE,
 };
 
-// TODO:
-#define GST_DROID_A_ENC_TARGET_BITRATE_DEFAULT 192000
+#define GST_DROID_A_ENC_TARGET_BITRATE_DEFAULT 128000
 
 static void gst_droidaenc_signal_eos (void *data);
 static void gst_droidaenc_error (void *data, int err);
