@@ -11,10 +11,12 @@ libgstdroidcodec_la_SOURCES = \
 	gstdroiddec.c \
 	gstdroidenc.c \
 	gstdroidcodec.c \
-	gstdroidadec.c
+	gstdroidadec.c \
+	gstdroidaenc.c
 
 noinst_HEADERS = \
 	gstdroiddec.h \
 	gstdroidenc.h \
 	gstdroidcodec.h \
-	gstdroidadec.h
+	gstdroidadec.h \
+	gstdroidaenc.h
