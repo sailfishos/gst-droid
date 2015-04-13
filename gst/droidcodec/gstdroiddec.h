@@ -57,6 +57,8 @@ struct _GstDroidDec
   GMutex eos_lock;
   GCond eos_cond;
 
+  GstBufferPool *pool;
+
   /* protected by decoder stream lock */
   GstFlowReturn downstream_flow_ret;
   GstBuffer *codec_data;

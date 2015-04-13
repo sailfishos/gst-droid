@@ -26,6 +26,7 @@
 
 #include "gstdroiddec.h"
 #include "gst/droid/gstdroidmediabuffer.h"
+#include "gst/droid/gstdroidbufferpool.h"
 #include "plugin.h"
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -35,6 +36,8 @@
 #else
 #define orc_memcpy memcpy
 #endif
+
+#define GST_DROID_DEC_NUM_BUFFERS         2
 
 #define gst_droiddec_parent_class parent_class
 G_DEFINE_TYPE (GstDroidDec, gst_droiddec, GST_TYPE_VIDEO_DECODER);
@@ -60,6 +63,27 @@ static void gst_droiddec_buffers_released (void *user);
 static void gst_droiddec_frame_available (void *user);
 static gboolean gst_droiddec_convert_buffer (GstDroidDec * dec,
     DroidMediaBuffer * in, GstBuffer * out, GstVideoInfo * info);
+static void gst_droiddec_loop (GstDroidDec * dec);
+
+static void
+gst_droiddec_loop (GstDroidDec * dec)
+{
+  GST_LOG_OBJECT (dec, "loop");
+
+  if (!gst_droid_buffer_pool_wait_for_buffer (dec->pool)) {
+    goto out;
+  }
+
+  while (droid_media_codec_loop (dec->codec)
+      == DROID_MEDIA_CODEC_LOOP_OK) {
+    GST_LOG_OBJECT (dec, "tick");
+    return;
+  }
+
+out:
+  GST_INFO_OBJECT (dec, "pausing task");
+  gst_pad_pause_task (GST_VIDEO_DECODER_SRC_PAD (GST_VIDEO_DECODER (dec)));
+}
 
 static gboolean
 gst_droiddec_create_codec (GstDroidDec * dec)
@@ -70,11 +94,36 @@ gst_droiddec_create_codec (GstDroidDec * dec)
   GST_INFO_OBJECT (dec, "create codec of type %s: %dx%d",
       droid, dec->in_state->info.width, dec->in_state->info.height);
 
+  /* Let's take care of the buffer pool first */
+  if (!dec->pool) {
+    GstStructure *config;
+
+    dec->pool = gst_droid_buffer_pool_new ();
+    config = gst_buffer_pool_get_config (dec->pool);
+    gst_buffer_pool_config_set_params (config, dec->out_state->caps, 0,
+        GST_DROID_DEC_NUM_BUFFERS, GST_DROID_DEC_NUM_BUFFERS);
+
+    if (!gst_buffer_pool_set_config (dec->pool, config)) {
+      GST_ELEMENT_ERROR (dec, STREAM, FAILED, (NULL),
+          ("Failed to configure buffer pool"));
+      return FALSE;
+    }
+
+    if (!gst_buffer_pool_set_active (dec->pool, TRUE)) {
+      GST_ELEMENT_ERROR (dec, STREAM, FAILED, (NULL),
+          ("Failed to activate buffer pool"));
+      return FALSE;
+    }
+  } else {
+    gst_buffer_pool_set_flushing (dec->pool, FALSE);
+  }
+
   md.parent.type = droid;
   md.parent.width = dec->in_state->info.width;
   md.parent.height = dec->in_state->info.height;
   md.parent.fps = dec->in_state->info.fps_n / dec->in_state->info.fps_d;
-  md.parent.flags = DROID_MEDIA_CODEC_HW_ONLY;
+  md.parent.flags =
+      DROID_MEDIA_CODEC_HW_ONLY | DROID_MEDIA_CODEC_USE_EXTERNAL_LOOP;
   md.codec_data.size = 0;
 
   if (dec->codec_data) {
@@ -83,7 +132,7 @@ gst_droiddec_create_codec (GstDroidDec * dec)
       GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
           ("Failed to create codec_data."));
 
-      return FALSE;
+      goto error;
     }
   }
 
@@ -97,7 +146,7 @@ gst_droiddec_create_codec (GstDroidDec * dec)
     GST_ELEMENT_ERROR (dec, LIBRARY, SETTINGS, NULL,
         ("Failed to create decoder"));
 
-    return FALSE;
+    goto error;
   }
 
   dec->queue = droid_media_codec_get_buffer_queue (dec->codec);
@@ -125,10 +174,18 @@ gst_droiddec_create_codec (GstDroidDec * dec)
     dec->codec = NULL;
     dec->queue = NULL;
 
-    return FALSE;
+    goto error;
   }
 
+  /* now start our task */
+  gst_pad_start_task (GST_VIDEO_DECODER_SRC_PAD (GST_VIDEO_DECODER (dec)),
+      (GstTaskFunction) gst_droiddec_loop, gst_object_ref (dec),
+      gst_object_unref);
   return TRUE;
+
+error:
+  gst_buffer_pool_set_active (dec->pool, FALSE);
+  return FALSE;
 }
 
 static void
@@ -243,10 +300,11 @@ gst_droiddec_frame_available (void *user)
     goto acquire_and_release;
   }
 
-  if (dec->convert) {
-    buff = gst_video_decoder_allocate_output_buffer (decoder);
-  } else {
-    buff = gst_buffer_new ();
+  flow_ret = gst_buffer_pool_acquire_buffer (dec->pool, &buff, NULL);
+  if (flow_ret != GST_FLOW_OK) {
+    GST_WARNING_OBJECT (dec, "failed to acquire buffer from pool: %s",
+        gst_flow_get_name (flow_ret));
+    goto acquire_and_release;
   }
 
   cb.ref = (DroidMediaCallback) gst_buffer_ref;
@@ -356,6 +414,10 @@ gst_droiddec_signal_eos (void *data)
     GST_WARNING_OBJECT (dec, "codec signaled EOS but we are not expecting it");
   }
 
+  if (dec->pool) {
+    gst_buffer_pool_set_flushing (dec->pool, TRUE);
+  }
+
   g_cond_signal (&dec->eos_cond);
   g_mutex_unlock (&dec->eos_lock);
 }
@@ -383,6 +445,10 @@ gst_droiddec_error (void *data, int err)
       ("error 0x%x from android codec", -err));
 
 out:
+  if (dec->pool) {
+    gst_buffer_pool_set_flushing (dec->pool, TRUE);
+  }
+
   g_mutex_unlock (&dec->eos_lock);
 }
 
@@ -487,7 +553,32 @@ gst_droiddec_stop (GstVideoDecoder * decoder)
     dec->convert = NULL;
   }
 
+  if (dec->pool) {
+    gst_buffer_pool_set_active (dec->pool, FALSE);
+  }
+
   return TRUE;
+}
+
+static void
+gst_droiddec_stop_loop (GstDroidDec * dec)
+{
+  /*
+   * we cannot use _stop() here because it tries to acquire stream lock
+   * which frame_available also needs. This can deadlock because stop
+   * won't complete before frame_available is done.
+   */
+  GST_DEBUG_OBJECT (dec, "stop loop");
+
+  if (dec->pool) {
+    gst_buffer_pool_set_flushing (dec->pool, TRUE);
+  }
+
+  gst_pad_stop_task (GST_VIDEO_DECODER_SRC_PAD (GST_VIDEO_DECODER (dec)));
+
+  if (dec->pool) {
+    gst_buffer_pool_set_flushing (dec->pool, FALSE);
+  }
 }
 
 static void
@@ -498,6 +589,11 @@ gst_droiddec_finalize (GObject * object)
   GST_DEBUG_OBJECT (dec, "finalize");
 
   gst_droiddec_stop (GST_VIDEO_DECODER (dec));
+
+  if (dec->pool) {
+    gst_object_unref (dec->pool);
+    dec->pool = NULL;
+  }
 
   gst_object_unref (dec->allocator);
   dec->allocator = NULL;
@@ -809,6 +905,27 @@ gst_droiddec_flush (GstVideoDecoder * decoder)
   return TRUE;
 }
 
+static GstStateChangeReturn
+gst_droiddec_change_state (GstElement * element, GstStateChange transition)
+{
+  GstStateChangeReturn ret;
+  GstDroidDec *dec;
+
+  dec = GST_DROIDDEC (element);
+
+  GST_DEBUG_OBJECT (dec, "change state from %s to %s",
+      gst_element_state_get_name (GST_STATE_TRANSITION_CURRENT (transition)),
+      gst_element_state_get_name (GST_STATE_TRANSITION_NEXT (transition)));
+
+  if (transition == GST_STATE_CHANGE_PAUSED_TO_READY) {
+    gst_droiddec_stop_loop (dec);
+  }
+
+  ret = GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
+
+  return ret;
+}
+
 static void
 gst_droiddec_init (GstDroidDec * dec)
 {
@@ -828,6 +945,7 @@ gst_droiddec_init (GstDroidDec * dec)
   dec->in_state = NULL;
   dec->out_state = NULL;
   dec->convert = NULL;
+  dec->pool = NULL;
 }
 
 static void
@@ -857,6 +975,8 @@ gst_droiddec_class_init (GstDroidDecClass * klass)
 
   gobject_class->finalize = gst_droiddec_finalize;
 
+  gstelement_class->change_state =
+      GST_DEBUG_FUNCPTR (gst_droiddec_change_state);
   gstvideodecoder_class->open = GST_DEBUG_FUNCPTR (gst_droiddec_open);
   gstvideodecoder_class->close = GST_DEBUG_FUNCPTR (gst_droiddec_close);
   gstvideodecoder_class->start = GST_DEBUG_FUNCPTR (gst_droiddec_start);
