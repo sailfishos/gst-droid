@@ -470,7 +470,7 @@ gst_droidcamsrc_params_choose_image_framerate (GstDroidCamSrcParams * params,
       target_max = max;
     }
 
-    if (min < target_min && max > target_max) {
+    if (min <= target_min && max >= target_max) {
       /* we need to pick the widest range */
       target_min = min;
       target_max = max;
