@@ -407,14 +407,13 @@ gst_droidcamsrc_params_get_image_caps (GstDroidCamSrcParams * params)
 }
 
 void
-gst_droidcamsrc_params_set_string (GstDroidCamSrcParams * params,
+gst_droidcamsrc_params_set_string_locked (GstDroidCamSrcParams * params,
     const gchar * key, const gchar * value)
 {
   gchar *val;
 
   GST_DEBUG ("setting param %s to %s", key, value);
 
-  g_mutex_lock (&params->lock);
   val = g_hash_table_lookup (params->params, key);
 
   /* update only if not equal */
@@ -422,6 +421,13 @@ gst_droidcamsrc_params_set_string (GstDroidCamSrcParams * params,
     g_hash_table_insert (params->params, g_strdup (key), g_strdup (value));
     params->is_dirty = TRUE;
   }
+}
 
+void
+gst_droidcamsrc_params_set_string (GstDroidCamSrcParams * params,
+    const gchar * key, const gchar * value)
+{
+  g_mutex_lock (&params->lock);
+  gst_droidcamsrc_params_set_string_locked (params, key, value);
   g_mutex_unlock (&params->lock);
 }
