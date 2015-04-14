@@ -315,9 +315,7 @@ gst_droidcamsrc_params_get_caps_locked (GstDroidCamSrcParams * params,
     GstCaps *caps2;
     if (gst_droidcamsrc_params_parse_dimension (*tmp, &w, &h)) {
       caps2 = gst_caps_new_simple (media,
-          "width", G_TYPE_INT, w,
-          "height", G_TYPE_INT, h,
-          "framerate", GST_TYPE_FRACTION, fps, 1, NULL);
+          "width", G_TYPE_INT, w, "height", G_TYPE_INT, h, NULL);
 
       if (format) {
         gst_caps_set_simple (caps2, "format", G_TYPE_STRING, format, NULL);
@@ -328,7 +326,37 @@ gst_droidcamsrc_params_get_caps_locked (GstDroidCamSrcParams * params,
                 NULL));
       }
 
-      caps = gst_caps_merge (caps, caps2);
+      /* now add frame rate */
+      if (params->min_fps_range->len == 0) {
+        /* the easy part first */
+        gst_caps_set_simple (caps2, "framerate", GST_TYPE_FRACTION, fps, 1,
+            NULL);
+        GST_DEBUG ("merging caps %" GST_PTR_FORMAT, caps2);
+        caps = gst_caps_merge (caps, caps2);
+      } else {
+        int x;
+        for (x = 0; x < params->min_fps_range->len; x++) {
+          GstCaps *caps3;
+          int min = g_array_index (params->min_fps_range, gint, x);
+          int max = g_array_index (params->max_fps_range, gint, x);
+          min /= 1000;
+          max /= 1000;
+
+          caps3 = gst_caps_copy (caps2);
+          if (min == max) {
+            gst_caps_set_simple (caps3, "framerate", GST_TYPE_FRACTION, min, 1,
+                NULL);
+          } else {
+            gst_caps_set_simple (caps3, "framerate", GST_TYPE_FRACTION_RANGE,
+                min, 1, max, 1, NULL);
+          }
+
+          GST_DEBUG ("merging caps %" GST_PTR_FORMAT, caps3);
+          caps = gst_caps_merge (caps, caps3);
+        }
+
+        gst_caps_unref (caps2);
+      }
     }
 
     ++tmp;
@@ -336,8 +364,7 @@ gst_droidcamsrc_params_get_caps_locked (GstDroidCamSrcParams * params,
 
   g_strfreev (vals);
 
-
-  return caps;
+  return gst_caps_simplify (caps);
 }
 
 GstCaps *
