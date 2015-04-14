@@ -28,7 +28,8 @@
 #include <stdlib.h>
 #include "gst/droid/gstdroidmediabuffer.h"
 #include "plugin.h"
-#include <gst/droid/gstwrappedmemory.h>
+#include "gst/droid/gstwrappedmemory.h"
+#include <string.h>
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
 #define GST_CAT_DEFAULT gst_droid_camsrc_debug
@@ -108,6 +109,53 @@ gst_droidcamsrc_params_parse_dimension (char *d, int *w, int *h)
 }
 
 void
+gst_droidcamsrc_params_fill_fps_range_arrays_locked (GstDroidCamSrcParams *
+    params)
+{
+  gchar *range;
+  gchar *val;
+
+  range = g_hash_table_lookup (params->params, "preview-fps-range-values");
+  if (!range) {
+    GST_ERROR ("no preview-fps-range-values");
+    return;
+  }
+
+  if (!range[0] == '(') {
+    GST_ERROR ("invalid preview-fps-range-values");
+    return;
+  }
+
+  val = range;
+
+  /* this is really a primitive parser but I assume the HAL is providing correct values as
+   * it should work with Android */
+  while (*val != '\0') {
+    int min, max;
+
+    val = strchr (val, '(');
+    ++val;
+    min = atoi (val);
+
+    val = strchr (val, ',');
+    ++val;                      /* bypass , */
+    max = atoi (val);
+    val = strchr (val, ')');
+    ++val;
+
+    if (min == 0 || max == 0) {
+      GST_ERROR ("failed to parse preview-fps-range-values");
+      continue;
+    }
+
+    g_array_append_val (params->min_fps_range, min);
+    g_array_append_val (params->max_fps_range, max);
+
+    GST_LOG ("parsed fps range: %d - %d", min, max);
+  }
+}
+
+void
 gst_droidcamsrc_params_reload_locked (GstDroidCamSrcParams * params,
     const gchar * str)
 {
@@ -134,6 +182,19 @@ gst_droidcamsrc_params_reload_locked (GstDroidCamSrcParams * params,
     GST_ERROR ("reloading discarded unset parameters");
   }
 
+  /* now try to extract preview-fps-range-values */
+  if (params->min_fps_range) {
+    g_array_free (params->min_fps_range, TRUE);
+  }
+  params->min_fps_range = g_array_new (FALSE, FALSE, sizeof (gint));
+
+  if (params->max_fps_range) {
+    g_array_free (params->max_fps_range, TRUE);
+  }
+  params->max_fps_range = g_array_new (FALSE, FALSE, sizeof (gint));
+
+  gst_droidcamsrc_params_fill_fps_range_arrays_locked (params);
+
   params->is_dirty = FALSE;
 }
 
@@ -154,6 +215,14 @@ void
 gst_droidcamsrc_params_destroy (GstDroidCamSrcParams * params)
 {
   GST_DEBUG ("params destroy");
+
+  if (params->min_fps_range) {
+    g_array_free (params->min_fps_range, TRUE);
+  }
+
+  if (params->max_fps_range) {
+    g_array_free (params->max_fps_range, TRUE);
+  }
 
   g_mutex_clear (&params->lock);
   g_hash_table_unref (params->params);
