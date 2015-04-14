@@ -1323,6 +1323,12 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   our_caps = gst_caps_make_writable (our_caps);
   our_caps = gst_caps_truncate (our_caps);
 
+  if (src->mode == MODE_IMAGE) {
+    gst_droidcamsrc_params_choose_image_framerate (src->dev->params, our_caps);
+  } else {
+    gst_droidcamsrc_params_choose_video_framerate (src->dev->params, our_caps);
+  }
+
   if (!gst_pad_set_caps (data->pad, our_caps)) {
     GST_ERROR_OBJECT (src, "failed to set caps");
     goto out;
