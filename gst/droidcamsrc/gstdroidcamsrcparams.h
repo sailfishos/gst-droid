@@ -52,6 +52,8 @@ void gst_droidcamsrc_params_set_string (GstDroidCamSrcParams *params, const gcha
 int gst_droidcamsrc_params_get_int (GstDroidCamSrcParams * params, const char *key);
 float gst_droidcamsrc_params_get_float (GstDroidCamSrcParams * params, const char *key);
 
+void gst_droidcamsrc_params_choose_image_framerate (GstDroidCamSrcParams * params, GstCaps * caps);
+
 G_END_DECLS
 
 #endif /* __GST_DROID_CAM_SRC_PARAMS_H__ */
