@@ -27,7 +27,7 @@
 
 static GstDroidCamSrcMode *gst_droid_cam_src_mode_new (GstDroidCamSrc * src);
 static gboolean gst_droid_cam_src_mode_negotiate_pad (GstDroidCamSrcMode * mode,
-    GstPad * pad);
+    GstPad * pad, gboolean force);
 
 static GstDroidCamSrcMode *
 gst_droid_cam_src_mode_new (GstDroidCamSrc * src)
@@ -82,8 +82,8 @@ gst_droid_cam_src_mode_activate (GstDroidCamSrcMode * mode)
   }
 
   gst_droidcamsrc_dev_stop (mode->src->dev);
-  gst_droid_cam_src_mode_negotiate_pad (mode, mode->modesrc);
-  gst_droid_cam_src_mode_negotiate_pad (mode, mode->vfsrc);
+  gst_droid_cam_src_mode_negotiate_pad (mode, mode->modesrc, FALSE);
+  gst_droid_cam_src_mode_negotiate_pad (mode, mode->vfsrc, TRUE);
 
   ret = gst_droidcamsrc_dev_start (mode->src->dev, FALSE);
 
@@ -120,7 +120,7 @@ gst_droid_cam_src_mode_negotiate (GstDroidCamSrcMode * mode, GstPad * pad)
     gst_droidcamsrc_dev_stop (mode->src->dev);
   }
 
-  gst_droid_cam_src_mode_negotiate_pad (mode, pad);
+  gst_droid_cam_src_mode_negotiate_pad (mode, pad, FALSE);
 
   if (pad == mode->vfsrc) {
     /* start which will also apply the settings */
@@ -140,15 +140,18 @@ gst_droid_cam_src_mode_negotiate (GstDroidCamSrcMode * mode, GstPad * pad)
 }
 
 static gboolean
-gst_droid_cam_src_mode_negotiate_pad (GstDroidCamSrcMode * mode, GstPad * pad)
+gst_droid_cam_src_mode_negotiate_pad (GstDroidCamSrcMode * mode, GstPad * pad,
+    gboolean force)
 {
   GstDroidCamSrcPad *data = gst_pad_get_element_private (pad);
   /* take pad lock */
   g_mutex_lock (&data->lock);
 
-  if (!gst_pad_check_reconfigure (data->pad)) {
-    g_mutex_unlock (&data->lock);
-    return TRUE;
+  if (!force) {
+    if (!gst_pad_check_reconfigure (data->pad)) {
+      g_mutex_unlock (&data->lock);
+      return TRUE;
+    }
   }
 
   /*
