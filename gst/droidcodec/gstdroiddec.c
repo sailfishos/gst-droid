@@ -300,11 +300,16 @@ gst_droiddec_frame_available (void *user)
     goto acquire_and_release;
   }
 
-  flow_ret = gst_buffer_pool_acquire_buffer (dec->pool, &buff, NULL);
-  if (flow_ret != GST_FLOW_OK) {
-    GST_WARNING_OBJECT (dec, "failed to acquire buffer from pool: %s",
-        gst_flow_get_name (flow_ret));
-    goto acquire_and_release;
+  if (dec->convert) {
+    buff = gst_video_decoder_allocate_output_buffer (decoder);
+  } else {
+    flow_ret = gst_buffer_pool_acquire_buffer (dec->pool, &buff, NULL);
+
+    if (flow_ret != GST_FLOW_OK) {
+      GST_WARNING_OBJECT (dec, "failed to acquire buffer from pool: %s",
+          gst_flow_get_name (flow_ret));
+      goto acquire_and_release;
+    }
   }
 
   cb.ref = (DroidMediaCallback) gst_buffer_ref;
