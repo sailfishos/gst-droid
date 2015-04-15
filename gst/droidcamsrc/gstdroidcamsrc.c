@@ -1630,6 +1630,9 @@ gst_droidcamsrc_start_capture (GstDroidCamSrc * src)
     started = gst_droidcamsrc_start_image_capture_locked (src);
   } else {
     started = gst_droidcamsrc_start_video_recording_locked (src);
+    if (started) {
+      started = gst_droidcamsrc_apply_params (src);
+    }
   }
 
   if (!started) {
