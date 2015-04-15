@@ -77,8 +77,7 @@ static void gst_droidcamsrc_stop_capture (GstDroidCamSrc * src);
 static void gst_droidcamsrc_update_ev_compensation_bounds (GstDroidCamSrc *
     src);
 static void gst_droidcamsrc_add_vfsrc_orientation_tag (GstDroidCamSrc * src);
-static gboolean gst_droid_cam_src_select_and_activate_mode (GstDroidCamSrc *
-    src);
+static gboolean gst_droidcamsrc_select_and_activate_mode (GstDroidCamSrc * src);
 
 enum
 {
@@ -182,8 +181,8 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   src->vidsrc->negotiate = gst_droidcamsrc_vidsrc_negotiate;
 
   /* create the modes after we create the pads because the modes need the pads */
-  src->image = gst_droid_cam_src_mode_new_image (src);
-  src->video = gst_droid_cam_src_mode_new_video (src);
+  src->image = gst_droidcamsrc_mode_new_image (src);
+  src->video = gst_droidcamsrc_mode_new_video (src);
   src->active_mode = NULL;
 
   GST_OBJECT_FLAG_SET (src, GST_ELEMENT_FLAG_SOURCE);
@@ -294,14 +293,14 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
 
       /* deactivate old mode */
       if (src->active_mode) {
-        gst_droid_cam_src_mode_deactivate (src->active_mode);
+        gst_droidcamsrc_mode_deactivate (src->active_mode);
         src->active_mode = NULL;
       }
 
       src->mode = mode;
 
       /* activate mode. */
-      gst_droid_cam_src_select_and_activate_mode (src);
+      gst_droidcamsrc_select_and_activate_mode (src);
 
       /* set mode settings */
       gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
@@ -341,8 +340,8 @@ gst_droidcamsrc_finalize (GObject * object)
 
   GST_DEBUG_OBJECT (src, "finalize");
 
-  gst_droid_cam_src_mode_free (src->image);
-  gst_droid_cam_src_mode_free (src->video);
+  gst_droidcamsrc_mode_free (src->image);
+  gst_droidcamsrc_mode_free (src->video);
 
   gst_droidcamsrc_destroy_pad (src->vfsrc);
   gst_droidcamsrc_destroy_pad (src->imgsrc);
@@ -387,7 +386,7 @@ gst_droidcamsrc_fill_info (GstDroidCamSrc * src, GstDroidCamSrcCamInfo * target,
 }
 
 static gboolean
-gst_droid_cam_src_get_hw (GstDroidCamSrc * src)
+gst_droidcamsrc_get_hw (GstDroidCamSrc * src)
 {
   int num;
   gboolean front_found, back_found;
@@ -460,7 +459,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 
   switch (transition) {
     case GST_STATE_CHANGE_NULL_TO_READY:
-      if (!gst_droid_cam_src_get_hw (src)) {
+      if (!gst_droidcamsrc_get_hw (src)) {
         ret = GST_STATE_CHANGE_FAILURE;
         break;
       }
@@ -511,7 +510,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       gst_droidcamsrc_photography_apply (src, SET_ONLY);
 
       /* activate mode */
-      if (!gst_droid_cam_src_select_and_activate_mode (src)) {
+      if (!gst_droidcamsrc_select_and_activate_mode (src)) {
         ret = GST_STATE_CHANGE_FAILURE;
         break;
       }
@@ -551,7 +550,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 
       /* deactivate mode */
       if (src->active_mode) {
-        gst_droid_cam_src_mode_deactivate (src->active_mode);
+        gst_droidcamsrc_mode_deactivate (src->active_mode);
         src->active_mode = NULL;
       }
 
@@ -1141,9 +1140,8 @@ gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent, GstEvent * event)
             GST_PAD_NAME (data->pad));
         ret = FALSE;
       } else if (src->active_mode
-          && gst_droid_cam_src_mode_pad_is_significant (src->active_mode,
-              pad)) {
-        ret = gst_droid_cam_src_mode_negotiate (src->active_mode, pad);
+          && gst_droidcamsrc_mode_pad_is_significant (src->active_mode, pad)) {
+        ret = gst_droidcamsrc_mode_negotiate (src->active_mode, pad);
       } else {
         /* pad will negotiate later */
         ret = TRUE;
@@ -1946,7 +1944,7 @@ gst_droidcamsrc_add_vfsrc_orientation_tag (GstDroidCamSrc * src)
 }
 
 static gboolean
-gst_droid_cam_src_select_and_activate_mode (GstDroidCamSrc * src)
+gst_droidcamsrc_select_and_activate_mode (GstDroidCamSrc * src)
 {
   switch (src->mode) {
     case MODE_IMAGE:
@@ -1962,7 +1960,7 @@ gst_droid_cam_src_select_and_activate_mode (GstDroidCamSrc * src)
       return FALSE;
   }
 
-  if (!gst_droid_cam_src_mode_activate (src->active_mode)) {
+  if (!gst_droidcamsrc_mode_activate (src->active_mode)) {
     GST_ERROR_OBJECT (src, "failed to activate mode");
     return FALSE;
   }

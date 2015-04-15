@@ -20,8 +20,8 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef __GST_DROID_CAM_SRC_DEV_H__
-#define __GST_DROID_CAM_SRC_DEV_H__
+#ifndef __GST_DROIDCAMSRC_DEV_H__
+#define __GST_DROIDCAMSRC_DEV_H__
 
 #include <gst/gst.h>
 #include "gstdroidcamsrcparams.h"
@@ -85,4 +85,4 @@ gboolean gst_droidcamsrc_dev_restart (GstDroidCamSrcDev * dev);
 
 G_END_DECLS
 
-#endif /* __GST_DROID_CAM_SRC_DEV_H__ */
+#endif /* __GST_DROIDCAMSRC_DEV_H__ */

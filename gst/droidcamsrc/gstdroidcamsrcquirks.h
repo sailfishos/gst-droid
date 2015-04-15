@@ -19,8 +19,8 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef __GST_DROID_CAM_SRC_QUIRKS_H__
-#define __GST_DROID_CAM_SRC_QUIRKS_H__
+#ifndef __GST_DROIDCAMSRC_QUIRKS_H__
+#define __GST_DROIDCAMSRC_QUIRKS_H__
 
 #include <glib.h>
 
@@ -48,4 +48,4 @@ void gst_droidcamsrc_quirks_destroy (GstDroidCamSrcQuirks * quirks);
 
 G_END_DECLS
 
-#endif /* __GST_DROID_CAM_SRC_QUIRKS_H__ */
+#endif /* __GST_DROIDCAMSRC_QUIRKS_H__ */

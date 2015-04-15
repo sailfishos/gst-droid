@@ -19,8 +19,8 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef __GST_DROID_CAM_SRC_PARAMS_H__
-#define __GST_DROID_CAM_SRC_PARAMS_H__
+#ifndef __GST_DROIDCAMSRC_PARAMS_H__
+#define __GST_DROIDCAMSRC_PARAMS_H__
 
 #include <gst/gst.h>
 
@@ -57,4 +57,4 @@ void gst_droidcamsrc_params_choose_video_framerate (GstDroidCamSrcParams * param
 
 G_END_DECLS
 
-#endif /* __GST_DROID_CAM_SRC_PARAMS_H__ */
+#endif /* __GST_DROIDCAMSRC_PARAMS_H__ */

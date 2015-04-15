@@ -19,8 +19,8 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef __GST_DROID_CAM_SRC_MODE_H__
-#define __GST_DROID_CAM_SRC_MODE_H__
+#ifndef __GST_DROIDCAMSRC_MODE_H__
+#define __GST_DROIDCAMSRC_MODE_H__
 
 #include <gst/gst.h>
 
@@ -36,16 +36,16 @@ struct _GstDroidCamSrcMode
   GstPad *modesrc;
 };
 
-GstDroidCamSrcMode *gst_droid_cam_src_mode_new_image (GstDroidCamSrc *src);
-GstDroidCamSrcMode *gst_droid_cam_src_mode_new_video (GstDroidCamSrc *src);
-void gst_droid_cam_src_mode_free (GstDroidCamSrcMode * mode);
+GstDroidCamSrcMode *gst_droidcamsrc_mode_new_image (GstDroidCamSrc *src);
+GstDroidCamSrcMode *gst_droidcamsrc_mode_new_video (GstDroidCamSrc *src);
+void gst_droidcamsrc_mode_free (GstDroidCamSrcMode * mode);
 
-gboolean gst_droid_cam_src_mode_activate (GstDroidCamSrcMode * mode);
-void gst_droid_cam_src_mode_deactivate (GstDroidCamSrcMode * mode);
+gboolean gst_droidcamsrc_mode_activate (GstDroidCamSrcMode * mode);
+void gst_droidcamsrc_mode_deactivate (GstDroidCamSrcMode * mode);
 
-gboolean gst_droid_cam_src_mode_pad_is_significant (GstDroidCamSrcMode * mode, GstPad * pad);
-gboolean gst_droid_cam_src_mode_negotiate (GstDroidCamSrcMode * mode, GstPad * pad);
+gboolean gst_droidcamsrc_mode_pad_is_significant (GstDroidCamSrcMode * mode, GstPad * pad);
+gboolean gst_droidcamsrc_mode_negotiate (GstDroidCamSrcMode * mode, GstPad * pad);
 
 G_END_DECLS
 
-#endif /* __GST_DROID_CAM_SRC_MODE_H__ */
+#endif /* __GST_DROIDCAMSRC_MODE_H__ */

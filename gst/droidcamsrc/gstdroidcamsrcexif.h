@@ -19,8 +19,8 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef __GST_DROID_CAM_SRC_EXIF_H__
-#define __GST_DROID_CAM_SRC_EXIF_H__
+#ifndef __GST_DROIDCAMSRC_EXIF_H__
+#define __GST_DROIDCAMSRC_EXIF_H__
 
 #include <gst/gst.h>
 
@@ -30,4 +30,4 @@ GstTagList *gst_droidcamsrc_exif_tags_from_jpeg_data (void *data, size_t size);
 
 G_END_DECLS
 
-#endif /* __GST_DROID_CAM_SRC_EXIF_H__ */
+#endif /* __GST_DROIDCAMSRC_EXIF_H__ */
