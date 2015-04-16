@@ -353,7 +353,8 @@ gst_droidcamsrc_dev_preview_metadata_callback (void *user,
   GST_OBJECT_UNLOCK (src);
 
   s = gst_structure_new ("regions-of-interest", "frame-width", G_TYPE_UINT,
-      width, "frame-height", G_TYPE_UINT, height, NULL);
+      width, "frame-height", G_TYPE_UINT, height, "type", G_TYPE_UINT,
+      GST_DROIDCAMSRC_ROI_FACE_AREA, NULL);
 
   g_value_init (&regions, GST_TYPE_LIST);
 
