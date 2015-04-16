@@ -587,15 +587,38 @@ gst_droidcamsrc_handle_roi_event (GstDroidCamSrc * src,
   guint width, height, count;
   guint w, h, top, left, prio;
   const GValue *regions, *region;
-  guint x, len;
-  GList *rects = NULL;
-  gchar **array;
-  gchar *param;
+  guint x;
+  GPtrArray *focus_areas, *metering_areas;
+  gboolean reset_focus_areas = FALSE, reset_metering_areas = FALSE;
+  gint max_focus_areas;
+  gint max_metering_areas;
+  guint type;
+
+#define SET_ROI_PARAM(a,n)						\
+  do {									\
+    gchar *param;							\
+    /* we want a null terminated array */				\
+    g_ptr_array_add (a, NULL);						\
+    param = g_strjoinv (",", (gchar **)a->pdata);			\
+    gst_droidcamsrc_params_set_string (src->dev->params, n, param);	\
+    g_free (param);							\
+  } while (0)
 
   GST_DEBUG_OBJECT (src, "roi event");
 
   if (!src->dev || !src->dev->params) {
     GST_WARNING_OBJECT (src, "camera not running");
+    return FALSE;
+  }
+
+  max_focus_areas =
+      gst_droidcamsrc_params_get_int (src->dev->params, "max-num-focus-areas");
+  max_metering_areas =
+      gst_droidcamsrc_params_get_int (src->dev->params,
+      "max-num-metering-areas");
+
+  if (max_focus_areas == 0 && max_metering_areas == 0) {
+    GST_WARNING_OBJECT (src, "focus and metering areas are unsupported");
     return FALSE;
   }
 
@@ -605,6 +628,11 @@ gst_droidcamsrc_handle_roi_event (GstDroidCamSrc * src,
     return FALSE;
   }
 
+  if (!gst_structure_get_uint (structure, "type", &type)) {
+    GST_DEBUG_OBJECT (src, "assuming focus and metering types for RoI event");
+    type = GST_DROIDCAMSRC_ROI_FOCUS_AREA | GST_DROIDCAMSRC_ROI_METERING_AREA;
+  }
+
   regions = gst_structure_get_value (structure, "regions");
   if (!regions) {
     GST_WARNING_OBJECT (src, "RoI event missing regions data");
@@ -612,7 +640,13 @@ gst_droidcamsrc_handle_roi_event (GstDroidCamSrc * src,
   }
 
   count = gst_value_list_get_size (regions);
-  /* TODO: cap count to max areas supported by HAL */
+
+  max_focus_areas = MIN (count, max_focus_areas);
+  max_metering_areas = MIN (count, max_metering_areas);
+
+  /* an extra element for the terminating NULL */
+  focus_areas = g_ptr_array_new_full (max_focus_areas + 1, g_free);
+  metering_areas = g_ptr_array_new_full (max_metering_areas + 1, g_free);
 
   for (x = 0; x < count; x++) {
     const GstStructure *rs;
@@ -632,15 +666,17 @@ gst_droidcamsrc_handle_roi_event (GstDroidCamSrc * src,
 
     GST_DEBUG_OBJECT (src, "RoI: x=%d, y=%d, w=%d, h=%d, pri=%d",
         left, top, w, h, prio);
+
     if (prio == 0) {
       GST_DEBUG_OBJECT (src, "resetting RoI");
-      /* toss our rectangles */
-      if (rects) {
-        g_list_free_full (rects, g_free);
+
+      if (type & GST_DROIDCAMSRC_ROI_FOCUS_AREA) {
+        reset_focus_areas = TRUE;
       }
 
-      /* add an empty one */
-      rects = g_list_append (NULL, g_strdup ("(0,0,0,0,0)"));
+      if (type & GST_DROIDCAMSRC_ROI_METERING_AREA) {
+        reset_metering_areas = TRUE;
+      }
 
       /* no point in continuing */
       break;
@@ -659,35 +695,39 @@ gst_droidcamsrc_handle_roi_event (GstDroidCamSrc * src,
     GST_DEBUG_OBJECT (src, "adjusted RoI: x=%d, y=%d, w=%d, h=%d, pri=%d",
         left, top, w, h, prio);
 
-    rects =
-        g_list_append (rects, g_strdup_printf ("(%d,%d,%d,%d,%d)", left, top,
-            left + w, top + h, prio));
+    if (type & GST_DROIDCAMSRC_ROI_FOCUS_AREA
+        && focus_areas->len < max_focus_areas) {
+      g_ptr_array_add (focus_areas, g_strdup_printf ("(%d,%d,%d,%d,%d)", left,
+              top, left + w, top + h, prio));
+    }
+
+    if (type & GST_DROIDCAMSRC_ROI_METERING_AREA
+        && metering_areas->len < max_metering_areas) {
+      g_ptr_array_add (metering_areas, g_strdup_printf ("(%d,%d,%d,%d,%d)",
+              left, top, left + w, top + h, prio));
+    }
   }
 
-  if (!rects) {
-    GST_DEBUG_OBJECT (src, "no RoI structures found");
-    return FALSE;
+  if (reset_focus_areas) {
+    gst_droidcamsrc_params_set_string (src->dev->params, "focus-areas",
+        "(0,0,0,0,0)");
+  } else {
+    SET_ROI_PARAM (focus_areas, "focus-areas");
   }
 
-  len = g_list_length (rects);
-
-  array = g_malloc ((len + 1) * sizeof (gchar *));
-  for (x = 0; x < len; x++) {
-    array[x] = g_list_nth_data (rects, x);
+  if (reset_metering_areas) {
+    gst_droidcamsrc_params_set_string (src->dev->params, "metering-areas",
+        "(0,0,0,0,0)");
+  } else {
+    SET_ROI_PARAM (metering_areas, "metering-areas");
   }
 
-  array[len] = NULL;
+  g_ptr_array_free (focus_areas, TRUE);
+  g_ptr_array_free (metering_areas, TRUE);
 
-  param = g_strjoinv (",", array);
-
-  g_free (array);
-
-  gst_droidcamsrc_params_set_string (src->dev->params, "focus-areas", param);
   if (!gst_droidcamsrc_apply_params (src)) {
     GST_WARNING_OBJECT (src, "failed to apply parameters");
   }
-
-  g_free (param);
 
   return TRUE;
 }
