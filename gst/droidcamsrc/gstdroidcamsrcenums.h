@@ -2,6 +2,7 @@
  * gst-droid
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2015 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -34,6 +35,12 @@ typedef enum {
 } GstDroidCamSrcCameraDevice;
 
 GType gst_droidcamsrc_camera_device_get_type (void);
+
+typedef enum {
+  GST_DROIDCAMSRC_ROI_FOCUS_AREA = 0x1,
+  GST_DROIDCAMSRC_ROI_METERING_AREA = 0x2,
+  GST_DROIDCAMSRC_ROI_FACE_AREA = 0x4,
+} GstDroidCamSrcRoiType;
 
 G_END_DECLS
 
