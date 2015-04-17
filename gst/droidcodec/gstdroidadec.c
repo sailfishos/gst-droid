@@ -501,19 +501,6 @@ gst_droidadec_flush (GstAudioDecoder * decoder, gboolean hard)
 
   GST_DEBUG_OBJECT (dec, "flush %d", hard);
 
-  /* TODO: handle non-hard flush */
-
-  /* We cannot flush the frames being decoded from the decoder. There is simply no way
-   * to do that. The best we can do is to clear the queue of frames to be encoded.
-   * The problem now is if we get flushed we will still decode the previous queued frames
-   * and push them later on when they get decoded.
-   * This will lead to frames being repeated if the flush happens in the beginning
-   * or inaccurate seeking.
-   * We will just mark the decoder as "dirty" so the next handle_frame can recreate it
-   */
-
-  dec->dirty = TRUE;
-
   dec->downstream_flow_ret = GST_FLOW_OK;
   g_mutex_lock (&dec->eos_lock);
   dec->eos = FALSE;
