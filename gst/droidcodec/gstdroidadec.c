@@ -138,9 +138,6 @@ gst_droidadec_data_available (void *data, DroidMediaCodecData * encoded)
   orc_memcpy (info.data, encoded->data.data, encoded->data.size);
   gst_buffer_unmap (out, &info);
 
-  GST_BUFFER_PTS (out) = encoded->ts;
-  GST_BUFFER_DTS (out) = encoded->decoding_ts;
-
   flow_ret = gst_audio_decoder_finish_frame (decoder, out, 1);
 
   if (flow_ret == GST_FLOW_OK || flow_ret == GST_FLOW_FLUSHING) {
