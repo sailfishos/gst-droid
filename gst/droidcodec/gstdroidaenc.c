@@ -98,6 +98,8 @@ gst_droidaenc_create_codec (GstDroidAEnc * enc)
   DroidMediaCodecEncoderMetaData md;
   GstAudioInfo info;
 
+  memset (&md, 0x0, sizeof (md));
+
   gst_audio_info_init (&info);
   gst_audio_info_set_format (&info, GST_AUDIO_FORMAT_S16, enc->rate,
       enc->channels, NULL);

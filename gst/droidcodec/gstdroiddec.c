@@ -30,7 +30,7 @@
 #include "plugin.h"
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-
+#include <string.h>             /* memset() */
 #ifdef HAVE_ORC
 #include <orc/orc.h>
 #else
@@ -93,6 +93,8 @@ gst_droiddec_create_codec (GstDroidDec * dec)
 
   GST_INFO_OBJECT (dec, "create codec of type %s: %dx%d",
       droid, dec->in_state->info.width, dec->in_state->info.height);
+
+  memset (&md, 0x0, sizeof (md));
 
   /* Let's take care of the buffer pool first */
   if (!dec->pool) {

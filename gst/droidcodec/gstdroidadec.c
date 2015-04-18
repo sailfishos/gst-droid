@@ -30,7 +30,7 @@
 
 #include "gstdroidadec.h"
 #include "plugin.h"
-
+#include <string.h>             /* memset() */
 #ifdef HAVE_ORC
 #include <orc/orc.h>
 #else
@@ -62,6 +62,8 @@ gst_droidadec_create_codec (GstDroidADec * dec)
   const gchar *droid = gst_droid_codec_get_droid_type (dec->codec_type);
 
   GST_INFO_OBJECT (dec, "create codec of type %s", droid);
+
+  memset (&md, 0x0, sizeof (md));
 
   md.parent.type = droid;
   md.parent.channels = dec->channels;

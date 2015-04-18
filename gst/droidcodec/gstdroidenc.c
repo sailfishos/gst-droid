@@ -125,6 +125,9 @@ gst_droidenc_create_codec (GstDroidEnc * enc)
       "create codec of type: %s resolution: %dx%d bitrate: %d", droid,
       enc->in_state->info.width, enc->in_state->info.height,
       enc->target_bitrate);
+
+  memset (&md, 0x0, sizeof (md));
+
   md.parent.type = droid;
   md.parent.width = enc->in_state->info.width;
   md.parent.height = enc->in_state->info.height;
