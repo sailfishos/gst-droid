@@ -31,8 +31,8 @@
 #define gst_droidaenc_parent_class parent_class
 G_DEFINE_TYPE (GstDroidAEnc, gst_droidaenc, GST_TYPE_AUDIO_ENCODER);
 
-GST_DEBUG_CATEGORY_EXTERN (gst_droid_enc_debug);
-#define GST_CAT_DEFAULT gst_droid_enc_debug
+GST_DEBUG_CATEGORY_EXTERN (gst_droid_aenc_debug);
+#define GST_CAT_DEFAULT gst_droid_aenc_debug
 
 static GstStaticPadTemplate gst_droidaenc_sink_template_factory =
 GST_STATIC_PAD_TEMPLATE (GST_AUDIO_ENCODER_SINK_NAME,

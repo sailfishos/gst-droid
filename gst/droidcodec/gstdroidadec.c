@@ -40,8 +40,8 @@
 #define gst_droidadec_parent_class parent_class
 G_DEFINE_TYPE (GstDroidADec, gst_droidadec, GST_TYPE_AUDIO_DECODER);
 
-GST_DEBUG_CATEGORY_EXTERN (gst_droid_dec_debug);
-#define GST_CAT_DEFAULT gst_droid_dec_debug
+GST_DEBUG_CATEGORY_EXTERN (gst_droid_adec_debug);
+#define GST_CAT_DEFAULT gst_droid_adec_debug
 
 static GstStaticPadTemplate gst_droidadec_src_template_factory =
 GST_STATIC_PAD_TEMPLATE (GST_AUDIO_DECODER_SRC_NAME,

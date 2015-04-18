@@ -32,8 +32,8 @@
 #define gst_droidenc_parent_class parent_class
 G_DEFINE_TYPE (GstDroidEnc, gst_droidenc, GST_TYPE_VIDEO_ENCODER);
 
-GST_DEBUG_CATEGORY_EXTERN (gst_droid_enc_debug);
-#define GST_CAT_DEFAULT gst_droid_enc_debug
+GST_DEBUG_CATEGORY_EXTERN (gst_droid_venc_debug);
+#define GST_CAT_DEFAULT gst_droid_venc_debug
 
 static GstStaticPadTemplate gst_droidenc_sink_template_factory =
 GST_STATIC_PAD_TEMPLATE (GST_VIDEO_ENCODER_SINK_NAME,

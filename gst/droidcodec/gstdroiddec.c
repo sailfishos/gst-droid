@@ -42,8 +42,8 @@
 #define gst_droiddec_parent_class parent_class
 G_DEFINE_TYPE (GstDroidDec, gst_droiddec, GST_TYPE_VIDEO_DECODER);
 
-GST_DEBUG_CATEGORY_EXTERN (gst_droid_dec_debug);
-#define GST_CAT_DEFAULT gst_droid_dec_debug
+GST_DEBUG_CATEGORY_EXTERN (gst_droid_vdec_debug);
+#define GST_CAT_DEFAULT gst_droid_vdec_debug
 
 static GstStaticPadTemplate gst_droiddec_src_template_factory =
     GST_STATIC_PAD_TEMPLATE (GST_VIDEO_DECODER_SRC_NAME,
