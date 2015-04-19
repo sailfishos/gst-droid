@@ -1746,8 +1746,6 @@ gst_droidcamsrc_timestamp (GstDroidCamSrc * src, GstBuffer * buffer)
   GstClockTime base_time, ts;
   GstClock *clock;
 
-  GST_DEBUG_OBJECT (src, "timestamp %p", buffer);
-
   GST_OBJECT_LOCK (src);
   clock = GST_ELEMENT_CLOCK (src);
   if (clock) {
@@ -1769,6 +1767,10 @@ gst_droidcamsrc_timestamp (GstDroidCamSrc * src, GstBuffer * buffer)
   /* TODO: duration */
   GST_BUFFER_DTS (buffer) = ts;
   GST_BUFFER_PTS (buffer) = ts;
+
+  GST_DEBUG_OBJECT (src,
+      "timestamp %" GST_TIME_FORMAT "for buffer %" GST_PTR_FORMAT,
+      GST_TIME_ARGS (ts), buffer);
 }
 
 void
