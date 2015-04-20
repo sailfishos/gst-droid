@@ -362,6 +362,9 @@ gst_droiddec_frame_available (void *user)
   crop_meta->width = rect.right - rect.left;
   crop_meta->height = rect.bottom - rect.top;
 
+  GST_LOG_OBJECT (dec, "crop info: x=%d, y=%d, w=%d, h=%d", crop_meta->x,
+      crop_meta->y, crop_meta->width, crop_meta->height);
+
   gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE,
       dec->convert ? GST_VIDEO_FORMAT_I420 : GST_VIDEO_FORMAT_YV12, width,
       height);
