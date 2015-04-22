@@ -63,6 +63,7 @@ struct _GstDroidDec
   GstFlowReturn downstream_flow_ret;
   GstBuffer *codec_data;
   gboolean dirty;
+  DroidMediaRect crop_rect;
 
   GstVideoCodecState *in_state;
   GstVideoCodecState *out_state;
