@@ -29,7 +29,9 @@
 #include <gst/video/video.h>
 #include "gst/droid/gstdroidmediabuffer.h"
 #include "gst/droid/gstwrappedmemory.h"
+#include "gst/droid/gstdroidquery.h"
 #include "gstdroidcamsrcphotography.h"
+#include "droidmediacamera.h"
 #ifndef GST_USE_UNSTABLE_API
 #define GST_USE_UNSTABLE_API
 #endif /* GST_USE_UNSTABLE_API */
@@ -1231,7 +1233,6 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
     case GST_QUERY_DRAIN:
     case GST_QUERY_CONTEXT:
     case GST_QUERY_UNKNOWN:
-    case GST_QUERY_CUSTOM:
     case GST_QUERY_ALLOCATION:
     case GST_QUERY_SEGMENT:
       ret = FALSE;
@@ -1310,6 +1311,26 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
         gst_caps_unref (caps);
       }
 
+      break;
+
+    case GST_QUERY_CUSTOM:
+    {
+      const GstStructure *structure = gst_query_get_structure (query);
+      if (structure
+          && !g_strcmp0 (gst_structure_get_name (structure),
+              GST_DROID_VIDEO_COLOR_FORMAT_QUERY_NAME)) {
+        gint format = droid_media_camera_get_video_color_format (src->dev->cam);
+        if (format == -1) {
+          GST_WARNING_OBJECT (src, "failed to get video color format");
+          ret = FALSE;
+        } else {
+          gst_droid_query_set_video_color_format (query, format);
+          ret = TRUE;
+        }
+      } else {
+        ret = FALSE;
+      }
+    }
       break;
   }
 
