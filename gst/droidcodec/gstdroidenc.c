@@ -26,6 +26,7 @@
 
 #include "gstdroidenc.h"
 #include "gst/droid/gstwrappedmemory.h"
+#include "gst/droid/gstdroidquery.h"
 #include "plugin.h"
 #include <string.h>
 
@@ -119,6 +120,8 @@ static gboolean
 gst_droidenc_create_codec (GstDroidEnc * enc)
 {
   DroidMediaCodecEncoderMetaData md;
+  GstQuery *query;
+
   const gchar *droid = gst_droid_codec_get_droid_type (enc->codec_type);
 
   GST_INFO_OBJECT (enc,
@@ -139,6 +142,24 @@ gst_droidenc_create_codec (GstDroidEnc * enc)
 
   /* TODO: get this from caps */
   md.meta_data = true;
+
+  query = gst_droid_query_new_video_color_format ();
+  if (!gst_pad_peer_query (GST_VIDEO_ENCODER_SINK_PAD (GST_VIDEO_ENCODER (enc)),
+          query)) {
+    gst_query_unref (query);
+    GST_ELEMENT_ERROR (enc, LIBRARY, SETTINGS, NULL,
+        ("Failed to query video color format"));
+    return FALSE;
+  }
+
+  if (!gst_droid_query_parse_video_color_format (query, &md.color_format)) {
+    gst_query_unref (query);
+    GST_ELEMENT_ERROR (enc, LIBRARY, SETTINGS, NULL,
+        ("Failed to get video color format"));
+    return FALSE;
+  }
+
+  gst_query_unref (query);
 
   enc->codec = droid_media_codec_create_encoder (&md);
 
