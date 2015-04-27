@@ -32,6 +32,9 @@
 #include <gst/tag/tag.h>
 #include <libexif/exif-data.h>
 
+GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
+#define GST_CAT_DEFAULT gst_droid_camsrc_debug
+
 #if 0
 const guchar marker[2] = { 0xFF, 0xE1 };
 
@@ -110,6 +113,7 @@ gst_droidcamsrc_exif_tags_from_jpeg_data (void *data, size_t size)
   unsigned int exif_data_size = 0;
   GstBuffer *buffer;
   ExifEntry *iso;
+  int x, i;
 
   exif_data_load_data (exif, data, size);
   exif_data_set_data_type (exif, EXIF_DATA_TYPE_COMPRESSED);
@@ -121,6 +125,19 @@ gst_droidcamsrc_exif_tags_from_jpeg_data (void *data, size_t size)
 
   if (exif_data_size <= 6) {
     goto out;
+  }
+
+  /* dump the data. based on libexif code */
+  for (x = 0; x < EXIF_IFD_COUNT; x++) {
+    if (exif->ifd[x] && exif->ifd[x]->count) {
+      for (i = 0; i < exif->ifd[x]->count; i++) {
+        char val[1024];
+        ExifEntry *e = exif->ifd[x]->entries[i];
+        GST_LOG ("Exif IFD: %s. Tag 0x%x (%s) = %s", exif_ifd_get_name (x),
+            e->tag, exif_tag_get_name_in_ifd (e->tag, exif_entry_get_ifd (e)),
+            exif_entry_get_value (e, val, sizeof (val)));
+      }
+    }
   }
 
   _exif_data = exif_data;
@@ -159,6 +176,13 @@ gst_droidcamsrc_exif_tags_from_jpeg_data (void *data, size_t size)
    * 0xa003 EXIF_TAG_PIXEL_Y_DIMENSION
    * 0xa005 EXIF_TAG_INTEROPERABILITY_IFD_POINTER
    * thumbnail.
+   * 0x100 EXIF_TAG_IMAGE_WIDTH
+   * 0x101 EXIF_TAG_IMAGE_LENGTH
+   * 0x9203 EXIF_TAG_BRIGHTNESS_VALUE
+   * 0x9205 EXIF_TAG_MAX_APERTURE_VALUE
+   * 0x9206 EXIF_TAG_SUBJECT_DISTANCE
+   * 0x9208 EXIF_TAG_LIGHT_SOURCE
+   * 0x9286 EXIF_TAG_USER_COMMENT
    */
 out:
   if (_exif_data) {
