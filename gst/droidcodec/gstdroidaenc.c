@@ -263,8 +263,13 @@ gst_droidaenc_data_available (void *data, DroidMediaCodecData * encoded)
   GST_BUFFER_PTS (buffer) = encoded->ts;
   GST_BUFFER_DTS (buffer) = encoded->decoding_ts;
 
+  /*
+   * 1024 seems to be the number of samples per buffer that Android uses.
+   * It should be fine as long as we have only AAC encoding but should
+   * be revisited if we ever use another audio encoding format
+   */
   flow_ret =
-      gst_audio_encoder_finish_frame (GST_AUDIO_ENCODER (enc), buffer, 1);
+      gst_audio_encoder_finish_frame (GST_AUDIO_ENCODER (enc), buffer, 1024);
 
   if (flow_ret == GST_FLOW_OK || flow_ret == GST_FLOW_FLUSHING) {
     goto out;
