@@ -20,10 +20,6 @@
  * Boston, MA 02110-1301, USA.
  */
 
-/* TODO:
- * we need to allow more than 6 channels and detect when stagefright decoder is downmixing
- * find a generic way to pass aac_profile
- */
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
