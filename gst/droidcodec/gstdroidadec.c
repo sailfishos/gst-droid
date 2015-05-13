@@ -134,6 +134,28 @@ gst_droidadec_data_available (void *data, DroidMediaCodecData * encoded)
 
   GST_AUDIO_DECODER_STREAM_LOCK (decoder);
 
+  if (G_UNLIKELY (gst_audio_decoder_get_audio_info (GST_AUDIO_DECODER
+              (dec))->finfo->format == GST_AUDIO_FORMAT_UNKNOWN)) {
+    DroidMediaCodecMetaData md;
+    DroidMediaRect crop;        /* TODO: get rid of that */
+    GstAudioInfo info;
+
+    memset (&md, 0x0, sizeof (md));
+    droid_media_codec_get_output_info (dec->codec, &md, &crop);
+    GST_INFO_OBJECT (dec, "output rate=%d, output channels=%d", md.sample_rate,
+        md.channels);
+
+    gst_audio_info_init (&info);
+    gst_audio_info_set_format (&info, GST_AUDIO_FORMAT_S16, md.sample_rate,
+        md.channels, NULL);
+
+
+    if (!gst_audio_decoder_set_output_format (decoder, &info)) {
+      flow_ret = GST_FLOW_ERROR;
+      goto out;
+    }
+  }
+
   out = gst_audio_decoder_allocate_output_buffer (decoder, encoded->data.size);
 
   gst_buffer_map (out, &info, GST_MAP_READWRITE);
@@ -288,7 +310,6 @@ gst_droidadec_set_format (GstAudioDecoder * decoder, GstCaps * caps)
   GstStructure *str = gst_caps_get_structure (caps, 0);
   const GValue *value = gst_structure_get_value (str, "codec_data");
   GstBuffer *codec_data = value ? gst_value_get_buffer (value) : NULL;
-  GstAudioInfo info;
 
   /*
    * destroying the droidmedia codec here will cause stagefright to call abort.
@@ -320,14 +341,6 @@ gst_droidadec_set_format (GstAudioDecoder * decoder, GstCaps * caps)
 
   GST_INFO_OBJECT (dec, "configuring decoder. rate=%d, channels=%d", dec->rate,
       dec->channels);
-
-  gst_audio_info_init (&info);
-  gst_audio_info_set_format (&info, GST_AUDIO_FORMAT_S16, dec->rate,
-      dec->channels, NULL);
-
-  if (!gst_audio_decoder_set_output_format (decoder, &info)) {
-    return FALSE;
-  }
 
   gst_buffer_replace (&dec->codec_data, codec_data);
 
