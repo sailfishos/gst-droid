@@ -212,25 +212,77 @@ static gboolean
 gst_droiddec_convert_buffer (GstDroidDec * dec,
     GstBuffer * out, DroidMediaData * in, GstVideoInfo * info)
 {
+  gboolean use_external_buffer =
+      GST_VIDEO_INFO_COMP_STRIDE (info, 0) != info->width;
+  guint8 *data = NULL;
+  gboolean ret;
   GstMapInfo map_info;
 
   GST_DEBUG_OBJECT (dec, "convert buffer");
 
+  map_info.data = NULL;
+
   if (!gst_buffer_map (out, &map_info, GST_MAP_WRITE)) {
     GST_ERROR_OBJECT (dec, "failed to map buffer");
-    return FALSE;
+    ret = FALSE;
+    goto out;
   }
 
-  if (droid_media_convert_to_i420 (dec->convert, in, map_info.data) != true) {
+  if (use_external_buffer) {
+    GST_DEBUG_OBJECT (dec, "using an external buffer for I420 conversion.");
+    data = g_malloc (info->width * info->height * 3 / 2);
+  } else {
+    data = map_info.data;
+  }
+
+  if (droid_media_convert_to_i420 (dec->convert, in, data) != true) {
     GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, (NULL),
         ("failed to convert frame"));
 
-    gst_buffer_unmap (out, &map_info);
-    return FALSE;
+    ret = FALSE;
+    goto out;
   }
 
-  gst_buffer_unmap (out, &map_info);
-  return TRUE;
+  if (use_external_buffer) {
+    /* fix up the buffer */
+    /* Code is based on gst-colorconv qcom backend */
+
+    gint stride = GST_VIDEO_INFO_COMP_STRIDE (info, 0);
+    gint strideUV = GST_VIDEO_INFO_COMP_STRIDE (info, 1);
+    guint8 *p = data;
+    guint8 *dst = map_info.data;
+    int i;
+    int x;
+
+    /* Y */
+    for (i = 0; i < info->height; i++) {
+      orc_memcpy (dst, p, info->width);
+      dst += stride;
+      p += info->width;
+    }
+
+    /* U and V */
+    for (x = 0; x < 2; x++) {
+      for (i = 0; i < info->height / 2; i++) {
+        orc_memcpy (dst, p, info->width / 2);
+        dst += strideUV;
+        p += info->width / 2;
+      }
+    }
+  }
+
+  ret = TRUE;
+
+out:
+  if (use_external_buffer && data) {
+    g_free (data);
+  }
+
+  if (map_info.data) {
+    gst_buffer_unmap (out, &map_info);
+  }
+
+  return ret;
 }
 
 static void
