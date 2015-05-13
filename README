@@ -1,8 +1,6 @@
 Android specific GStreamer plugin
 
-droidcamsrc: A camera source. Wrapper around Android camera HAL
-droideglsink: A GStreamer sink for rendering
-droidenc and droiddec: Custom OpenMAX IL wrapper utilizing Android specific extensions.
-
-The code is far from perfect.
-droidenc and droiddec are an awful mess. It's a miracle that they work.
+Needs droidmedia (http://github.com/sailfishos/droidmedia).
+droidcamsrc: A camera source on top of camera service.
+droideglsink: A sink for rendering.
+droidcodec: encoders and decoders on top of Android's libstagefright
