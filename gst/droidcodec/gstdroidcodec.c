@@ -46,10 +46,10 @@ static gboolean create_aacdec_codec_data (GstDroidCodec * codec,
     GstBuffer * data, DroidMediaData * out, GstBuffer * frame_data);
 static gboolean process_h264dec_data (GstDroidCodec * codec, GstBuffer * buffer,
     DroidMediaData * out);
-static gboolean is_mpeg4v (const GstStructure * s);
-static gboolean is_mp3 (const GstStructure * s);
-static gboolean is_h264_dec (const GstStructure * s);
-static gboolean is_h264_enc (const GstStructure * s);
+static gboolean is_mpeg4v (GstDroidCodec * codec, const GstStructure * s);
+static gboolean is_mp3 (GstDroidCodec * codec, const GstStructure * s);
+static gboolean is_h264_dec (GstDroidCodec * codec, const GstStructure * s);
+static gboolean is_h264_enc (GstDroidCodec * codec, const GstStructure * s);
 static void h264enc_complement (GstCaps * caps);
 static gboolean process_h264enc_data (DroidMediaData * in,
     DroidMediaData * out);
@@ -76,7 +76,8 @@ struct _GstDroidCodecInfo
   const gchar *droid;
   const gchar *caps;
 
-    gboolean (*validate_structure) (const GstStructure * s);
+    gboolean (*validate_structure) (GstDroidCodec * codec,
+      const GstStructure * s);
   void (*complement_caps) (GstCaps * caps);
   GstBuffer *(*create_encoder_codec_data) (DroidMediaData * data);
     gboolean (*process_encoder_data) (DroidMediaData * in,
@@ -147,6 +148,8 @@ gst_droid_codec_new_from_caps (GstCaps * caps, GstDroidCodecType type)
   int len = G_N_ELEMENTS (codecs);
   GstStructure *s = gst_caps_get_structure (caps, 0);
   const gchar *name = gst_structure_get_name (s);
+  GstDroidCodec *codec = g_slice_new (GstDroidCodec);
+  codec->data = g_slice_new0 (GstDroidCodecPrivate);
 
   for (x = 0; x < len; x++) {
     if (codecs[x].type != type) {
@@ -158,17 +161,18 @@ gst_droid_codec_new_from_caps (GstCaps * caps, GstDroidCodecType type)
       continue;
     }
 
-    if (!codecs[x].validate_structure || codecs[x].validate_structure (s)) {
-      GstDroidCodec *codec = g_slice_new (GstDroidCodec);
-      codec->info = &codecs[x];
-      codec->data = g_slice_new0 (GstDroidCodecPrivate);
-
+    if (!codecs[x].validate_structure
+        || codecs[x].validate_structure (codec, s)) {
       gst_mini_object_init (GST_MINI_OBJECT_CAST (codec), 0,
           gst_droid_codec_get_type (), NULL, NULL,
           (GstMiniObjectFreeFunction) gst_droid_codec_free);
+
+      codec->info = &codecs[x];
       return codec;
     }
   }
+
+  gst_droid_codec_free (codec);
 
   return NULL;
 }
@@ -448,7 +452,7 @@ out:
 }
 
 static gboolean
-is_mpeg4v (const GstStructure * s)
+is_mpeg4v (GstDroidCodec * codec G_GNUC_UNUSED, const GstStructure * s)
 {
   gint val;
 
@@ -456,7 +460,7 @@ is_mpeg4v (const GstStructure * s)
 }
 
 static gboolean
-is_mp3 (const GstStructure * s)
+is_mp3 (GstDroidCodec * codec G_GNUC_UNUSED, const GstStructure * s)
 {
   gint val, layer;
 
@@ -465,7 +469,7 @@ is_mp3 (const GstStructure * s)
 }
 
 static gboolean
-is_h264_dec (const GstStructure * s)
+is_h264_dec (GstDroidCodec * codec G_GNUC_UNUSED, const GstStructure * s)
 {
   const char *alignment = gst_structure_get_string (s, "alignment");
   const char *format = gst_structure_get_string (s, "stream-format");
@@ -476,7 +480,7 @@ is_h264_dec (const GstStructure * s)
 }
 
 static gboolean
-is_h264_enc (const GstStructure * s)
+is_h264_enc (GstDroidCodec * codec G_GNUC_UNUSED, const GstStructure * s)
 {
   const char *alignment = gst_structure_get_string (s, "alignment");
   const char *format = gst_structure_get_string (s, "stream-format");
