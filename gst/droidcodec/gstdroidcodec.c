@@ -47,6 +47,7 @@ static gboolean create_aacdec_codec_data (GstDroidCodec * codec,
 static gboolean process_h264dec_data (GstDroidCodec * codec, GstBuffer * buffer,
     DroidMediaData * out);
 static gboolean is_mpeg4v (GstDroidCodec * codec, const GstStructure * s);
+static gboolean is_aac_dec (GstDroidCodec * codec, const GstStructure * s);
 static gboolean is_mp3 (GstDroidCodec * codec, const GstStructure * s);
 static gboolean is_h264_dec (GstDroidCodec * codec, const GstStructure * s);
 static gboolean is_h264_enc (GstDroidCodec * codec, const GstStructure * s);
@@ -67,6 +68,7 @@ typedef struct
 struct _GstDroidCodecPrivate
 {
   guint h264_nal;
+  gboolean aac_adts;
 };
 
 struct _GstDroidCodecInfo
@@ -101,9 +103,9 @@ struct _GstDroidCodecInfo
 static GstDroidCodecInfo codecs[] = {
   /* audio decoders */
   {GST_DROID_CODEC_DECODER_AUDIO, "audio/mpeg", "audio/mp4a-latm",
-        "audio/mpeg, mpegversion=(int)4, stream-format=(string){raw}"
+        "audio/mpeg, mpegversion=(int)4, stream-format=(string){raw, adts}"
         CAPS_FRAGMENT_AUDIO_DECODER,
-      is_mpeg4v, NULL, NULL, NULL, create_aacdec_codec_data, NULL},
+      is_aac_dec, NULL, NULL, NULL, create_aacdec_codec_data, NULL},
 
   {GST_DROID_CODEC_DECODER_AUDIO, "audio/mpeg", "audio/mpeg",
         "audio/mpeg, mpegversion=(int)1, layer=[1, 3]"
@@ -457,6 +459,31 @@ is_mpeg4v (GstDroidCodec * codec G_GNUC_UNUSED, const GstStructure * s)
   gint val;
 
   return gst_structure_get_int (s, "mpegversion", &val) && val == 4;
+}
+
+static gboolean
+is_aac_dec (GstDroidCodec * codec, const GstStructure * s)
+{
+  const gchar *val;
+
+  if (!is_mpeg4v (codec, s)) {
+    return FALSE;
+  }
+
+  val = gst_structure_get_string (s, "stream-format");
+  if (!val) {
+    return FALSE;
+  }
+
+  if (!g_strcmp0 (val, "raw")) {
+    codec->data->aac_adts = FALSE;
+    return TRUE;
+  } else if (!g_strcmp0 (val, "adts")) {
+    codec->data->aac_adts = TRUE;
+    return TRUE;
+  }
+
+  return FALSE;
 }
 
 static gboolean
