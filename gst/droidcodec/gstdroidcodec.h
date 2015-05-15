@@ -33,6 +33,7 @@ typedef struct _GstDroidCodec GstDroidCodec;
 typedef struct _GstDroidCodecInfo GstDroidCodecInfo;
 typedef struct _GstDroidCodecPrivate GstDroidCodecPrivate;
 typedef enum _GstDroidCodecType GstDroidCodecType;
+typedef enum _GstDroidCodecCodecDataResult GstDroidCodecCodecDataResult;
 
 enum _GstDroidCodecType
 {
@@ -40,6 +41,13 @@ enum _GstDroidCodecType
   GST_DROID_CODEC_ENCODER_AUDIO,
   GST_DROID_CODEC_DECODER_VIDEO,
   GST_DROID_CODEC_ENCODER_VIDEO,
+};
+
+enum _GstDroidCodecCodecDataResult
+{
+  GST_DROID_CODEC_CODEC_DATA_OK,
+  GST_DROID_CODEC_CODEC_DATA_NOT_NEEDED,
+  GST_DROID_CODEC_CODEC_DATA_ERROR,
 };
 
 struct _GstDroidCodec {
@@ -70,8 +78,10 @@ const gchar *gst_droid_codec_get_droid_type (GstDroidCodec * codec);
 void gst_droid_codec_complement_caps (GstDroidCodec *codec, GstCaps * caps);
 GstBuffer *gst_droid_codec_create_encoder_codec_data (GstDroidCodec *codec, DroidMediaData *data);
 
-gboolean gst_droid_codec_create_decoder_codec_data (GstDroidCodec *codec, GstBuffer *data,
-						    DroidMediaData *out);
+GstDroidCodecCodecDataResult gst_droid_codec_create_decoder_codec_data (GstDroidCodec *codec,
+									GstBuffer *data,
+									DroidMediaData *out,
+									GstBuffer *frame_data);
 
 gboolean gst_droid_codec_prepare_decoder_frame (GstDroidCodec * codec, GstVideoCodecFrame * frame,
 						DroidMediaData * data,

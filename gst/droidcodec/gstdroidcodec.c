@@ -221,11 +221,17 @@ gst_droid_codec_create_encoder_codec_data (GstDroidCodec * codec,
   return codec->info->create_encoder_codec_data (data);
 }
 
-gboolean
+GstDroidCodecCodecDataResult
 gst_droid_codec_create_decoder_codec_data (GstDroidCodec * codec,
-    GstBuffer * data, DroidMediaData * out)
+    GstBuffer * data, DroidMediaData * out, GstBuffer * frame_data)
 {
-  return codec->info->create_decoder_codec_data (codec, data, out);
+  if (!codec->info->create_decoder_codec_data) {
+    return GST_DROID_CODEC_CODEC_DATA_NOT_NEEDED;
+  } else if (codec->info->create_decoder_codec_data (codec, data, out)) {
+    return GST_DROID_CODEC_CODEC_DATA_OK;
+  } else {
+    return GST_DROID_CODEC_CODEC_DATA_ERROR;
+  }
 }
 
 gboolean

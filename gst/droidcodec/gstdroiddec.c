@@ -136,14 +136,20 @@ gst_droiddec_create_codec (GstDroidDec * dec)
     md.parent.flags |= DROID_MEDIA_CODEC_NO_MEDIA_BUFFER;
   }
 
-  if (dec->codec_data) {
-    if (!gst_droid_codec_create_decoder_codec_data (dec->codec_type,
-            dec->codec_data, &md.codec_data)) {
+  /* TODO: get rid of NULL */
+  switch (gst_droid_codec_create_decoder_codec_data (dec->codec_type,
+          dec->codec_data, &md.codec_data, NULL)) {
+    case GST_DROID_CODEC_CODEC_DATA_OK:
+      break;
+
+    case GST_DROID_CODEC_CODEC_DATA_NOT_NEEDED:
+      g_assert (dec->codec_data == NULL);
+      break;
+
+    case GST_DROID_CODEC_CODEC_DATA_ERROR:
       GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
           ("Failed to create codec_data."));
-
       goto error;
-    }
   }
 
   dec->codec = droid_media_codec_create_decoder (&md);
