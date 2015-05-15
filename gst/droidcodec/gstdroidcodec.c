@@ -39,11 +39,11 @@ GST_DEBUG_CATEGORY_EXTERN (gst_droid_codec_debug);
 static GstBuffer *create_mpeg4venc_codec_data (DroidMediaData * data);
 static GstBuffer *create_h264enc_codec_data (DroidMediaData * data);
 static gboolean create_mpeg4vdec_codec_data (GstDroidCodec * codec,
-    GstBuffer * data, DroidMediaData * out);
+    GstBuffer * data, DroidMediaData * out, GstBuffer * frame_data);
 static gboolean create_h264dec_codec_data (GstDroidCodec * codec,
-    GstBuffer * data, DroidMediaData * out);
+    GstBuffer * data, DroidMediaData * out, GstBuffer * frame_data);
 static gboolean create_aacdec_codec_data (GstDroidCodec * codec,
-    GstBuffer * data, DroidMediaData * out);
+    GstBuffer * data, DroidMediaData * out, GstBuffer * frame_data);
 static gboolean process_h264dec_data (GstDroidCodec * codec, GstBuffer * buffer,
     DroidMediaData * out);
 static gboolean is_mpeg4v (const GstStructure * s);
@@ -82,7 +82,7 @@ struct _GstDroidCodecInfo
     gboolean (*process_encoder_data) (DroidMediaData * in,
       DroidMediaData * out);
     gboolean (*create_decoder_codec_data) (GstDroidCodec * codec,
-      GstBuffer * data, DroidMediaData * out);
+      GstBuffer * data, DroidMediaData * out, GstBuffer * frame_data);
     gboolean (*process_decoder_data) (GstDroidCodec * codec, GstBuffer * buffer,
       DroidMediaData * out);
 };
@@ -227,7 +227,8 @@ gst_droid_codec_create_decoder_codec_data (GstDroidCodec * codec,
 {
   if (!codec->info->create_decoder_codec_data) {
     return GST_DROID_CODEC_CODEC_DATA_NOT_NEEDED;
-  } else if (codec->info->create_decoder_codec_data (codec, data, out)) {
+  } else if (codec->info->create_decoder_codec_data (codec, data, out,
+          frame_data)) {
     return GST_DROID_CODEC_CODEC_DATA_OK;
   } else {
     return GST_DROID_CODEC_CODEC_DATA_ERROR;
@@ -501,7 +502,8 @@ h264enc_complement (GstCaps * caps)
 
 static gboolean
 create_mpeg4vdec_codec_data (GstDroidCodec * codec G_GNUC_UNUSED,
-    GstBuffer * data, DroidMediaData * out)
+    GstBuffer * data, DroidMediaData * out,
+    GstBuffer * frame_data G_GNUC_UNUSED)
 {
   /*
    * If there are things which I hate the most, this function will be among them
@@ -561,7 +563,7 @@ create_mpeg4vdec_codec_data (GstDroidCodec * codec G_GNUC_UNUSED,
 
 static gboolean
 create_h264dec_codec_data (GstDroidCodec * codec, GstBuffer * data,
-    DroidMediaData * out)
+    DroidMediaData * out, GstBuffer * frame_data G_GNUC_UNUSED)
 {
   GstMapInfo info;
   gboolean ret = FALSE;
@@ -607,7 +609,7 @@ write_len (guint8 * buf, int val)
 
 static gboolean
 create_aacdec_codec_data (GstDroidCodec * codec,
-    GstBuffer * data, DroidMediaData * out)
+    GstBuffer * data, DroidMediaData * out, GstBuffer * frame_data)
 {
 #define _QT_PUT(__data, __idx, __size, __shift, __num) \
   (((guint8 *) (__data))[__idx] = (((guint##__size) __num) >> __shift) & 0xff)
