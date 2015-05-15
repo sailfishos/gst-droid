@@ -52,7 +52,7 @@ static void gst_droidadec_data_available (void *data,
 static GstFlowReturn gst_droidadec_finish (GstAudioDecoder * decoder);
 
 static gboolean
-gst_droidadec_create_codec (GstDroidADec * dec)
+gst_droidadec_create_codec (GstDroidADec * dec, GstBuffer * input)
 {
   DroidMediaCodecDecoderMetaData md;
   const gchar *droid = gst_droid_codec_get_droid_type (dec->codec_type);
@@ -67,9 +67,8 @@ gst_droidadec_create_codec (GstDroidADec * dec)
   md.parent.flags = DROID_MEDIA_CODEC_SW_ONLY;
   md.codec_data.size = 0;
 
-  /* TODO: get rid of NULL */
   switch (gst_droid_codec_create_decoder_codec_data (dec->codec_type,
-          dec->codec_data, &md.codec_data, NULL)) {
+          dec->codec_data, &md.codec_data, input)) {
     case GST_DROID_CODEC_CODEC_DATA_OK:
       break;
 
@@ -439,7 +438,7 @@ gst_droidadec_handle_frame (GstAudioDecoder * decoder, GstBuffer * buffer)
       gst_droidadec_finish (decoder);
     }
 
-    if (!gst_droidadec_create_codec (dec)) {
+    if (!gst_droidadec_create_codec (dec, buffer)) {
       ret = GST_FLOW_ERROR;
       goto error;
     }

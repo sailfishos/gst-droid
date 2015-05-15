@@ -89,7 +89,7 @@ out:
 }
 
 static gboolean
-gst_droiddec_create_codec (GstDroidDec * dec)
+gst_droiddec_create_codec (GstDroidDec * dec, GstBuffer * input)
 {
   DroidMediaCodecDecoderMetaData md;
   const gchar *droid = gst_droid_codec_get_droid_type (dec->codec_type);
@@ -136,9 +136,8 @@ gst_droiddec_create_codec (GstDroidDec * dec)
     md.parent.flags |= DROID_MEDIA_CODEC_NO_MEDIA_BUFFER;
   }
 
-  /* TODO: get rid of NULL */
   switch (gst_droid_codec_create_decoder_codec_data (dec->codec_type,
-          dec->codec_data, &md.codec_data, NULL)) {
+          dec->codec_data, &md.codec_data, input)) {
     case GST_DROID_CODEC_CODEC_DATA_OK:
       break;
 
@@ -936,7 +935,7 @@ gst_droiddec_handle_frame (GstVideoDecoder * decoder,
       gst_droiddec_finish (decoder);
     }
 
-    if (!gst_droiddec_create_codec (dec)) {
+    if (!gst_droiddec_create_codec (dec, frame->input_buffer)) {
       ret = GST_FLOW_ERROR;
       goto error;
     }
