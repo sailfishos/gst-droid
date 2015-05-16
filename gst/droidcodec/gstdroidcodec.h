@@ -89,6 +89,9 @@ gboolean gst_droid_codec_prepare_decoder_frame (GstDroidCodec * codec, GstVideoC
 
 GstBuffer *gst_droid_codec_prepare_encoded_data (GstDroidCodec * codec, DroidMediaData * in);
 
+gboolean gst_droid_codec_process_decoder_data (GstDroidCodec * codec, GstBuffer * buffer,
+					       DroidMediaData * out);
+
 G_END_DECLS
 
 #endif /* __GST_DROID_CODEC_H__ */

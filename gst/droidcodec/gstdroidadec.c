@@ -397,7 +397,6 @@ gst_droidadec_handle_frame (GstAudioDecoder * decoder, GstBuffer * buffer)
   GstFlowReturn ret;
   DroidMediaCodecData data;
   DroidMediaBufferCallbacks cb;
-  GstMapInfo info;
 
   GST_DEBUG_OBJECT (dec, "handle frame");
 
@@ -446,11 +445,12 @@ gst_droidadec_handle_frame (GstAudioDecoder * decoder, GstBuffer * buffer)
     dec->dirty = FALSE;
   }
 
-  gst_buffer_map (buffer, &info, GST_MAP_READ);
-  data.data.size = info.size;
-  data.data.data = g_malloc (info.size);
-  orc_memcpy (data.data.data, info.data, info.size);
-  gst_buffer_unmap (buffer, &info);
+  if (!gst_droid_codec_process_decoder_data (dec->codec_type, buffer,
+          &data.data)) {
+    /* TODO: error */
+    ret = GST_FLOW_ERROR;
+    goto error;
+  }
 
   cb.unref = g_free;
   cb.data = data.data.data;

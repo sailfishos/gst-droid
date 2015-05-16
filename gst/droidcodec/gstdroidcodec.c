@@ -299,6 +299,29 @@ gst_droid_codec_prepare_encoded_data (GstDroidCodec * codec,
   return buffer;
 }
 
+gboolean
+gst_droid_codec_process_decoder_data (GstDroidCodec * codec, GstBuffer * buffer,
+    DroidMediaData * out)
+{
+  GstMapInfo info;
+
+  if (codec->info->process_decoder_data) {
+    return codec->info->process_decoder_data (codec, buffer, out);
+  }
+
+  if (!gst_buffer_map (buffer, &info, GST_MAP_READ)) {
+    GST_ERROR ("failed to map buffer");
+    return FALSE;
+  }
+
+  out->size = info.size;
+  out->data = g_malloc (info.size);
+  memcpy (out->data, info.data, info.size);
+  gst_buffer_unmap (buffer, &info);
+
+  return TRUE;
+}
+
 static GstBuffer *
 create_mpeg4venc_codec_data (DroidMediaData * data)
 {
