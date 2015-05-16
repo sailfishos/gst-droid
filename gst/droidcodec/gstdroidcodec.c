@@ -651,6 +651,7 @@ create_aacdec_codec_data (GstDroidCodec * codec,
 } while (0)
 
   GstMapInfo info;
+  gboolean ret;
 
   if (codec->data->aac_adts) {
     /* stolen from gstaacparse.c */
@@ -667,12 +668,15 @@ create_aacdec_codec_data (GstDroidCodec * codec,
     // TODO: size, TODO: error
     if (!gst_buffer_map (frame_data, &info, GST_MAP_READ)) {
       GST_ERROR ("failed to map buffer");
-      return FALSE;
+      ret = FALSE;
+      goto out;
     }
 
     sr_idx = (info.data[2] & 0x3c) >> 2;
-    object = ((info.data[2] & 0xc0) >> 6);
+    object = ((info.data[2] & 0xc0) >> 6) + 1;
     channels = ((info.data[2] & 0x01) << 2) | ((info.data[3] & 0xc0) >> 6);
+    GST_INFO ("AAC info: sample rate index: %d, object type: %d, channels: %d",
+        sr_idx, object, channels);
     gst_buffer_unmap (frame_data, &info);
 
     codec_data_data = (object << 11) | sr_idx << 7 | channels << 3;
@@ -690,11 +694,8 @@ create_aacdec_codec_data (GstDroidCodec * codec,
   if (!gst_buffer_map (data, &info, GST_MAP_READ)) {
     GST_ERROR ("failed to map buffer");
 
-    if (codec->data->aac_adts) {
-      gst_buffer_unref (data);
-    }
-
-    return FALSE;
+    ret = FALSE;
+    goto out;
   }
 
   int offset = 0;
@@ -752,11 +753,14 @@ create_aacdec_codec_data (GstDroidCodec * codec,
 
   gst_buffer_unmap (data, &info);
 
-  if (codec->data->aac_adts) {
+  ret = TRUE;
+
+out:
+  if (data && codec->data->aac_adts) {
     gst_buffer_unref (data);
   }
 
-  return TRUE;
+  return ret;
 }
 
 static gboolean
