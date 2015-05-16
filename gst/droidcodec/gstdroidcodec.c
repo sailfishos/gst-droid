@@ -46,6 +46,8 @@ static gboolean create_aacdec_codec_data (GstDroidCodec * codec,
     GstBuffer * data, DroidMediaData * out, GstBuffer * frame_data);
 static gboolean process_h264dec_data (GstDroidCodec * codec, GstBuffer * buffer,
     DroidMediaData * out);
+static gboolean process_aacdec_data (GstDroidCodec * codec, GstBuffer * buffer,
+    DroidMediaData * out);
 static gboolean is_mpeg4v (GstDroidCodec * codec, const GstStructure * s);
 static gboolean is_aac_dec (GstDroidCodec * codec, const GstStructure * s);
 static gboolean is_mp3 (GstDroidCodec * codec, const GstStructure * s);
@@ -105,7 +107,8 @@ static GstDroidCodecInfo codecs[] = {
   {GST_DROID_CODEC_DECODER_AUDIO, "audio/mpeg", "audio/mp4a-latm",
         "audio/mpeg, mpegversion=(int)4, stream-format=(string){raw, adts}"
         CAPS_FRAGMENT_AUDIO_DECODER,
-      is_aac_dec, NULL, NULL, NULL, create_aacdec_codec_data, NULL},
+        is_aac_dec, NULL, NULL, NULL, create_aacdec_codec_data,
+      process_aacdec_data},
 
   {GST_DROID_CODEC_DECODER_AUDIO, "audio/mpeg", "audio/mpeg",
         "audio/mpeg, mpegversion=(int)1, layer=[1, 3]"
@@ -891,6 +894,35 @@ out:
   gst_buffer_unmap (buffer, &info);
 
   return ret;
+}
+
+static gboolean
+process_aacdec_data (GstDroidCodec * codec, GstBuffer * buffer,
+    DroidMediaData * out)
+{
+  GstMapInfo info;
+
+  if (!gst_buffer_map (buffer, &info, GST_MAP_READ)) {
+    GST_ERROR ("failed to map buffer");
+    return FALSE;
+  }
+
+  if (!codec->data->aac_adts) {
+    out->size = info.size;
+    out->data = g_malloc (info.size);
+    memcpy (out->data, info.data, info.size);
+  } else {
+    /* stolen from gstaacparse.c */
+    guint header_size = (info.data[1] & 1) ? 7 : 9;     /* optional CRC */
+    out->size = info.size - header_size;
+    out->data = g_malloc (out->size);
+    memcpy (out->data, info.data + header_size, out->size);
+    GST_LOG ("stripping %d bytes", header_size);
+  }
+
+  gst_buffer_unmap (buffer, &info);
+
+  return TRUE;
 }
 
 static gboolean
