@@ -27,8 +27,8 @@
 #include "plugin.h"
 #include "gstdroidcamsrc.h"
 #include "gstdroideglsink.h"
-#include "gstdroiddec.h"
-#include "gstdroidenc.h"
+#include "gstdroidvdec.h"
+#include "gstdroidvenc.h"
 #include "gstdroidadec.h"
 #include "gstdroidaenc.h"
 #include "droidmedia.h"
@@ -72,10 +72,10 @@ plugin_init (GstPlugin * plugin)
   ok &= gst_element_register (plugin, "droideglsink", GST_RANK_PRIMARY,
       GST_TYPE_DROIDEGLSINK);
 
-  ok &= gst_element_register (plugin, "droiddec", GST_RANK_PRIMARY + 1,
-      GST_TYPE_DROIDDEC);
-  ok &= gst_element_register (plugin, "droidenc", GST_RANK_PRIMARY + 1,
-      GST_TYPE_DROIDENC);
+  ok &= gst_element_register (plugin, "droidvdec", GST_RANK_PRIMARY + 1,
+      GST_TYPE_DROIDVDEC);
+  ok &= gst_element_register (plugin, "droidvenc", GST_RANK_PRIMARY + 1,
+      GST_TYPE_DROIDVENC);
   ok &= gst_element_register (plugin, "droidadec", GST_RANK_PRIMARY + 1,
       GST_TYPE_DROIDADEC);
   ok &= gst_element_register (plugin, "droidaenc", GST_RANK_PRIMARY + 1,

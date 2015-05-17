@@ -24,19 +24,19 @@
 #include <config.h>
 #endif
 
-#include "gstdroidenc.h"
+#include "gstdroidvenc.h"
 #include "gst/droid/gstwrappedmemory.h"
 #include "gst/droid/gstdroidquery.h"
 #include "plugin.h"
 #include <string.h>
 
-#define gst_droidenc_parent_class parent_class
-G_DEFINE_TYPE (GstDroidEnc, gst_droidenc, GST_TYPE_VIDEO_ENCODER);
+#define gst_droidvenc_parent_class parent_class
+G_DEFINE_TYPE (GstDroidVEnc, gst_droidvenc, GST_TYPE_VIDEO_ENCODER);
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_venc_debug);
 #define GST_CAT_DEFAULT gst_droid_venc_debug
 
-static GstStaticPadTemplate gst_droidenc_sink_template_factory =
+static GstStaticPadTemplate gst_droidvenc_sink_template_factory =
 GST_STATIC_PAD_TEMPLATE (GST_VIDEO_ENCODER_SINK_NAME,
     GST_PAD_SINK,
     GST_PAD_ALWAYS,
@@ -55,21 +55,21 @@ typedef struct
 {
   GstMapInfo info;
   GstVideoCodecFrame *frame;
-} GstDroidEncFrameReleaseData;
+} GstDroidVEncFrameReleaseData;
 
-static GstVideoCodecState *gst_droidenc_configure_state (GstDroidEnc * enc,
+static GstVideoCodecState *gst_droidvenc_configure_state (GstDroidVEnc * enc,
     GstCaps * caps);
-static void gst_droidenc_signal_eos (void *data);
-static void gst_droidenc_error (void *data, int err);
+static void gst_droidvenc_signal_eos (void *data);
+static void gst_droidvenc_error (void *data, int err);
 static void
-gst_droidenc_data_available (void *data, DroidMediaCodecData * encoded);
-static void gst_droidenc_release_input_frame (void *data);
+gst_droidvenc_data_available (void *data, DroidMediaCodecData * encoded);
+static void gst_droidvenc_release_input_frame (void *data);
 
 static void
-gst_droidenc_release_input_frame (void *data)
+gst_droidvenc_release_input_frame (void *data)
 {
-  GstDroidEncFrameReleaseData *release_data =
-      (GstDroidEncFrameReleaseData *) data;
+  GstDroidVEncFrameReleaseData *release_data =
+      (GstDroidVEncFrameReleaseData *) data;
 
   gst_buffer_unmap (release_data->frame->input_buffer, &release_data->info);
 
@@ -79,11 +79,11 @@ gst_droidenc_release_input_frame (void *data)
 
   gst_video_codec_frame_unref (release_data->frame);
 
-  g_slice_free (GstDroidEncFrameReleaseData, release_data);
+  g_slice_free (GstDroidVEncFrameReleaseData, release_data);
 }
 
 static gboolean
-gst_droidenc_negotiate_src_caps (GstDroidEnc * enc)
+gst_droidvenc_negotiate_src_caps (GstDroidVEnc * enc)
 {
   GstCaps *caps;
 
@@ -108,7 +108,7 @@ gst_droidenc_negotiate_src_caps (GstDroidEnc * enc)
   }
 
   /* ownership of caps is transferred */
-  enc->out_state = gst_droidenc_configure_state (enc, caps);
+  enc->out_state = gst_droidvenc_configure_state (enc, caps);
 
   return TRUE;
 
@@ -117,7 +117,7 @@ error:
 }
 
 static gboolean
-gst_droidenc_create_codec (GstDroidEnc * enc)
+gst_droidvenc_create_codec (GstDroidVEnc * enc)
 {
   DroidMediaCodecEncoderMetaData md;
   GstQuery *query;
@@ -171,14 +171,14 @@ gst_droidenc_create_codec (GstDroidEnc * enc)
 
   {
     DroidMediaCodecCallbacks cb;
-    cb.signal_eos = gst_droidenc_signal_eos;
-    cb.error = gst_droidenc_error;
+    cb.signal_eos = gst_droidvenc_signal_eos;
+    cb.error = gst_droidvenc_error;
     droid_media_codec_set_callbacks (enc->codec, &cb, enc);
   }
 
   {
     DroidMediaCodecDataCallbacks cb;
-    cb.data_available = gst_droidenc_data_available;
+    cb.data_available = gst_droidvenc_data_available;
     droid_media_codec_set_data_callbacks (enc->codec, &cb, enc);
   }
 
@@ -195,9 +195,9 @@ gst_droidenc_create_codec (GstDroidEnc * enc)
 }
 
 static void
-gst_droidenc_signal_eos (void *data)
+gst_droidvenc_signal_eos (void *data)
 {
-  GstDroidEnc *enc = (GstDroidEnc *) data;
+  GstDroidVEnc *enc = (GstDroidVEnc *) data;
 
   GST_DEBUG_OBJECT (enc, "codec signaled EOS");
 
@@ -212,9 +212,9 @@ gst_droidenc_signal_eos (void *data)
 }
 
 static void
-gst_droidenc_error (void *data, int err)
+gst_droidvenc_error (void *data, int err)
 {
-  GstDroidEnc *enc = (GstDroidEnc *) data;
+  GstDroidVEnc *enc = (GstDroidVEnc *) data;
 
   GST_DEBUG_OBJECT (enc, "codec error");
 
@@ -238,11 +238,11 @@ out:
 }
 
 static void
-gst_droidenc_data_available (void *data, DroidMediaCodecData * encoded)
+gst_droidvenc_data_available (void *data, DroidMediaCodecData * encoded)
 {
   GstVideoCodecFrame *frame;
   GstFlowReturn flow_ret;
-  GstDroidEnc *enc = (GstDroidEnc *) data;
+  GstDroidVEnc *enc = (GstDroidVEnc *) data;
   GstVideoEncoder *encoder = GST_VIDEO_ENCODER (enc);
 
   GST_DEBUG_OBJECT (enc, "data available");
@@ -322,7 +322,7 @@ out:
 }
 
 static GstVideoCodecState *
-gst_droidenc_configure_state (GstDroidEnc * enc, GstCaps * caps)
+gst_droidvenc_configure_state (GstDroidVEnc * enc, GstCaps * caps)
 {
   GstVideoCodecState *out = NULL;
 
@@ -342,10 +342,10 @@ gst_droidenc_configure_state (GstDroidEnc * enc, GstCaps * caps)
 }
 
 static void
-gst_droidenc_set_property (GObject * object, guint prop_id,
+gst_droidvenc_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec)
 {
-  GstDroidEnc *enc = GST_DROIDENC (object);
+  GstDroidVEnc *enc = GST_DROIDVENC (object);
 
   switch (prop_id) {
     case PROP_TARGET_BITRATE:
@@ -358,10 +358,10 @@ gst_droidenc_set_property (GObject * object, guint prop_id,
 }
 
 static void
-gst_droidenc_get_property (GObject * object, guint prop_id, GValue * value,
+gst_droidvenc_get_property (GObject * object, guint prop_id, GValue * value,
     GParamSpec * pspec)
 {
-  GstDroidEnc *enc = GST_DROIDENC (object);
+  GstDroidVEnc *enc = GST_DROIDVENC (object);
 
   switch (prop_id) {
     case PROP_TARGET_BITRATE:
@@ -374,9 +374,9 @@ gst_droidenc_get_property (GObject * object, guint prop_id, GValue * value,
 }
 
 static void
-gst_droidenc_finalize (GObject * object)
+gst_droidvenc_finalize (GObject * object)
 {
-  GstDroidEnc *enc = GST_DROIDENC (object);
+  GstDroidVEnc *enc = GST_DROIDVENC (object);
 
   GST_DEBUG_OBJECT (enc, "finalize");
 
@@ -389,9 +389,9 @@ gst_droidenc_finalize (GObject * object)
 }
 
 static gboolean
-gst_droidenc_open (GstVideoEncoder * encoder)
+gst_droidvenc_open (GstVideoEncoder * encoder)
 {
-  GstDroidEnc *enc = GST_DROIDENC (encoder);
+  GstDroidVEnc *enc = GST_DROIDVENC (encoder);
 
   GST_DEBUG_OBJECT (enc, "open");
 
@@ -401,9 +401,9 @@ gst_droidenc_open (GstVideoEncoder * encoder)
 }
 
 static gboolean
-gst_droidenc_close (GstVideoEncoder * encoder)
+gst_droidvenc_close (GstVideoEncoder * encoder)
 {
-  GstDroidEnc *enc = GST_DROIDENC (encoder);
+  GstDroidVEnc *enc = GST_DROIDVENC (encoder);
 
   GST_DEBUG_OBJECT (enc, "close");
 
@@ -413,9 +413,9 @@ gst_droidenc_close (GstVideoEncoder * encoder)
 }
 
 static gboolean
-gst_droidenc_start (GstVideoEncoder * encoder)
+gst_droidvenc_start (GstVideoEncoder * encoder)
 {
-  GstDroidEnc *enc = GST_DROIDENC (encoder);
+  GstDroidVEnc *enc = GST_DROIDVENC (encoder);
 
   GST_DEBUG_OBJECT (enc, "start");
 
@@ -427,9 +427,9 @@ gst_droidenc_start (GstVideoEncoder * encoder)
 }
 
 static gboolean
-gst_droidenc_stop (GstVideoEncoder * encoder)
+gst_droidvenc_stop (GstVideoEncoder * encoder)
 {
-  GstDroidEnc *enc = GST_DROIDENC (encoder);
+  GstDroidVEnc *enc = GST_DROIDVENC (encoder);
 
   GST_DEBUG_OBJECT (enc, "stop");
 
@@ -459,9 +459,9 @@ gst_droidenc_stop (GstVideoEncoder * encoder)
 }
 
 static gboolean
-gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
+gst_droidvenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
 {
-  GstDroidEnc *enc = GST_DROIDENC (encoder);
+  GstDroidVEnc *enc = GST_DROIDVENC (encoder);
   gboolean ret = FALSE;
 
   GST_DEBUG_OBJECT (enc, "set format %" GST_PTR_FORMAT, state->caps);
@@ -476,7 +476,7 @@ gst_droidenc_set_format (GstVideoEncoder * encoder, GstVideoCodecState * state)
 
   enc->in_state = gst_video_codec_state_ref (state);
 
-  if (!gst_droidenc_negotiate_src_caps (enc)) {
+  if (!gst_droidvenc_negotiate_src_caps (enc)) {
     goto error;
   }
 
@@ -500,9 +500,9 @@ error:
 }
 
 static GstFlowReturn
-gst_droidenc_finish (GstVideoEncoder * encoder)
+gst_droidvenc_finish (GstVideoEncoder * encoder)
 {
-  GstDroidEnc *enc = GST_DROIDENC (encoder);
+  GstDroidVEnc *enc = GST_DROIDVENC (encoder);
 
   GST_DEBUG_OBJECT (enc, "finish");
 
@@ -530,15 +530,15 @@ out:
 }
 
 static GstFlowReturn
-gst_droidenc_handle_frame (GstVideoEncoder * encoder,
+gst_droidvenc_handle_frame (GstVideoEncoder * encoder,
     GstVideoCodecFrame * frame)
 {
-  GstDroidEnc *enc = GST_DROIDENC (encoder);
+  GstDroidVEnc *enc = GST_DROIDVENC (encoder);
   GstFlowReturn ret = GST_FLOW_ERROR;
   DroidMediaCodecData data;
   GstMapInfo info;
   DroidMediaBufferCallbacks cb;
-  GstDroidEncFrameReleaseData *release_data;
+  GstDroidVEncFrameReleaseData *release_data;
 
   GST_DEBUG_OBJECT (enc, "handle frame");
 
@@ -562,7 +562,7 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
   if (G_UNLIKELY (enc->dirty)) {
     g_assert (enc->codec == NULL);
 
-    if (!gst_droidenc_create_codec (enc)) {
+    if (!gst_droidvenc_create_codec (enc)) {
       goto error;
     }
 
@@ -575,11 +575,11 @@ gst_droidenc_handle_frame (GstVideoEncoder * encoder,
   data.sync = false;
   data.ts = GST_TIME_AS_USECONDS (frame->pts);
 
-  release_data = g_slice_new (GstDroidEncFrameReleaseData);
+  release_data = g_slice_new (GstDroidVEncFrameReleaseData);
   release_data->info = info;
   release_data->frame = gst_video_codec_frame_ref (frame);
 
-  cb.unref = gst_droidenc_release_input_frame;
+  cb.unref = gst_droidvenc_release_input_frame;
   cb.data = release_data;
 
   /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
@@ -622,9 +622,9 @@ error:
 }
 
 static gboolean
-gst_droidenc_flush (GstVideoEncoder * encoder)
+gst_droidvenc_flush (GstVideoEncoder * encoder)
 {
-  GstDroidEnc *enc = GST_DROIDENC (encoder);
+  GstDroidVEnc *enc = GST_DROIDVENC (encoder);
 
   GST_DEBUG_OBJECT (enc, "flush");
 
@@ -641,7 +641,7 @@ gst_droidenc_flush (GstVideoEncoder * encoder)
 }
 
 static void
-gst_droidenc_init (GstDroidEnc * enc)
+gst_droidvenc_init (GstDroidVEnc * enc)
 {
   enc->codec = NULL;
   enc->codec_type = NULL;
@@ -654,13 +654,13 @@ gst_droidenc_init (GstDroidEnc * enc)
 }
 
 static GstCaps *
-gst_droidenc_getcaps (GstVideoEncoder * encoder, GstCaps * filter)
+gst_droidvenc_getcaps (GstVideoEncoder * encoder, GstCaps * filter)
 {
-  GstDroidEnc *enc;
+  GstDroidVEnc *enc;
   GstCaps *caps;
   GstCaps *ret;
 
-  enc = GST_DROIDENC (encoder);
+  enc = GST_DROIDVENC (encoder);
 
   GST_DEBUG_OBJECT (enc, "getcaps with filter %" GST_PTR_FORMAT, filter);
 
@@ -710,7 +710,7 @@ gst_droidenc_getcaps (GstVideoEncoder * encoder, GstCaps * filter)
 }
 
 static void
-gst_droidenc_class_init (GstDroidEncClass * klass)
+gst_droidvenc_class_init (GstDroidVEncClass * klass)
 {
   GObjectClass *gobject_class;
   GstElementClass *gstelement_class;
@@ -733,23 +733,23 @@ gst_droidenc_class_init (GstDroidEncClass * klass)
   gst_element_class_add_pad_template (gstelement_class, tpl);
 
   gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&gst_droidenc_sink_template_factory));
+      gst_static_pad_template_get (&gst_droidvenc_sink_template_factory));
 
-  gobject_class->finalize = gst_droidenc_finalize;
-  gobject_class->set_property = gst_droidenc_set_property;
-  gobject_class->get_property = gst_droidenc_get_property;
+  gobject_class->finalize = gst_droidvenc_finalize;
+  gobject_class->set_property = gst_droidvenc_set_property;
+  gobject_class->get_property = gst_droidvenc_get_property;
 
-  gstvideoencoder_class->open = GST_DEBUG_FUNCPTR (gst_droidenc_open);
-  gstvideoencoder_class->close = GST_DEBUG_FUNCPTR (gst_droidenc_close);
-  gstvideoencoder_class->start = GST_DEBUG_FUNCPTR (gst_droidenc_start);
-  gstvideoencoder_class->stop = GST_DEBUG_FUNCPTR (gst_droidenc_stop);
+  gstvideoencoder_class->open = GST_DEBUG_FUNCPTR (gst_droidvenc_open);
+  gstvideoencoder_class->close = GST_DEBUG_FUNCPTR (gst_droidvenc_close);
+  gstvideoencoder_class->start = GST_DEBUG_FUNCPTR (gst_droidvenc_start);
+  gstvideoencoder_class->stop = GST_DEBUG_FUNCPTR (gst_droidvenc_stop);
   gstvideoencoder_class->set_format =
-      GST_DEBUG_FUNCPTR (gst_droidenc_set_format);
-  gstvideoencoder_class->getcaps = GST_DEBUG_FUNCPTR (gst_droidenc_getcaps);
-  gstvideoencoder_class->finish = GST_DEBUG_FUNCPTR (gst_droidenc_finish);
+      GST_DEBUG_FUNCPTR (gst_droidvenc_set_format);
+  gstvideoencoder_class->getcaps = GST_DEBUG_FUNCPTR (gst_droidvenc_getcaps);
+  gstvideoencoder_class->finish = GST_DEBUG_FUNCPTR (gst_droidvenc_finish);
   gstvideoencoder_class->handle_frame =
-      GST_DEBUG_FUNCPTR (gst_droidenc_handle_frame);
-  gstvideoencoder_class->flush = GST_DEBUG_FUNCPTR (gst_droidenc_flush);
+      GST_DEBUG_FUNCPTR (gst_droidvenc_handle_frame);
+  gstvideoencoder_class->flush = GST_DEBUG_FUNCPTR (gst_droidvenc_flush);
 
   g_object_class_install_property (gobject_class, PROP_TARGET_BITRATE,
       g_param_spec_int ("target-bitrate", "Target Bitrate",

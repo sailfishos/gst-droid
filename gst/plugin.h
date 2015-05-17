@@ -26,12 +26,6 @@
 
 G_BEGIN_DECLS
 
-GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
-GST_DEBUG_CATEGORY_EXTERN (gst_droid_dec_debug);
-GST_DEBUG_CATEGORY_EXTERN (gst_droid_enc_debug);
-GST_DEBUG_CATEGORY_EXTERN (gst_droid_codec_debug);
-GST_DEBUG_CATEGORY_EXTERN (gst_droid_eglsink_debug);
-
 G_END_DECLS
 
 #endif /* __PLUGIN_H__ */

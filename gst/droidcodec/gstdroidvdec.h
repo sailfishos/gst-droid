@@ -20,8 +20,8 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef __GST_DROID_DEC_H__
-#define __GST_DROID_DEC_H__
+#ifndef __GST_DROID_V_DEC_H__
+#define __GST_DROID_V_DEC_H__
 
 #include <gst/gst.h>
 #include <gst/video/gstvideodecoder.h>
@@ -30,21 +30,21 @@
 
 G_BEGIN_DECLS
 
-#define GST_TYPE_DROIDDEC \
-  (gst_droiddec_get_type())
-#define GST_DROIDDEC(obj) \
-  (G_TYPE_CHECK_INSTANCE_CAST((obj), GST_TYPE_DROIDDEC, GstDroidDec))
-#define GST_DROIDDEC_CLASS(klass) \
-  (G_TYPE_CHECK_CLASS_CAST((klass), GST_TYPE_DROIDDEC, GstDroidDecClass))
-#define GST_IS_DROIDDEC(obj) \
-  (G_TYPE_CHECK_INSTANCE_TYPE((obj), GST_TYPE_DROIDDEC))
-#define GST_IS_DROIDDEC_CLASS(klass) \
-  (G_TYPE_CHECK_CLASS_TYPE((klass), GST_TYPE_DROIDDEC))
+#define GST_TYPE_DROIDVDEC \
+  (gst_droidvdec_get_type())
+#define GST_DROIDVDEC(obj) \
+  (G_TYPE_CHECK_INSTANCE_CAST((obj), GST_TYPE_DROIDVDEC, GstDroidVDec))
+#define GST_DROIDVDEC_CLASS(klass) \
+  (G_TYPE_CHECK_CLASS_CAST((klass), GST_TYPE_DROIDVDEC, GstDroidVDecClass))
+#define GST_IS_DROIDVDEC(obj) \
+  (G_TYPE_CHECK_INSTANCE_TYPE((obj), GST_TYPE_DROIDVDEC))
+#define GST_IS_DROIDVDEC_CLASS(klass) \
+  (G_TYPE_CHECK_CLASS_TYPE((klass), GST_TYPE_DROIDVDEC))
 
-typedef struct _GstDroidDec GstDroidDec;
-typedef struct _GstDroidDecClass GstDroidDecClass;
+typedef struct _GstDroidVDec GstDroidVDec;
+typedef struct _GstDroidVDecClass GstDroidVDecClass;
 
-struct _GstDroidDec
+struct _GstDroidVDec
 {
   GstVideoDecoder parent;
   DroidMediaCodec *codec;
@@ -71,13 +71,13 @@ struct _GstDroidDec
   DroidMediaConvert *convert;
 };
 
-struct _GstDroidDecClass
+struct _GstDroidVDecClass
 {
   GstVideoDecoderClass parent_class;
 };
 
-GType gst_droiddec_get_type (void);
+GType gst_droidvdec_get_type (void);
 
 G_END_DECLS
 
-#endif /* __GST_DROID_DEC_H__ */
+#endif /* __GST_DROID_V_DEC_H__ */

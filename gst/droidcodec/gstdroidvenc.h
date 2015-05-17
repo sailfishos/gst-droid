@@ -19,8 +19,8 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef __GST_DROID_ENC_H__
-#define __GST_DROID_ENC_H__
+#ifndef __GST_DROID_V_ENC_H__
+#define __GST_DROID_V_ENC_H__
 
 #include <gst/gst.h>
 #include <gst/video/gstvideoencoder.h>
@@ -28,21 +28,21 @@
 
 G_BEGIN_DECLS
 
-#define GST_TYPE_DROIDENC \
-  (gst_droidenc_get_type())
-#define GST_DROIDENC(obj) \
-  (G_TYPE_CHECK_INSTANCE_CAST((obj), GST_TYPE_DROIDENC, GstDroidEnc))
-#define GST_DROIDENC_CLASS(klass) \
-  (G_TYPE_CHECK_CLASS_CAST((klass), GST_TYPE_DROIDENC, GstDroidEncClass))
-#define GST_IS_DROIDENC(obj) \
-  (G_TYPE_CHECK_INSTANCE_TYPE((obj), GST_TYPE_DROIDENC))
-#define GST_IS_DROIDENC_CLASS(klass) \
-  (G_TYPE_CHECK_CLASS_TYPE((klass), GST_TYPE_DROIDENC))
+#define GST_TYPE_DROIDVENC \
+  (gst_droidvenc_get_type())
+#define GST_DROIDVENC(obj) \
+  (G_TYPE_CHECK_INSTANCE_CAST((obj), GST_TYPE_DROIDVENC, GstDroidVEnc))
+#define GST_DROIDVENC_CLASS(klass) \
+  (G_TYPE_CHECK_CLASS_CAST((klass), GST_TYPE_DROIDVENC, GstDroidVEncClass))
+#define GST_IS_DROIDVENC(obj) \
+  (G_TYPE_CHECK_INSTANCE_TYPE((obj), GST_TYPE_DROIDVENC))
+#define GST_IS_DROIDVENC_CLASS(klass) \
+  (G_TYPE_CHECK_CLASS_TYPE((klass), GST_TYPE_DROIDVENC))
 
-typedef struct _GstDroidEnc GstDroidEnc;
-typedef struct _GstDroidEncClass GstDroidEncClass;
+typedef struct _GstDroidVEnc GstDroidVEnc;
+typedef struct _GstDroidVEncClass GstDroidVEncClass;
 
-struct _GstDroidEnc
+struct _GstDroidVEnc
 {
   GstVideoEncoder parent;
   DroidMediaCodec *codec;
@@ -62,13 +62,13 @@ struct _GstDroidEnc
   gboolean dirty;
 };
 
-struct _GstDroidEncClass
+struct _GstDroidVEncClass
 {
   GstVideoEncoderClass parent_class;
 };
 
-GType gst_droidenc_get_type (void);
+GType gst_droidvenc_get_type (void);
 
 G_END_DECLS
 
-#endif /* __GST_DROID_ENC_H__ */
+#endif /* __GST_DROID_V_ENC_H__ */

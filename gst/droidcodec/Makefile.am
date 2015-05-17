@@ -8,15 +8,15 @@ libgstdroidcodec_la_CFLAGS = $(GST_CFLAGS) $(NGI_CFLAGS) $(EGL_CFLAGS) $(DROID_C
 libgstdroidcodec_la_LIBADD = $(GST_LIBS) $(NGI_LIBS) $(EGL_LIBS) $(DROID_LIBS) $(ORC_LIBS)
 
 libgstdroidcodec_la_SOURCES = \
-	gstdroiddec.c \
-	gstdroidenc.c \
+	gstdroidvdec.c \
+	gstdroidvenc.c \
 	gstdroidcodec.c \
 	gstdroidadec.c \
 	gstdroidaenc.c
 
 noinst_HEADERS = \
-	gstdroiddec.h \
-	gstdroidenc.h \
+	gstdroidvdec.h \
+	gstdroidvenc.h \
 	gstdroidcodec.h \
 	gstdroidadec.h \
 	gstdroidaenc.h
