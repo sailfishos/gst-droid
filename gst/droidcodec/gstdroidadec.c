@@ -133,6 +133,17 @@ gst_droidadec_data_available (void *data, DroidMediaCodecData * encoded)
 
   GST_DEBUG_OBJECT (dec, "data available");
 
+  g_mutex_lock (&dec->eos_lock);
+  if (G_UNLIKELY (dec->eos)) {
+    GST_LOG_OBJECT (dec, "EOS. dropping data");
+    gst_audio_decoder_finish_frame (decoder, NULL, 1);
+    g_mutex_unlock (&dec->eos_lock);
+
+    return;
+  }
+
+  g_mutex_unlock (&dec->eos_lock);
+
   GST_AUDIO_DECODER_STREAM_LOCK (decoder);
 
   if (G_UNLIKELY (gst_audio_decoder_get_audio_info (GST_AUDIO_DECODER
@@ -516,6 +527,10 @@ gst_droidadec_flush (GstAudioDecoder * decoder, gboolean hard)
   GstDroidADec *dec = GST_DROIDADEC (decoder);
 
   GST_DEBUG_OBJECT (dec, "flush %d", hard);
+
+  if (hard) {
+    gst_droidadec_finish (decoder);
+  }
 
   dec->downstream_flow_ret = GST_FLOW_OK;
   g_mutex_lock (&dec->eos_lock);
