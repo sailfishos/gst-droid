@@ -550,6 +550,7 @@ static void
 gst_droidadec_init (GstDroidADec * dec)
 {
   gst_audio_decoder_set_needs_format (GST_AUDIO_DECODER (dec), TRUE);
+  gst_audio_decoder_set_drainable (GST_AUDIO_DECODER (dec), TRUE);
 
   dec->codec = NULL;
   dec->codec_type = NULL;
