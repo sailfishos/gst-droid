@@ -146,6 +146,14 @@ gst_droidadec_data_available (void *data, DroidMediaCodecData * encoded)
 
   GST_AUDIO_DECODER_STREAM_LOCK (decoder);
 
+  if (G_UNLIKELY (dec->downstream_flow_ret != GST_FLOW_OK)) {
+    GST_WARNING_OBJECT (dec, "not handling data in error state: %s",
+        gst_flow_get_name (dec->downstream_flow_ret));
+    flow_ret = dec->downstream_flow_ret;
+    gst_audio_decoder_finish_frame (decoder, NULL, 1);
+    goto out;
+  }
+
   if (G_UNLIKELY (gst_audio_decoder_get_audio_info (GST_AUDIO_DECODER
               (dec))->finfo->format == GST_AUDIO_FORMAT_UNKNOWN)) {
     DroidMediaCodecMetaData md;
