@@ -147,7 +147,7 @@ gst_droidadec_data_available (void *data, DroidMediaCodecData * encoded)
   GST_AUDIO_DECODER_STREAM_LOCK (decoder);
 
   if (G_UNLIKELY (dec->downstream_flow_ret != GST_FLOW_OK)) {
-    GST_WARNING_OBJECT (dec, "not handling data in error state: %s",
+    GST_DEBUG_OBJECT (dec, "not handling data in error state: %s",
         gst_flow_get_name (dec->downstream_flow_ret));
     flow_ret = dec->downstream_flow_ret;
     gst_audio_decoder_finish_frame (decoder, NULL, 1);
@@ -432,7 +432,7 @@ gst_droidadec_handle_frame (GstAudioDecoder * decoder, GstBuffer * buffer)
   }
 
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
-    GST_WARNING_OBJECT (dec, "not handling frame in error state: %s",
+    GST_DEBUG_OBJECT (dec, "not handling frame in error state: %s",
         gst_flow_get_name (dec->downstream_flow_ret));
     ret = dec->downstream_flow_ret;
     goto error;
@@ -502,7 +502,7 @@ gst_droidadec_handle_frame (GstAudioDecoder * decoder, GstBuffer * buffer)
    */
 
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
-    GST_WARNING_OBJECT (dec, "not handling frame in error state: %s",
+    GST_DEBUG_OBJECT (dec, "not handling frame in error state: %s",
         gst_flow_get_name (dec->downstream_flow_ret));
     ret = dec->downstream_flow_ret;
     goto out;

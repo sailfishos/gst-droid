@@ -315,7 +315,7 @@ gst_droidvdec_frame_available (void *user)
   }
 
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
-    GST_WARNING_OBJECT (dec, "not handling frame in error state: %s",
+    GST_DEBUG_OBJECT (dec, "not handling frame in error state: %s",
         gst_flow_get_name (dec->downstream_flow_ret));
     goto acquire_and_release;
   }
@@ -423,7 +423,7 @@ gst_droidvdec_data_available (void *data, DroidMediaCodecData * encoded)
   }
 
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
-    GST_WARNING_OBJECT (dec, "not handling frame in error state: %s",
+    GST_DEBUG_OBJECT (dec, "not handling frame in error state: %s",
         gst_flow_get_name (dec->downstream_flow_ret));
     flow_ret = dec->downstream_flow_ret;
     goto out;
@@ -905,7 +905,7 @@ gst_droidvdec_handle_frame (GstVideoDecoder * decoder,
   }
 
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
-    GST_WARNING_OBJECT (dec, "not handling frame in error state: %s",
+    GST_DEBUG_OBJECT (dec, "not handling frame in error state: %s",
         gst_flow_get_name (dec->downstream_flow_ret));
     ret = dec->downstream_flow_ret;
     goto error;
@@ -977,7 +977,7 @@ gst_droidvdec_handle_frame (GstVideoDecoder * decoder,
    */
 
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
-    GST_WARNING_OBJECT (dec, "not handling frame in error state: %s",
+    GST_DEBUG_OBJECT (dec, "not handling frame in error state: %s",
         gst_flow_get_name (dec->downstream_flow_ret));
     ret = dec->downstream_flow_ret;
     goto out;

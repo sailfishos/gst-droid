@@ -543,7 +543,7 @@ gst_droidvenc_handle_frame (GstVideoEncoder * encoder,
   GST_DEBUG_OBJECT (enc, "handle frame");
 
   if (enc->downstream_flow_ret != GST_FLOW_OK) {
-    GST_WARNING_OBJECT (enc, "not handling frame in error state: %s",
+    GST_DEBUG_OBJECT (enc, "not handling frame in error state: %s",
         gst_flow_get_name (enc->downstream_flow_ret));
     ret = enc->downstream_flow_ret;
     goto error;
@@ -594,7 +594,7 @@ gst_droidvenc_handle_frame (GstVideoEncoder * encoder,
   GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
 
   if (enc->downstream_flow_ret != GST_FLOW_OK) {
-    GST_WARNING_OBJECT (enc, "not handling frame in error state: %s",
+    GST_DEBUG_OBJECT (enc, "not handling frame in error state: %s",
         gst_flow_get_name (enc->downstream_flow_ret));
     ret = enc->downstream_flow_ret;
     goto out;
