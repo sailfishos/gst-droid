@@ -131,7 +131,7 @@ gst_droidadec_data_available (void *data, DroidMediaCodecData * encoded)
   GstBuffer *out;
   GstMapInfo info;
 
-  GST_DEBUG_OBJECT (dec, "data available");
+  GST_DEBUG_OBJECT (dec, "data available of size %d", encoded->data.size);
 
   g_mutex_lock (&dec->eos_lock);
   if (G_UNLIKELY (dec->eos)) {
@@ -473,6 +473,9 @@ gst_droidadec_handle_frame (GstAudioDecoder * decoder, GstBuffer * buffer)
 
   cb.unref = g_free;
   cb.data = data.data.data;
+
+  GST_DEBUG_OBJECT (dec, "decoding data of size %d (%d)",
+      gst_buffer_get_size (buffer), data.data.size);
 
   /*
    * try to use dts if pts is not valid.
