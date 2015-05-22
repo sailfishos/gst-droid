@@ -169,11 +169,12 @@ gst_droidadec_data_available (void *data, DroidMediaCodecData * encoded)
     gst_audio_info_set_format (&info, GST_AUDIO_FORMAT_S16, md.sample_rate,
         md.channels, NULL);
 
-
     if (!gst_audio_decoder_set_output_format (decoder, &info)) {
       flow_ret = GST_FLOW_ERROR;
       goto out;
     }
+
+    dec->info = gst_audio_decoder_get_audio_info (GST_AUDIO_DECODER (dec));
   }
 
   out = gst_audio_decoder_allocate_output_buffer (decoder, encoded->data.size);
@@ -182,6 +183,23 @@ gst_droidadec_data_available (void *data, DroidMediaCodecData * encoded)
   orc_memcpy (info.data, encoded->data.data, encoded->data.size);
   gst_buffer_unmap (out, &info);
 
+  //  GST_WARNING_OBJECT (dec, "bpf %d, bps %d", dec->info->bpf, GST_AUDIO_INFO_BPS(dec->info));
+  if (dec->spf == -1 || (encoded->data.size == dec->spf * dec->info->bpf
+          && gst_adapter_available (dec->adapter) == 0)) {
+    /* fast path. no need for anything */
+    goto push;
+  }
+
+  gst_adapter_push (dec->adapter, out);
+
+  if (gst_adapter_available (dec->adapter) >= dec->spf * dec->info->bpf) {
+    out = gst_adapter_take_buffer (dec->adapter, dec->spf * dec->info->bpf);
+  } else {
+    flow_ret = GST_FLOW_OK;
+    goto out;
+  }
+
+push:
   flow_ret = gst_audio_decoder_finish_frame (decoder, out, 1);
 
   if (flow_ret == GST_FLOW_OK || flow_ret == GST_FLOW_FLUSHING) {
@@ -255,6 +273,8 @@ gst_droidadec_stop (GstAudioDecoder * decoder)
     dec->codec = NULL;
   }
 
+  gst_adapter_flush (dec->adapter, gst_adapter_available (dec->adapter));
+
   g_mutex_lock (&dec->eos_lock);
   dec->eos = FALSE;
   g_mutex_unlock (&dec->eos_lock);
@@ -280,6 +300,9 @@ gst_droidadec_finalize (GObject * object)
 
   g_mutex_clear (&dec->eos_lock);
   g_cond_clear (&dec->eos_cond);
+
+  gst_object_unref (dec->adapter);
+  dec->adapter = NULL;
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
@@ -319,6 +342,7 @@ gst_droidadec_start (GstAudioDecoder * decoder)
   dec->downstream_flow_ret = GST_FLOW_OK;
   dec->codec_type = NULL;
   dec->dirty = TRUE;
+  dec->spf = -1;
 
   return TRUE;
 }
@@ -367,6 +391,10 @@ gst_droidadec_set_format (GstAudioDecoder * decoder, GstCaps * caps)
   /* handle_frame will create the codec */
   dec->dirty = TRUE;
 
+  dec->spf = gst_droid_codec_get_samples_per_frane (caps);
+
+  GST_INFO_OBJECT (dec, "samples per frame: %d", dec->spf);
+
   return TRUE;
 }
 
@@ -374,6 +402,7 @@ static GstFlowReturn
 gst_droidadec_finish (GstAudioDecoder * decoder)
 {
   GstDroidADec *dec = GST_DROIDADEC (decoder);
+  gint available;
 
   GST_DEBUG_OBJECT (dec, "finish");
 
@@ -397,6 +426,36 @@ gst_droidadec_finish (GstAudioDecoder * decoder)
     droid_media_codec_stop (dec->codec);
     droid_media_codec_destroy (dec->codec);
     dec->codec = NULL;
+  }
+
+  if (dec->spf != -1) {
+    available = gst_adapter_available (dec->adapter);
+    if (available > 0) {
+      gint size = dec->spf * dec->info->bpf;
+      gint nframes = available / size;
+      GstBuffer *out;
+      GstFlowReturn ret G_GNUC_UNUSED;
+
+      GST_INFO_OBJECT (dec, "pushing remaining %d bytes", available);
+      if (nframes > 0) {
+        out = gst_adapter_take_buffer (dec->adapter, nframes * size);
+        available -= (nframes * size);
+      } else {
+        out = gst_adapter_take_buffer (dec->adapter, available);
+        nframes = 1;
+        available = 0;
+      }
+
+      ret = gst_audio_decoder_finish_frame (decoder, out, nframes);
+
+
+      GST_INFO_OBJECT (dec, "pushed %d frames. flow return: %s", nframes,
+          gst_flow_get_name (ret));
+
+      if (available > 0) {
+        GST_ERROR_OBJECT (dec, "%d bytes remaining", available);
+      }
+    }
   }
 
   dec->dirty = TRUE;
@@ -565,6 +624,7 @@ gst_droidadec_init (GstDroidADec * dec)
 
   g_mutex_init (&dec->eos_lock);
   g_cond_init (&dec->eos_cond);
+  dec->adapter = gst_adapter_new ();
 }
 
 static void

@@ -325,6 +325,34 @@ gst_droid_codec_process_decoder_data (GstDroidCodec * codec, GstBuffer * buffer,
   return TRUE;
 }
 
+gint
+gst_droid_codec_get_samples_per_frane (GstCaps * caps)
+{
+  gint mpegversion = -1;
+  const GstStructure *s = gst_caps_get_structure (caps, 0);
+  const gchar *name = gst_structure_get_name (s);
+  if (!g_str_has_prefix (name, "audio/")) {
+    return -1;
+  }
+
+  /* see gst-plugins-bad 5b23cf69 */
+  gst_structure_get_int (s, "mpegversion", &mpegversion);
+  if (mpegversion == 1) {
+    gint layer = -1, mpegaudioversion = -1;
+    gst_structure_get_int (s, "layer", &layer);
+    gst_structure_get_int (s, "mpegaudioversion", &mpegaudioversion);
+    if (layer == 1) {
+      return 384;
+    } else if (layer == 2) {
+      return 1152;
+    } else if (layer == 3 && mpegaudioversion != -1) {
+      return (mpegaudioversion == 1 ? 1152 : 576);
+    }
+  }
+
+  return -1;
+}
+
 static GstBuffer *
 create_mpeg4venc_codec_data (DroidMediaData * data)
 {

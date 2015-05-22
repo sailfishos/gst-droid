@@ -25,6 +25,7 @@
 
 #include <gst/gst.h>
 #include <gst/audio/gstaudiodecoder.h>
+#include <gst/base/gstadapter.h>
 #include "gstdroidcodec.h"
 
 G_BEGIN_DECLS
@@ -61,6 +62,9 @@ struct _GstDroidADec
   GstFlowReturn downstream_flow_ret;
   GstBuffer *codec_data;
   gboolean dirty;
+  gint spf;
+  GstAudioInfo *info;
+  GstAdapter *adapter;
 };
 
 struct _GstDroidADecClass

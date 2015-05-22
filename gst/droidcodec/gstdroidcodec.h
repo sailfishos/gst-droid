@@ -91,6 +91,7 @@ GstBuffer *gst_droid_codec_prepare_encoded_data (GstDroidCodec * codec, DroidMed
 
 gboolean gst_droid_codec_process_decoder_data (GstDroidCodec * codec, GstBuffer * buffer,
 					       DroidMediaData * out);
+gint gst_droid_codec_get_samples_per_frane (GstCaps * caps);
 
 G_END_DECLS
 
