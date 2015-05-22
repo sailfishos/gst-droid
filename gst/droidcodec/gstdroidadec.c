@@ -200,6 +200,8 @@ gst_droidadec_data_available (void *data, DroidMediaCodecData * encoded)
   }
 
 push:
+  GST_DEBUG_OBJECT (dec, "pushing %d bytes out", gst_buffer_get_size (out));
+
   flow_ret = gst_audio_decoder_finish_frame (decoder, out, 1);
 
   if (flow_ret == GST_FLOW_OK || flow_ret == GST_FLOW_FLUSHING) {
