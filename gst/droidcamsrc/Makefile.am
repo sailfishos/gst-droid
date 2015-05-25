@@ -4,7 +4,7 @@ libgstdroidcamsrc_la_CFLAGS = $(GST_CFLAGS) $(NGI_CFLAGS) \
                               $(NGM_CFLAGS) $(EXIF_CFLAGS) \
 			      -I$(top_builddir)/gst/ \
 			      -I$(top_builddir)/gst-libs/ \
-			      -I$(top_builddir)/gst-libs/ext/droidmedia/
+			      -I/usr/include/droidmedia/
 
 libgstdroidcamsrc_la_LIBADD = $(GST_LIBS) $(NGI_LIBS) \
                               $(NGM_LIBS) $(EXIF_LIBS) \

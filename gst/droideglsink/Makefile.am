@@ -1,7 +1,7 @@
 noinst_LTLIBRARIES = libgstdroideglsink.la
 libgstdroideglsink_la_CFLAGS = $(GST_CFLAGS) $(NGI_CFLAGS) $(EGL_CFLAGS) \
 			       -I$(top_builddir)/gst-libs/ \
-			       -I$(top_builddir)/gst-libs/ext/droidmedia/
+			       -I/usr/include/droidmedia/
 
 libgstdroideglsink_la_LIBADD = $(GST_LIBS) $(NGI_LIBS) $(EGL_LIBS)
 
