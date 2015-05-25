@@ -21,7 +21,7 @@ BuildRequires:  pkgconfig(libexif)
 BuildRequires:  libtool
 BuildRequires:  gettext
 BuildRequires:  droidmedia-devel
-BuildRequires:  libhybris-devel
+BuildRequires:  pkgconfig(libandroid-properties)
 
 %description
 GStreamer droid plug-in contains elements using the Android HAL
