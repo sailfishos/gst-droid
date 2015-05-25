@@ -20,6 +20,8 @@ BuildRequires:  pkgconfig(nemo-gstreamer-interfaces-1.0)
 BuildRequires:  pkgconfig(libexif)
 BuildRequires:  libtool
 BuildRequires:  gettext
+BuildRequires:  droidmedia-devel
+BuildRequires:  libhybris-devel
 
 %description
 GStreamer droid plug-in contains elements using the Android HAL
