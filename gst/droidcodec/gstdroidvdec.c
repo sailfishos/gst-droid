@@ -855,7 +855,7 @@ gst_droidvdec_finish (GstVideoDecoder * decoder)
   g_mutex_lock (&dec->eos_lock);
   dec->eos = TRUE;
 
-  if (dec->codec) {
+  if (dec->codec && GST_PAD_TASK (GST_VIDEO_DECODER_SRC_PAD (decoder))) {
     droid_media_codec_drain (dec->codec);
   } else {
     goto out;
