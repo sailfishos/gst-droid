@@ -526,6 +526,10 @@ gst_droidvdec_error (void *data, int err)
 
   GST_DEBUG_OBJECT (dec, "codec error");
 
+  GST_OBJECT_LOCK (dec);
+  dec->codec_error = TRUE;
+  GST_OBJECT_UNLOCK (dec);
+
   g_mutex_lock (&dec->eos_lock);
 
   if (dec->eos) {
@@ -776,6 +780,7 @@ gst_droidvdec_start (GstVideoDecoder * decoder)
   dec->downstream_flow_ret = GST_FLOW_OK;
   dec->codec_type = NULL;
   dec->dirty = TRUE;
+  dec->codec_error = FALSE;
 
   return TRUE;
 }
@@ -849,13 +854,18 @@ static GstFlowReturn
 gst_droidvdec_finish (GstVideoDecoder * decoder)
 {
   GstDroidVDec *dec = GST_DROIDVDEC (decoder);
+  gboolean codec_error;
 
   GST_DEBUG_OBJECT (dec, "finish");
+
+  GST_OBJECT_LOCK (dec);
+  codec_error = dec->codec_error;
+  GST_OBJECT_UNLOCK (dec);
 
   g_mutex_lock (&dec->eos_lock);
   dec->eos = TRUE;
 
-  if (dec->codec) {
+  if (dec->codec && !codec_error) {
     droid_media_codec_drain (dec->codec);
   } else {
     goto out;

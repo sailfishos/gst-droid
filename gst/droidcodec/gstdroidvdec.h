@@ -59,6 +59,9 @@ struct _GstDroidVDec
 
   GstBufferPool *pool;
 
+  /* protected with object lock */
+  gboolean codec_error;
+
   /* protected by decoder stream lock */
   GstFlowReturn downstream_flow_ret;
   GstBuffer *codec_data;
