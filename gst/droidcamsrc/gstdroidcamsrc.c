@@ -301,11 +301,17 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
 
       src->mode = mode;
 
-      /* activate mode. */
-      gst_droidcamsrc_select_and_activate_mode (src);
+      g_rec_mutex_lock (&src->dev_lock);
 
-      /* set mode settings */
-      gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
+      if (src->dev && src->dev->params) {
+        /* activate mode. */
+        gst_droidcamsrc_select_and_activate_mode (src);
+
+        /* set mode settings */
+        gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
+      }
+
+      g_rec_mutex_unlock (&src->dev_lock);
     }
 
       break;
