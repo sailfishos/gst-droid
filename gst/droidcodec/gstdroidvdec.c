@@ -855,9 +855,10 @@ gst_droidvdec_finish (GstVideoDecoder * decoder)
   GST_DEBUG_OBJECT (dec, "finish");
 
   g_mutex_lock (&dec->state_lock);
-  dec->state = GST_DROID_VDEC_STATE_WAITING_FOR_EOS;
 
   if (dec->codec && dec->state == GST_DROID_VDEC_STATE_OK) {
+    GST_INFO_OBJECT (dec, "draining");
+    dec->state = GST_DROID_VDEC_STATE_WAITING_FOR_EOS;
     droid_media_codec_drain (dec->codec);
   } else {
     goto out;
