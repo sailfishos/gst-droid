@@ -890,6 +890,8 @@ gst_droidvdec_finish (GstVideoDecoder * decoder)
 out:
   dec->state = GST_DROID_VDEC_STATE_OK;
 
+  GST_DEBUG_OBJECT (dec, "finished");
+
   g_mutex_unlock (&dec->state_lock);
 
   return GST_FLOW_OK;
