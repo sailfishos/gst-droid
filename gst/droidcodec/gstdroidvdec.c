@@ -505,9 +505,9 @@ gst_droidvdec_signal_eos (void *data)
 
   GST_DEBUG_OBJECT (dec, "codec signaled EOS");
 
-  g_mutex_lock (&dec->eos_lock);
+  g_mutex_lock (&dec->state_lock);
 
-  if (!dec->eos) {
+  if (dec->state != GST_DROID_VDEC_STATE_WAITING_FOR_EOS) {
     GST_WARNING_OBJECT (dec, "codec signaled EOS but we are not expecting it");
   }
 
@@ -515,8 +515,10 @@ gst_droidvdec_signal_eos (void *data)
     gst_buffer_pool_set_flushing (dec->pool, TRUE);
   }
 
-  g_cond_signal (&dec->eos_cond);
-  g_mutex_unlock (&dec->eos_lock);
+  dec->state = GST_DROID_VDEC_STATE_EOS;
+
+  g_cond_signal (&dec->state_cond);
+  g_mutex_unlock (&dec->state_lock);
 }
 
 static void
@@ -526,17 +528,19 @@ gst_droidvdec_error (void *data, int err)
 
   GST_DEBUG_OBJECT (dec, "codec error");
 
-  GST_OBJECT_LOCK (dec);
-  dec->codec_error = TRUE;
-  GST_OBJECT_UNLOCK (dec);
+  g_mutex_lock (&dec->state_lock);
 
-  g_mutex_lock (&dec->eos_lock);
-
-  if (dec->eos) {
+  if (dec->state == GST_DROID_VDEC_STATE_WAITING_FOR_EOS) {
     /* Gotta love Android. We will ignore errors if we are expecting EOS */
-    g_cond_signal (&dec->eos_cond);
+    g_cond_signal (&dec->state_cond);
+    g_mutex_unlock (&dec->state_lock);
     goto out;
   }
+
+  /* just in case */
+  g_cond_signal (&dec->state_cond);
+
+  g_mutex_unlock (&dec->state_lock);
 
   GST_VIDEO_DECODER_STREAM_LOCK (dec);
   dec->downstream_flow_ret = GST_FLOW_ERROR;
@@ -549,8 +553,6 @@ out:
   if (dec->pool) {
     gst_buffer_pool_set_flushing (dec->pool, TRUE);
   }
-
-  g_mutex_unlock (&dec->eos_lock);
 }
 
 static int
@@ -678,10 +680,6 @@ gst_droidvdec_stop (GstVideoDecoder * decoder)
     dec->out_state = NULL;
   }
 
-  g_mutex_lock (&dec->eos_lock);
-  dec->eos = FALSE;
-  g_mutex_unlock (&dec->eos_lock);
-
   gst_buffer_replace (&dec->codec_data, NULL);
 
   if (dec->codec_type) {
@@ -739,8 +737,8 @@ gst_droidvdec_finalize (GObject * object)
   gst_object_unref (dec->allocator);
   dec->allocator = NULL;
 
-  g_mutex_clear (&dec->eos_lock);
-  g_cond_clear (&dec->eos_cond);
+  g_mutex_clear (&dec->state_lock);
+  g_cond_clear (&dec->state_cond);
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
@@ -776,11 +774,10 @@ gst_droidvdec_start (GstVideoDecoder * decoder)
 
   GST_DEBUG_OBJECT (dec, "start");
 
-  dec->eos = FALSE;
+  dec->state = GST_DROID_VDEC_STATE_OK;
   dec->downstream_flow_ret = GST_FLOW_OK;
   dec->codec_type = NULL;
   dec->dirty = TRUE;
-  dec->codec_error = FALSE;
 
   return TRUE;
 }
@@ -854,18 +851,13 @@ static GstFlowReturn
 gst_droidvdec_finish (GstVideoDecoder * decoder)
 {
   GstDroidVDec *dec = GST_DROIDVDEC (decoder);
-  gboolean codec_error;
 
   GST_DEBUG_OBJECT (dec, "finish");
 
-  GST_OBJECT_LOCK (dec);
-  codec_error = dec->codec_error;
-  GST_OBJECT_UNLOCK (dec);
+  g_mutex_lock (&dec->state_lock);
+  dec->state = GST_DROID_VDEC_STATE_WAITING_FOR_EOS;
 
-  g_mutex_lock (&dec->eos_lock);
-  dec->eos = TRUE;
-
-  if (dec->codec && !codec_error) {
+  if (dec->codec && dec->state == GST_DROID_VDEC_STATE_OK) {
     droid_media_codec_drain (dec->codec);
   } else {
     goto out;
@@ -874,7 +866,7 @@ gst_droidvdec_finish (GstVideoDecoder * decoder)
   /* release the lock to allow _frame_available () to do its job */
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
   /* Now we wait for the codec to signal EOS */
-  g_cond_wait (&dec->eos_cond, &dec->eos_lock);
+  g_cond_wait (&dec->state_cond, &dec->state_lock);
   GST_VIDEO_DECODER_STREAM_LOCK (decoder);
 
   /* We drained the codec. Better to recreate it. */
@@ -888,9 +880,9 @@ gst_droidvdec_finish (GstVideoDecoder * decoder)
   dec->dirty = TRUE;
 
 out:
-  dec->eos = FALSE;
+  dec->state = GST_DROID_VDEC_STATE_OK;
 
-  g_mutex_unlock (&dec->eos_lock);
+  g_mutex_unlock (&dec->state_lock);
 
   return GST_FLOW_OK;
 }
@@ -921,14 +913,14 @@ gst_droidvdec_handle_frame (GstVideoDecoder * decoder,
     goto error;
   }
 
-  g_mutex_lock (&dec->eos_lock);
-  if (dec->eos) {
+  g_mutex_lock (&dec->state_lock);
+  if (dec->state == GST_DROID_VDEC_STATE_EOS) {
     GST_WARNING_OBJECT (dec, "got frame in eos state");
-    g_mutex_unlock (&dec->eos_lock);
+    g_mutex_unlock (&dec->state_lock);
     ret = GST_FLOW_EOS;
     goto error;
   }
-  g_mutex_unlock (&dec->eos_lock);
+  g_mutex_unlock (&dec->state_lock);
 
   /* We must create the codec before we process any data. _create_codec will call
    * construct_decoder_codec_data which will store the nal prefix length for H264.
@@ -993,14 +985,14 @@ gst_droidvdec_handle_frame (GstVideoDecoder * decoder,
     goto out;
   }
 
-  g_mutex_lock (&dec->eos_lock);
-  if (dec->eos) {
+  g_mutex_lock (&dec->state_lock);
+  if (dec->state == GST_DROID_VDEC_STATE_EOS) {
     GST_WARNING_OBJECT (dec, "got frame in eos state");
-    g_mutex_unlock (&dec->eos_lock);
+    g_mutex_unlock (&dec->state_lock);
     ret = GST_FLOW_EOS;
     goto out;
   }
-  g_mutex_unlock (&dec->eos_lock);
+  g_mutex_unlock (&dec->state_lock);
 
   ret = GST_FLOW_OK;
 
@@ -1033,9 +1025,9 @@ gst_droidvdec_flush (GstVideoDecoder * decoder)
   dec->dirty = TRUE;
 
   dec->downstream_flow_ret = GST_FLOW_OK;
-  g_mutex_lock (&dec->eos_lock);
-  dec->eos = FALSE;
-  g_mutex_unlock (&dec->eos_lock);
+  g_mutex_lock (&dec->state_lock);
+  dec->state = GST_DROID_VDEC_STATE_OK;
+  g_mutex_unlock (&dec->state_lock);
 
   return TRUE;
 }
@@ -1081,11 +1073,11 @@ gst_droidvdec_init (GstDroidVDec * dec)
   dec->queue = NULL;
   dec->codec_type = NULL;
   dec->downstream_flow_ret = GST_FLOW_OK;
-  dec->eos = FALSE;
+  dec->state = GST_DROID_VDEC_STATE_OK;
   dec->codec_data = NULL;
 
-  g_mutex_init (&dec->eos_lock);
-  g_cond_init (&dec->eos_cond);
+  g_mutex_init (&dec->state_lock);
+  g_cond_init (&dec->state_cond);
 
   dec->allocator = gst_droid_media_buffer_allocator_new ();
   dec->in_state = NULL;

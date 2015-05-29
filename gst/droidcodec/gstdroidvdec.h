@@ -43,6 +43,15 @@ G_BEGIN_DECLS
 
 typedef struct _GstDroidVDec GstDroidVDec;
 typedef struct _GstDroidVDecClass GstDroidVDecClass;
+typedef enum _GstDroidVDecState GstDroidVDecState;
+
+enum _GstDroidVDecState
+{
+  GST_DROID_VDEC_STATE_OK,
+  GST_DROID_VDEC_STATE_ERROR,
+  GST_DROID_VDEC_STATE_WAITING_FOR_EOS,
+  GST_DROID_VDEC_STATE_EOS,
+};
 
 struct _GstDroidVDec
 {
@@ -53,14 +62,11 @@ struct _GstDroidVDec
   GstDroidCodec *codec_type;
 
   /* eos handling */
-  gboolean eos;
-  GMutex eos_lock;
-  GCond eos_cond;
+  GstDroidVDecState state;
+  GMutex state_lock;
+  GCond state_cond;
 
   GstBufferPool *pool;
-
-  /* protected with object lock */
-  gboolean codec_error;
 
   /* protected by decoder stream lock */
   GstFlowReturn downstream_flow_ret;
