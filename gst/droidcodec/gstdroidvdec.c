@@ -856,6 +856,13 @@ gst_droidvdec_finish (GstVideoDecoder * decoder)
 
   g_mutex_lock (&dec->state_lock);
 
+  /* since we release the stream lock, we can get called again */
+  if (dec->state == GST_DROID_VDEC_STATE_WAITING_FOR_EOS) {
+    GST_DEBUG_OBJECT (dec, "already finishing");
+    g_mutex_unlock (&dec->state_lock);
+    return GST_FLOW_OK;
+  }
+
   if (dec->codec && dec->state == GST_DROID_VDEC_STATE_OK) {
     GST_INFO_OBJECT (dec, "draining");
     dec->state = GST_DROID_VDEC_STATE_WAITING_FOR_EOS;
