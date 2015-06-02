@@ -562,9 +562,10 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         src->active_mode = NULL;
       }
 
-      /* Send EOS */
+      /* Send flush start to make sure the sink will drop its buffers */
       g_mutex_lock (&src->vfsrc->lock);
-      gst_pad_push_event (src->vfsrc->pad, gst_event_new_eos ());
+      GST_INFO_OBJECT (src, "pushing flush start");
+      gst_pad_push_event (src->vfsrc->pad, gst_event_new_flush_start ());
       g_mutex_unlock (&src->vfsrc->lock);
       break;
 
