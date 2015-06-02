@@ -562,6 +562,10 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         src->active_mode = NULL;
       }
 
+      /* Send EOS */
+      g_mutex_lock (&src->vfsrc->lock);
+      gst_pad_push_event (src->vfsrc->pad, gst_event_new_eos ());
+      g_mutex_unlock (&src->vfsrc->lock);
       break;
 
     case GST_STATE_CHANGE_PAUSED_TO_READY:
