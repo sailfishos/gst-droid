@@ -1947,7 +1947,6 @@ gst_droidcamsrc_update_ev_compensation_bounds (GstDroidCamSrc * src)
       gst_droidcamsrc_params_get_float (src->dev->params,
       "exposure-compensation-step");
 
-  /* TODO: hmm, not sure this works. */
   if (step <= 0.0) {
     GST_WARNING_OBJECT (src, "failed to get exposure-compensation-step");
     return;

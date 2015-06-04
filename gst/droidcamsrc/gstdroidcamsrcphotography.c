@@ -954,6 +954,16 @@ gst_droidcamsrc_set_ev_compensation (GstDroidCamSrc * src, gfloat ev_comp)
   gboolean ret;
 
   ev_comp = CLAMP (ev_comp, src->min_ev_compensation, src->max_ev_compensation);
+
+  if (src->ev_step == 0) {
+    GST_DEBUG_OBJECT (src,
+        "ev_step is still unknown. discarding requested ev compensation");
+    GST_OBJECT_LOCK (src);
+    src->photo->settings.ev_compensation = ev_comp;
+    GST_OBJECT_UNLOCK (src);
+    return FALSE;
+  }
+
   val = ev_comp / src->ev_step;
 
   value = g_strdup_printf ("%d", val);
@@ -1368,6 +1378,12 @@ gst_droidcamsrc_photography_set_ev_compensation_to_droid (GstDroidCamSrc * src)
   int val;
   gchar *value;
   gfloat ev_comp;
+
+  if (src->ev_step == 0) {
+    GST_DEBUG_OBJECT (src,
+        "Cannot set exposure compensation because ev_step is still unknown.");
+    return;
+  }
 
   ev_comp =
       CLAMP (src->photo->settings.ev_compensation, src->min_ev_compensation,
