@@ -88,7 +88,7 @@ gst_droidcamsrc_params_get_float (GstDroidCamSrcParams * params,
   value = g_hash_table_lookup (params->params, key);
 
   if (value) {
-    result = strtof (value, NULL);
+    result = g_ascii_strtod (value, NULL);
   }
 
   g_mutex_unlock (&params->lock);
