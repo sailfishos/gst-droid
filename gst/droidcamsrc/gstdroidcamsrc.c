@@ -80,6 +80,8 @@ static void gst_droidcamsrc_update_ev_compensation_bounds (GstDroidCamSrc *
     src);
 static void gst_droidcamsrc_add_vfsrc_orientation_tag (GstDroidCamSrc * src);
 static gboolean gst_droidcamsrc_select_and_activate_mode (GstDroidCamSrc * src);
+static GstCaps *gst_droidcamsrc_pick_largest_resolution (GstDroidCamSrc * src,
+    GstCaps * caps);
 
 enum
 {
@@ -1391,7 +1393,7 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   peer = NULL;
 
   our_caps = gst_caps_make_writable (our_caps);
-  our_caps = gst_caps_truncate (our_caps);
+  our_caps = gst_droidcamsrc_pick_largest_resolution (src, our_caps);
 
   if (src->mode == MODE_IMAGE) {
     gst_droidcamsrc_params_choose_image_framerate (src->dev->params, our_caps);
@@ -1476,7 +1478,7 @@ gst_droidcamsrc_imgsrc_negotiate (GstDroidCamSrcPad * data)
   peer = NULL;
 
   our_caps = gst_caps_make_writable (our_caps);
-  our_caps = gst_caps_truncate (our_caps);
+  our_caps = gst_droidcamsrc_pick_largest_resolution (src, our_caps);
 
   /* imgsrc frame rate is not really important so we will just set it to 30 */
   gst_caps_set_simple (our_caps, "framerate", G_TYPE_INT, 30, NULL);
@@ -1551,7 +1553,7 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
   peer = NULL;
 
   our_caps = gst_caps_make_writable (our_caps);
-  our_caps = gst_caps_truncate (our_caps);
+  our_caps = gst_droidcamsrc_pick_largest_resolution (src, our_caps);
 
   /* just in case.
    * TODO: a better way of doing it is to get the current fps preview range and use its
@@ -2049,4 +2051,45 @@ gst_droidcamsrc_select_and_activate_mode (GstDroidCamSrc * src)
   }
 
   return TRUE;
+}
+
+static GstCaps *
+gst_droidcamsrc_pick_largest_resolution (GstDroidCamSrc * src, GstCaps * caps)
+{
+  /* TODO: this function will fail if we have either width or height ranges */
+  gint len;
+  gint index = 0;
+  gint mp = 0;
+  gint x;
+  GstCaps *out_caps;
+
+  GST_LOG_OBJECT (src, "pick largest resolution from %" GST_PTR_FORMAT, caps);
+
+  len = gst_caps_get_size (caps);
+
+  if (len == 1) {
+    return caps;
+  }
+
+  for (x = 0; x < len; x++) {
+    gint width = 0, height = 0;
+    GstStructure *s = gst_caps_get_structure (caps, x);
+    gint size;
+
+    if (!gst_structure_get_int (s, "width", &width) ||
+        !gst_structure_get_int (s, "height", &height)) {
+      continue;
+    }
+
+    size = width * height;
+
+    if (size > mp) {
+      mp = size;
+      index = x;
+    }
+  }
+
+  out_caps = gst_caps_copy_nth (caps, index);
+  gst_caps_unref (caps);
+  return out_caps;
 }
