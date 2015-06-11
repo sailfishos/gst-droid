@@ -589,7 +589,7 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder)
 
   droid_media_codec_get_output_info (dec->codec, &md, &rect);
 
-  GST_DEBUG_OBJECT (dec,
+  GST_INFO_OBJECT (dec,
       "configure state: width: %d, height: %d, crop: %d,%d %d,%d", md.width,
       md.height, rect.left, rect.top, rect.right, rect.bottom);
 
