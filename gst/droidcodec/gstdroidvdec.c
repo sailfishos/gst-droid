@@ -1058,18 +1058,21 @@ gst_droidvdec_change_state (GstElement * element, GstStateChange transition)
       gst_element_state_get_name (GST_STATE_TRANSITION_NEXT (transition)));
 
   if (transition == GST_STATE_CHANGE_PAUSED_TO_READY) {
+    GstVideoDecoder *decoder = GST_VIDEO_DECODER (dec);
+
+    GST_VIDEO_DECODER_STREAM_LOCK (decoder);
     /*
      * _loop() can be waiting in droid_media_codec_loop() thus we must make
      * sure the stagefright decoder is not doing anything otherwise
      * gst_droidvdec_stop_loop() will deadlock
      */
     if (dec->codec) {
-      GstVideoDecoder *decoder = GST_VIDEO_DECODER (dec);
-      GST_VIDEO_DECODER_STREAM_LOCK (decoder);
       gst_droidvdec_finish (decoder);
-      GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
     }
+
     gst_droidvdec_stop_loop (dec);
+
+    GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
   }
 
   ret = GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
