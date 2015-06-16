@@ -74,6 +74,7 @@ struct _GstDroidVDec
   gboolean dirty;
   DroidMediaRect crop_rect;
   GstVideoInfo info;
+  gboolean running;
 
   GstVideoCodecState *in_state;
   GstVideoCodecState *out_state;

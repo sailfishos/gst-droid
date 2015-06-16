@@ -722,6 +722,8 @@ gst_droidvdec_stop_loop (GstDroidVDec * dec)
   if (dec->pool) {
     gst_buffer_pool_set_flushing (dec->pool, FALSE);
   }
+
+  dec->running = FALSE;
 }
 
 static void
@@ -782,6 +784,7 @@ gst_droidvdec_start (GstVideoDecoder * decoder)
   dec->downstream_flow_ret = GST_FLOW_OK;
   dec->codec_type = NULL;
   dec->dirty = TRUE;
+  dec->running = TRUE;
 
   return TRUE;
 }
@@ -913,6 +916,12 @@ gst_droidvdec_handle_frame (GstVideoDecoder * decoder,
   DroidMediaBufferCallbacks cb;
 
   GST_DEBUG_OBJECT (dec, "handle frame");
+
+  if (G_UNLIKELY (!dec->running)) {
+    GST_DEBUG_OBJECT (dec, "codec is not running");
+    ret = GST_FLOW_FLUSHING;
+    goto error;
+  }
 
   if (!GST_CLOCK_TIME_IS_VALID (frame->dts)
       && !GST_CLOCK_TIME_IS_VALID (frame->pts)) {
