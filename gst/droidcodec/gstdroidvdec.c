@@ -198,6 +198,8 @@ gst_droidvdec_create_codec (GstDroidVDec * dec, GstBuffer * input)
   }
 
   /* now start our task */
+  GST_LOG_OBJECT (dec, "starting task");
+
   gst_pad_start_task (GST_VIDEO_DECODER_SRC_PAD (GST_VIDEO_DECODER (dec)),
       (GstTaskFunction) gst_droidvdec_loop, gst_object_ref (dec),
       gst_object_unref);
@@ -874,10 +876,12 @@ gst_droidvdec_finish (GstVideoDecoder * decoder)
   }
 
   /* release the lock to allow _frame_available () to do its job */
+  GST_LOG_OBJECT (dec, "releasing stream lock");
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
   /* Now we wait for the codec to signal EOS */
   g_cond_wait (&dec->state_cond, &dec->state_lock);
   GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+  GST_LOG_OBJECT (dec, "acquired stream lock");
 
   /* We drained the codec. Better to recreate it. */
   if (dec->codec) {
@@ -983,10 +987,11 @@ gst_droidvdec_handle_frame (GstVideoDecoder * decoder,
    * to call get_oldest_frame() which acquires the stream lock the base class
    * is holding before calling us
    */
+  GST_LOG_OBJECT (dec, "releasing stream lock");
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
   droid_media_codec_queue (dec->codec, &data, &cb);
   GST_VIDEO_DECODER_STREAM_LOCK (decoder);
-
+  GST_LOG_OBJECT (dec, "acquired stream lock");
   /* from now on decoder owns a frame reference so we cannot use the out label otherwise
    * we will drop the needed reference
    */
