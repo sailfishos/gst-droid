@@ -1875,9 +1875,8 @@ static void
 gst_droidcamsrc_apply_quirk (GstDroidCamSrc * src,
     const gchar * name, gboolean state)
 {
-  gboolean enable = (state && src->mode == MODE_IMAGE);
   gst_droidcamsrc_quirks_apply (src->quirks, src, src->dev->info->direction,
-      name, enable);
+      src->mode, name, state);
 }
 
 void

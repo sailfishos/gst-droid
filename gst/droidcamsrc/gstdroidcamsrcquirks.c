@@ -34,7 +34,10 @@
  * with a specific command and arguments.
  * Quirks are read from $(sysconfdir)/gst-droid/gstdroidcamsrcquirks.conf
  *
- * NOTE: if type is not defined then we assume it's a property to keep backward compatibility
+ * NOTES:
+ * - if type is not defined then we assume it's a property to keep backward compatibility
+ * - the value of image and video does not matter. whether it's set or not is what matters.
+ * - if neither image nor video is set, we assume image to keep backward compatibility
  *
  * Format of a property quirk definition:
  * [quirk-id]
@@ -43,6 +46,8 @@
  * on=<value to turn on>
  * off=<value to turn off>
  * direction=<-1 = all devices or a camera device id>
+ * image=<any value to enable quirk in image mode>
+ * video=<any value to enable quirk in video mode>
  *
  * Format of a command quirk definition:
  * [quirk-id]
@@ -54,6 +59,8 @@
  * arg1_disable=<value of the first argument used for disabling>
  * arg2_disable=<value of the second argument used for disabling>
  * direction=<-1 = all devices or a camera device id>
+ * image=<any value to enable quirk in image mode>
+ * video=<any value to enable quirk in video mode>
  */
 #define CHECK_ERROR(e,s,p)						\
   if (e) {								\
@@ -82,6 +89,8 @@ struct _GstDroidCamSrcQuirk
 {
   gint direction;
   gchar *id;
+  gboolean image;
+  gboolean video;
 
   GstDRoidCamSrcQuirkType type;
 
@@ -140,6 +149,20 @@ gst_droidcamsrc_quirk_new (GKeyFile * file, const gchar * group)
 
   type = g_key_file_get_value (file, group, "type", &err);
   CHECK_ERROR (err, group, "type");
+
+  {
+    gboolean has_image = g_key_file_has_key (file, group, "image", NULL);
+    gboolean has_video = g_key_file_has_key (file, group, "video", NULL);
+
+    if (!has_image && !has_video) {
+      /* backwards compatibility */
+      quirk->image = TRUE;
+      quirk->video = FALSE;
+    } else {
+      quirk->image = has_image;
+      quirk->video = has_video;
+    }
+  }
 
   quirk->type = GST_DROID_CAM_SRC_QUIRK_PROPERTY;
 
@@ -244,42 +267,47 @@ _find_quirk (gconstpointer a, gconstpointer b)
 
 void
 gst_droidcamsrc_quirks_apply (GstDroidCamSrcQuirks * quirks,
-    GstDroidCamSrc * src, gint direction, const gchar * quirk_id,
+    GstDroidCamSrc * src, gint direction, gint mode, const gchar * quirk_id,
     gboolean enable)
 {
-  GList *data = g_list_find_custom (quirks->quirks, quirk_id,
+  gboolean same_direction;
+  gboolean same_mode;
+  const GstDroidCamSrcQuirk *quirk;
+  const GList *data = g_list_find_custom (quirks->quirks, quirk_id,
       _find_quirk);
   if (!data) {
     GST_DEBUG_OBJECT (src, "quirk %s not known", quirk_id);
     return;
   }
 
-  GstDroidCamSrcQuirk *quirk = data->data;
+  quirk = data->data;
 
   GST_INFO_OBJECT (src,
       "quirk %s direction is %d and requested direction is %d", quirk_id,
       quirk->direction, direction);
 
-  if (quirk->direction == direction || quirk->direction == -1) {
-    if (enable) {
-      GST_DEBUG_OBJECT (src, "enabling %s", quirk_id);
+  same_direction = (quirk->direction == direction || quirk->direction == -1);
+  same_mode = ((quirk->image && mode == MODE_IMAGE) || (quirk->video
+          && mode == MODE_VIDEO));
 
-      if (quirk->type == GST_DROID_CAM_SRC_QUIRK_PROPERTY) {
-        gst_droidcamsrc_params_set_string (src->dev->params,
-            quirk->prop, quirk->on);
-      } else {
-        gst_droidcamsrc_dev_send_command (src->dev, quirk->command_enable,
-            quirk->arg1_enable, quirk->arg2_enable);
-      }
+  if (same_direction && same_mode && enable) {
+    GST_INFO_OBJECT (src, "enabling %s", quirk_id);
+
+    if (quirk->type == GST_DROID_CAM_SRC_QUIRK_PROPERTY) {
+      gst_droidcamsrc_params_set_string (src->dev->params,
+          quirk->prop, quirk->on);
     } else {
-      GST_DEBUG_OBJECT (src, "disabling %s", quirk_id);
-      if (quirk->type == GST_DROID_CAM_SRC_QUIRK_PROPERTY) {
-        gst_droidcamsrc_params_set_string (src->dev->params,
-            quirk->prop, quirk->off);
-      } else {
-        gst_droidcamsrc_dev_send_command (src->dev, quirk->command_disable,
-            quirk->arg1_disable, quirk->arg2_disable);
-      }
+      gst_droidcamsrc_dev_send_command (src->dev, quirk->command_enable,
+          quirk->arg1_enable, quirk->arg2_enable);
+    }
+  } else {
+    GST_INFO_OBJECT (src, "disabling %s", quirk_id);
+    if (quirk->type == GST_DROID_CAM_SRC_QUIRK_PROPERTY) {
+      gst_droidcamsrc_params_set_string (src->dev->params,
+          quirk->prop, quirk->off);
+    } else {
+      gst_droidcamsrc_dev_send_command (src->dev, quirk->command_disable,
+          quirk->arg1_disable, quirk->arg2_disable);
     }
   }
 }
