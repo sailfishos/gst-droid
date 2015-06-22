@@ -286,8 +286,8 @@ gst_droidcamsrc_quirks_apply (GstDroidCamSrcQuirks * quirks,
   }
 
   GST_INFO_OBJECT (src,
-      "quirk %s direction is %d and requested direction is %d", quirk_id,
-      quirk->direction, direction);
+      "apply quirk %s: direction is %d, mode is %d, requested direction is %d",
+      quirk_id, quirk->direction, mode, direction);
 
   same_direction = (quirk->direction == direction || quirk->direction == -1);
   same_mode = ((quirk->image && mode == MODE_IMAGE) || (quirk->video
