@@ -147,9 +147,6 @@ gst_droidcamsrc_quirk_new (GKeyFile * file, const gchar * group)
   quirk->direction = g_key_file_get_integer (file, group, "direction", &err);
   CHECK_ERROR (err, group, "direction");
 
-  type = g_key_file_get_value (file, group, "type", &err);
-  CHECK_ERROR (err, group, "type");
-
   {
     gboolean has_image = g_key_file_has_key (file, group, "image", NULL);
     gboolean has_video = g_key_file_has_key (file, group, "video", NULL);
@@ -162,6 +159,14 @@ gst_droidcamsrc_quirk_new (GKeyFile * file, const gchar * group)
       quirk->image = has_image;
       quirk->video = has_video;
     }
+  }
+
+  type = g_key_file_get_value (file, group, "type", &err);
+  if (err) {
+    /* CHECK_ERROR() will issue a warning if the key "type" is not defined
+     * but this is valid as the key is not mandatory */
+    g_error_free (err);
+    err = NULL;
   }
 
   quirk->type = GST_DROID_CAM_SRC_QUIRK_PROPERTY;
