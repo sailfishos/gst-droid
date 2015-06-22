@@ -550,7 +550,7 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
   }
 
   /* disable shutter sound */
-  gst_droidcamsrc_dev_send_command (dev->cam,
+  gst_droidcamsrc_dev_send_command (dev,
       dev->c.CAMERA_CMD_ENABLE_SHUTTER_SOUND, 0, 0);
 
   g_rec_mutex_unlock (dev->lock);
