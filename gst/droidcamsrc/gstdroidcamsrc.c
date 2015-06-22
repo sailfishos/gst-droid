@@ -483,9 +483,11 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 
     case GST_STATE_CHANGE_READY_TO_PAUSED:
     {
-      /* find the device */
-      gboolean res;
       GstDroidCamSrcCamInfo *info;
+      const GstDroidCamSrcQuirk *quirk;
+      gboolean quirk_is_property = FALSE;
+
+      /* find the device */
       info = gst_droidcamsrc_find_camera_device (src);
 
       if (!info) {
@@ -493,15 +495,31 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         break;
       }
 
+      quirk = gst_droidcamsrc_quirks_get_quirk (src->quirks, "start-up");
+      if (quirk) {
+        quirk_is_property = gst_droidcamsrc_quirk_is_property (quirk);
+      }
+
       GST_DEBUG_OBJECT (src, "using camera device %i", info->num);
 
-      res = gst_droidcamsrc_dev_open (src->dev, info);
-      if (!res) {
+      if (!gst_droidcamsrc_dev_open (src->dev, info)) {
         ret = GST_STATE_CHANGE_FAILURE;
         break;
-      } else if (!gst_droidcamsrc_dev_init (src->dev)) {
+      }
+
+      if (quirk && !quirk_is_property) {
+        gst_droidcamsrc_quirks_apply_quirk (src->quirks, src,
+            src->dev->info->direction, src->mode, quirk, TRUE);
+      }
+
+      if (!gst_droidcamsrc_dev_init (src->dev)) {
         ret = GST_STATE_CHANGE_FAILURE;
         break;
+      }
+
+      if (quirk && quirk_is_property) {
+        gst_droidcamsrc_quirks_apply_quirk (src->quirks, src,
+            src->dev->info->direction, src->mode, quirk, TRUE);
       }
 
       g_object_notify (G_OBJECT (src), "sensor-orientation");
