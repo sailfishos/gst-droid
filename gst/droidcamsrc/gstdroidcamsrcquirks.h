@@ -28,23 +28,13 @@ G_BEGIN_DECLS
 
 typedef struct _GstDroidCamSrcQuirks GstDroidCamSrcQuirks;
 typedef struct _GstDroidCamSrcQuirk GstDroidCamSrcQuirk;
-
-struct _GstDroidCamSrcQuirk
-{
-  gchar *prop;
-  gchar *on;
-  gchar *off;
-  gint direction;
-};
-
-struct _GstDroidCamSrcQuirks
-{
-  GstDroidCamSrcQuirk *face_detection;
-  GstDroidCamSrcQuirk *image_noise_reduction;
-};
+typedef struct _GstDroidCamSrc GstDroidCamSrc;
 
 GstDroidCamSrcQuirks * gst_droidcamsrc_quirks_new ();
 void gst_droidcamsrc_quirks_destroy (GstDroidCamSrcQuirks * quirks);
+
+void gst_droidcamsrc_quirks_apply (GstDroidCamSrcQuirks * quirks,
+    GstDroidCamSrc * src, gint direction, const gchar * quirk_id, gboolean enable);
 
 G_END_DECLS
 

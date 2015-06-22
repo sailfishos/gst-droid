@@ -26,6 +26,7 @@
 
 #include "plugin.h"
 #include "gstdroidcamsrc.h"
+#include "gstdroidcamsrcquirks.h"
 #include <gst/video/video.h>
 #include "gst/droid/gstdroidmediabuffer.h"
 #include "gst/droid/gstwrappedmemory.h"
@@ -1871,27 +1872,12 @@ out:
 }
 
 static void
-gst_droidcamsrc_apply_quirk (GstDroidCamSrc * src, GstDroidCamSrcQuirk * quirk,
+gst_droidcamsrc_apply_quirk (GstDroidCamSrc * src,
     const gchar * name, gboolean state)
 {
-  if (!quirk) {
-    GST_WARNING_OBJECT (src, "unknown quirk %s", name);
-    return;
-  }
-
-  if (src->dev->info->direction == quirk->direction || quirk->direction == -1) {
-    if (!state || src->mode == MODE_VIDEO) {
-      /* disable */
-      GST_DEBUG_OBJECT (src, "disabling %s", name);
-      gst_droidcamsrc_params_set_string (src->dev->params,
-          quirk->prop, quirk->off);
-    } else {
-      /* enable */
-      GST_DEBUG_OBJECT (src, "enabling %s", name);
-      gst_droidcamsrc_params_set_string (src->dev->params,
-          quirk->prop, quirk->on);
-    }
-  }
+  gboolean enable = (state && src->mode == MODE_IMAGE);
+  gst_droidcamsrc_quirks_apply (src->quirks, src, src->dev->info->direction,
+      name, enable);
 }
 
 void
@@ -1912,8 +1898,7 @@ gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
   gst_droidcamsrc_photography_set_flash_to_droid (src);
 
   /* face detection quirk */
-  gst_droidcamsrc_apply_quirk (src, src->quirks->face_detection,
-      "face-detection", src->face_detection);
+  gst_droidcamsrc_apply_quirk (src, "face-detection", src->face_detection);
 
   /* face detection */
   if (src->mode == MODE_VIDEO || !src->face_detection) {
@@ -1925,8 +1910,8 @@ gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
   }
 
   /* image noise reduction */
-  gst_droidcamsrc_apply_quirk (src, src->quirks->image_noise_reduction,
-      "image-noise-reduction", src->image_noise_reduction);
+  gst_droidcamsrc_apply_quirk (src, "image-noise-reduction",
+      src->image_noise_reduction);
 
   if (type == SET_AND_APPLY) {
     gst_droidcamsrc_apply_params (src);

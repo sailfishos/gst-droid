@@ -25,6 +25,8 @@
 
 #include <gst/gst.h>
 #include "gstdroidcamsrcquirks.h"
+#include "gstdroidcamsrc.h"
+#include "gstdroidcamsrcparams.h"
 
 #define CHECK_ERROR(e,s,p)						\
   if (e) {								\
@@ -35,6 +37,20 @@
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
 #define GST_CAT_DEFAULT gst_droid_camsrc_debug
+
+struct _GstDroidCamSrcQuirks
+{
+  GList *quirks;
+};
+
+struct _GstDroidCamSrcQuirk
+{
+  gint direction;
+  gchar *id;
+  gchar *prop;
+  gchar *on;
+  gchar *off;
+};
 
 void
 gst_droidcamsrc_quirk_free (GstDroidCamSrcQuirk * quirk)
@@ -55,6 +71,10 @@ gst_droidcamsrc_quirk_free (GstDroidCamSrcQuirk * quirk)
     g_free (quirk->off);
   }
 
+  if (quirk->id) {
+    g_free (quirk->id);
+  }
+
   g_slice_free (GstDroidCamSrcQuirk, quirk);
 }
 
@@ -63,6 +83,8 @@ gst_droidcamsrc_quirk_new (GKeyFile * file, const gchar * group)
 {
   GstDroidCamSrcQuirk *quirk = g_slice_new0 (GstDroidCamSrcQuirk);
   GError *err = NULL;
+
+  quirk->id = g_strdup (group);
 
   quirk->prop = g_key_file_get_value (file, group, "prop", &err);
   CHECK_ERROR (err, group, "prop");
@@ -105,9 +127,13 @@ gst_droidcamsrc_quirks_new ()
     err = NULL;
   }
 
-  quirks->face_detection = gst_droidcamsrc_quirk_new (file, "face-detection");
-  quirks->image_noise_reduction =
-      gst_droidcamsrc_quirk_new (file, "image-noise-reduction");
+  quirks->quirks = NULL;
+  quirks->quirks =
+      g_list_append (quirks->quirks, gst_droidcamsrc_quirk_new (file,
+          "face-detection"));
+  quirks->quirks =
+      g_list_append (quirks->quirks, gst_droidcamsrc_quirk_new (file,
+          "image-noise-reduction"));
 
   g_free (file_path);
   g_key_file_unref (file);
@@ -118,8 +144,44 @@ gst_droidcamsrc_quirks_new ()
 void
 gst_droidcamsrc_quirks_destroy (GstDroidCamSrcQuirks * quirks)
 {
-  gst_droidcamsrc_quirk_free (quirks->face_detection);
-  gst_droidcamsrc_quirk_free (quirks->image_noise_reduction);
-
+  g_list_free_full (quirks->quirks,
+      (GDestroyNotify) gst_droidcamsrc_quirk_free);
   g_slice_free (GstDroidCamSrcQuirks, quirks);
+}
+
+static gint
+_find_quirk (gconstpointer a, gconstpointer b)
+{
+  return g_strcmp0 (((GstDroidCamSrcQuirk *) a)->id, (gchar *) b);
+}
+
+void
+gst_droidcamsrc_quirks_apply (GstDroidCamSrcQuirks * quirks,
+    GstDroidCamSrc * src, gint direction, const gchar * quirk_id,
+    gboolean enable)
+{
+  GstDroidCamSrcQuirk *quirk =
+      (GstDroidCamSrcQuirk *) (g_list_find_custom (quirks->quirks, quirk_id,
+          _find_quirk)->data);
+
+  if (!quirk) {
+    GST_DEBUG_OBJECT (src, "quirk %s not known", quirk_id);
+    return;
+  }
+
+  GST_INFO_OBJECT (src,
+      "quirk %s direction is %d and requested direction is %d", quirk_id,
+      quirk->direction, direction);
+
+  if (quirk->direction == direction || quirk->direction == -1) {
+    if (enable) {
+      GST_DEBUG_OBJECT (src, "enabling %s", quirk_id);
+      gst_droidcamsrc_params_set_string (src->dev->params,
+          quirk->prop, quirk->on);
+    } else {
+      GST_DEBUG_OBJECT (src, "disabling %s", quirk_id);
+      gst_droidcamsrc_params_set_string (src->dev->params,
+          quirk->prop, quirk->off);
+    }
+  }
 }
