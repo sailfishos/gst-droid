@@ -230,6 +230,9 @@ gst_droidcamsrc_quirks_new ()
       NULL);
   GError *err = NULL;
   GstDroidCamSrcQuirks *quirks = g_slice_new0 (GstDroidCamSrcQuirks);
+  gchar **groups = NULL;
+  gsize len = 0;
+  int x;
 
   if (!g_key_file_load_from_file (file, file_path, G_KEY_FILE_NONE, &err)) {
     GST_WARNING ("failed to load configuration file %s: %s", file_path,
@@ -241,14 +244,17 @@ gst_droidcamsrc_quirks_new ()
     err = NULL;
   }
 
+  groups = g_key_file_get_groups (file, &len);
   quirks->quirks = NULL;
-  quirks->quirks =
-      g_list_append (quirks->quirks, gst_droidcamsrc_quirk_new (file,
-          "face-detection"));
-  quirks->quirks =
-      g_list_append (quirks->quirks, gst_droidcamsrc_quirk_new (file,
-          "image-noise-reduction"));
+  for (x = 0; x < len; x++) {
+    GstDroidCamSrcQuirk *quirk = gst_droidcamsrc_quirk_new (file, groups[x]);
+    if (quirk) {
+      GST_INFO ("parsed quirk %s", groups[x]);
+      quirks->quirks = g_list_append (quirks->quirks, quirk);
+    }
+  }
 
+  g_strfreev (groups);
   g_free (file_path);
   g_key_file_unref (file);
 
