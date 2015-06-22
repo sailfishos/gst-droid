@@ -345,3 +345,9 @@ gst_droidcamsrc_quirks_get_quirk (GstDroidCamSrcQuirks * quirks,
 
   return NULL;
 }
+
+gboolean
+gst_droidcamsrc_quirk_is_property (const GstDroidCamSrcQuirk * quirk)
+{
+  return quirk->type == GST_DROID_CAM_SRC_QUIRK_PROPERTY;
+}
