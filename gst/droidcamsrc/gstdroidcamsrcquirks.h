@@ -37,6 +37,9 @@ void gst_droidcamsrc_quirks_apply (GstDroidCamSrcQuirks * quirks,
     GstDroidCamSrc * src, gint direction, gint mode,
     const gchar * quirk_id, gboolean enable);
 
+const GstDroidCamSrcQuirk *gst_droidcamsrc_quirks_get_quirk (GstDroidCamSrcQuirks * quirks,
+    const gchar * id);
+
 G_END_DECLS
 
 #endif /* __GST_DROIDCAMSRC_QUIRKS_H__ */

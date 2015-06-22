@@ -269,13 +269,6 @@ gst_droidcamsrc_quirks_destroy (GstDroidCamSrcQuirks * quirks)
   g_slice_free (GstDroidCamSrcQuirks, quirks);
 }
 
-static gint
-_find_quirk (gconstpointer a, gconstpointer b)
-{
-  /* a can be NULL */
-  return a && b ? g_strcmp0 (((GstDroidCamSrcQuirk *) a)->id, (gchar *) b) : -1;
-}
-
 void
 gst_droidcamsrc_quirks_apply (GstDroidCamSrcQuirks * quirks,
     GstDroidCamSrc * src, gint direction, gint mode, const gchar * quirk_id,
@@ -284,14 +277,13 @@ gst_droidcamsrc_quirks_apply (GstDroidCamSrcQuirks * quirks,
   gboolean same_direction;
   gboolean same_mode;
   const GstDroidCamSrcQuirk *quirk;
-  const GList *data = g_list_find_custom (quirks->quirks, quirk_id,
-      _find_quirk);
-  if (!data) {
+
+  quirk = gst_droidcamsrc_quirks_get_quirk (quirks, quirk_id);
+
+  if (!quirk) {
     GST_DEBUG_OBJECT (src, "quirk %s not known", quirk_id);
     return;
   }
-
-  quirk = data->data;
 
   GST_INFO_OBJECT (src,
       "quirk %s direction is %d and requested direction is %d", quirk_id,
@@ -321,4 +313,25 @@ gst_droidcamsrc_quirks_apply (GstDroidCamSrcQuirks * quirks,
           quirk->arg1_disable, quirk->arg2_disable);
     }
   }
+}
+
+G_INLINE_FUNC gint
+_find_quirk (gconstpointer a, gconstpointer b)
+{
+  /* a can be NULL */
+  return a && b ? g_strcmp0 (((GstDroidCamSrcQuirk *) a)->id, (gchar *) b) : -1;
+}
+
+const GstDroidCamSrcQuirk *
+gst_droidcamsrc_quirks_get_quirk (GstDroidCamSrcQuirks * quirks,
+    const gchar * id)
+{
+  const GList *data = g_list_find_custom (quirks->quirks, id,
+      _find_quirk);
+
+  if (data) {
+    return data->data;
+  }
+
+  return NULL;
 }
