@@ -93,9 +93,6 @@ struct _GstDroidCodecInfo
 };
 
 /* codecs */
-#define CAPS_FRAGMENT_VIDEO \
-  " , width = (int) [1, MAX], height = (int)[1, MAX], framerate = (fraction)[1/MAX, MAX]"
-
 #define CAPS_FRAGMENT_AUDIO_DECODER \
   " , channels = (int) [1, 6]"
 
@@ -117,16 +114,16 @@ static GstDroidCodecInfo codecs[] = {
 
   /* video decoders */
   {GST_DROID_CODEC_DECODER_VIDEO, "video/mpeg", "video/mp4v-es",
-        "video/mpeg, mpegversion=4" CAPS_FRAGMENT_VIDEO,
+        "video/mpeg, mpegversion=4",
       is_mpeg4v, NULL, NULL, NULL, create_mpeg4vdec_codec_data, NULL},
 
   {GST_DROID_CODEC_DECODER_VIDEO, "video/x-h264", "video/avc",
-        "video/x-h264, stream-format=avc,alignment=au" CAPS_FRAGMENT_VIDEO,
+        "video/x-h264, stream-format=avc,alignment=au",
         is_h264_dec, NULL, NULL, NULL,
       create_h264dec_codec_data, process_h264dec_data},
 
   {GST_DROID_CODEC_DECODER_VIDEO, "video/x-h263", "video/3gpp",
-        "video/x-h263" CAPS_FRAGMENT_VIDEO, NULL,
+        "video/x-h263", NULL,
       NULL, NULL, NULL, NULL, NULL},
 
   /* audio encoders */
@@ -137,11 +134,11 @@ static GstDroidCodecInfo codecs[] = {
 
   /* video encoders */
   {GST_DROID_CODEC_ENCODER_VIDEO, "video/mpeg", "video/mp4v-es",
-        "video/mpeg, mpegversion=4, systemstream=false" CAPS_FRAGMENT_VIDEO,
+        "video/mpeg, mpegversion=4, systemstream=false",
       is_mpeg4v, NULL, create_mpeg4venc_codec_data, NULL, NULL, NULL},
 
   {GST_DROID_CODEC_ENCODER_VIDEO, "video/x-h264", "video/avc",
-        "video/x-h264, stream-format=avc,alignment=au" CAPS_FRAGMENT_VIDEO,
+        "video/x-h264, stream-format=avc,alignment=au",
         is_h264_enc, h264enc_complement, create_h264enc_codec_data,
       process_h264enc_data, NULL, NULL},
 };
