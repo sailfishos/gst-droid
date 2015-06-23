@@ -484,14 +484,6 @@ gst_droidadec_handle_frame (GstAudioDecoder * decoder, GstBuffer * buffer)
     return gst_droidadec_finish (decoder);
   }
 
-  if (!GST_CLOCK_TIME_IS_VALID (buffer->dts)
-      && !GST_CLOCK_TIME_IS_VALID (buffer->pts)) {
-    GST_WARNING_OBJECT (dec,
-        "dropping received frame with invalid timestamps.");
-    ret = GST_FLOW_OK;
-    goto error;
-  }
-
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
     GST_DEBUG_OBJECT (dec, "not handling frame in error state: %s",
         gst_flow_get_name (dec->downstream_flow_ret));
@@ -539,15 +531,10 @@ gst_droidadec_handle_frame (GstAudioDecoder * decoder, GstBuffer * buffer)
       gst_buffer_get_size (buffer), data.data.size);
 
   /*
-   * try to use dts if pts is not valid.
-   * on one of the test streams we get the first PTS set to GST_CLOCK_TIME_NONE
-   * which breaks timestamping.
+   * We are ignoring timestamping completely and relying
+   * on the base class to do our bookkeeping ;-)
    */
-  data.ts =
-      GST_CLOCK_TIME_IS_VALID (buffer->
-      pts) ? GST_TIME_AS_USECONDS (buffer->pts) : GST_TIME_AS_USECONDS (buffer->
-      dts);
-
+  data.ts = 0;
   data.sync = false;
 
   /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
