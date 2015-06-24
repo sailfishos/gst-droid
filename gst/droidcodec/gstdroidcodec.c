@@ -49,7 +49,7 @@ static gboolean process_h264dec_data (GstDroidCodec * codec, GstBuffer * buffer,
 static gboolean process_aacdec_data (GstDroidCodec * codec, GstBuffer * buffer,
     DroidMediaData * out);
 static gboolean is_mpeg4v (GstDroidCodec * codec, const GstStructure * s);
-static gboolean is_mpeg4a (GstDroidCodec * codec, const GstStructure * s);
+static gboolean is_mpega (GstDroidCodec * codec, const GstStructure * s);
 static gboolean is_mp3 (GstDroidCodec * codec, const GstStructure * s);
 static gboolean is_h264_dec (GstDroidCodec * codec, const GstStructure * s);
 static gboolean is_h264_enc (GstDroidCodec * codec, const GstStructure * s);
@@ -99,8 +99,8 @@ struct _GstDroidCodecInfo
 static GstDroidCodecInfo codecs[] = {
   /* audio decoders */
   {GST_DROID_CODEC_DECODER_AUDIO, "audio/mpeg", "audio/mp4a-latm",
-        "audio/mpeg, mpegversion=(int)4, stream-format=(string){raw, adts}",
-        is_mpeg4a, NULL, NULL, NULL, create_aacdec_codec_data,
+        "audio/mpeg, mpegversion=(int){2, 4}, stream-format=(string){raw, adts}",
+        is_mpega, NULL, NULL, NULL, create_aacdec_codec_data,
       process_aacdec_data},
 
   {GST_DROID_CODEC_DECODER_AUDIO, "audio/mpeg", "audio/mpeg",
@@ -510,11 +510,16 @@ is_mpeg4v (GstDroidCodec * codec G_GNUC_UNUSED, const GstStructure * s)
 }
 
 static gboolean
-is_mpeg4a (GstDroidCodec * codec, const GstStructure * s)
+is_mpega (GstDroidCodec * codec, const GstStructure * s)
 {
   const gchar *val;
+  gint ver;
 
-  if (!is_mpeg4v (codec, s)) {
+  if (!gst_structure_get_int (s, "mpegversion", &ver)) {
+    return FALSE;
+  }
+
+  if (!(ver == 2 || ver == 4)) {
     return FALSE;
   }
 
