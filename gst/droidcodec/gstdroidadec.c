@@ -243,6 +243,10 @@ gst_droidadec_error (void *data, int err)
 
   GST_DEBUG_OBJECT (dec, "codec error");
 
+  GST_AUDIO_DECODER_STREAM_LOCK (dec);
+  dec->running = FALSE;
+  GST_AUDIO_DECODER_STREAM_UNLOCK (dec);
+
   g_mutex_lock (&dec->eos_lock);
 
   if (dec->eos) {
@@ -345,6 +349,7 @@ gst_droidadec_start (GstAudioDecoder * decoder)
   dec->codec_type = NULL;
   dec->dirty = TRUE;
   dec->spf = -1;
+  dec->running = TRUE;
 
   return TRUE;
 }
@@ -400,6 +405,7 @@ gst_droidadec_set_format (GstAudioDecoder * decoder, GstCaps * caps)
   return TRUE;
 }
 
+/* always call with stream lock */
 static GstFlowReturn
 gst_droidadec_finish (GstAudioDecoder * decoder)
 {
@@ -407,6 +413,11 @@ gst_droidadec_finish (GstAudioDecoder * decoder)
   gint available;
 
   GST_DEBUG_OBJECT (dec, "finish");
+
+  if (!dec->running) {
+    GST_DEBUG_OBJECT (dec, "decoder is not running");
+    goto finish;
+  }
 
   g_mutex_lock (&dec->eos_lock);
   dec->eos = TRUE;
@@ -423,6 +434,7 @@ gst_droidadec_finish (GstAudioDecoder * decoder)
   g_cond_wait (&dec->eos_cond, &dec->eos_lock);
   GST_AUDIO_DECODER_STREAM_LOCK (decoder);
 
+finish:
   /* We drained the codec. Better to recreate it. */
   if (dec->codec) {
     droid_media_codec_stop (dec->codec);

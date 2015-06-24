@@ -65,6 +65,7 @@ struct _GstDroidADec
   gint spf;
   GstAudioInfo *info;
   GstAdapter *adapter;
+  gboolean running;
 };
 
 struct _GstDroidADecClass
