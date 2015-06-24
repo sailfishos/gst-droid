@@ -231,8 +231,10 @@ GstDroidCodecCodecDataResult
 gst_droid_codec_create_decoder_codec_data (GstDroidCodec * codec,
     GstBuffer * data, DroidMediaData * out, GstBuffer * frame_data)
 {
-  if (!data || !codec->info->create_decoder_codec_data) {
+  if (!codec->info->create_decoder_codec_data) {
     return GST_DROID_CODEC_CODEC_DATA_NOT_NEEDED;
+  } else if (!data && !frame_data) {
+    return GST_DROID_CODEC_CODEC_DATA_ERROR;
   } else if (codec->info->create_decoder_codec_data (codec, data, out,
           frame_data)) {
     return GST_DROID_CODEC_CODEC_DATA_OK;
