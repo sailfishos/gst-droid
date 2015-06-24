@@ -93,23 +93,18 @@ struct _GstDroidCodecInfo
 };
 
 /* codecs */
-#define CAPS_FRAGMENT_AUDIO_DECODER \
-  " , channels = (int) [1, 6]"
-
 #define CAPS_FRAGMENT_AUDIO_ENCODER \
   " , channels = (int) [1, 2]"
 
 static GstDroidCodecInfo codecs[] = {
   /* audio decoders */
   {GST_DROID_CODEC_DECODER_AUDIO, "audio/mpeg", "audio/mp4a-latm",
-        "audio/mpeg, mpegversion=(int)4, stream-format=(string){raw, adts}"
-        CAPS_FRAGMENT_AUDIO_DECODER,
+        "audio/mpeg, mpegversion=(int)4, stream-format=(string){raw, adts}",
         is_aac_dec, NULL, NULL, NULL, create_aacdec_codec_data,
       process_aacdec_data},
 
   {GST_DROID_CODEC_DECODER_AUDIO, "audio/mpeg", "audio/mpeg",
-        "audio/mpeg, mpegversion=(int)1, layer=[1, 3]"
-        CAPS_FRAGMENT_AUDIO_DECODER,
+        "audio/mpeg, mpegversion=(int)1, layer=[1, 3]",
       is_mp3, NULL, NULL, NULL, NULL, NULL},
 
   /* video decoders */
