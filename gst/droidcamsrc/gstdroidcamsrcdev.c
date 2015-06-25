@@ -579,6 +579,11 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
 {
   GST_DEBUG ("dev destroy");
 
+  /* deactivate the buffer pool first.
+   * If we unref our active GstDroidBufferPool it will crash.
+   */
+  gst_buffer_pool_set_active (dev->pool, FALSE);
+
   dev->cam = NULL;
   dev->queue = NULL;
   dev->info = NULL;
