@@ -85,6 +85,8 @@ gboolean gst_droidcamsrc_dev_restart (GstDroidCamSrcDev * dev);
 
 void gst_droidcamsrc_dev_send_command (GstDroidCamSrcDev * dev, gint cmd, gint arg1, gint arg2);
 
+gboolean gst_droidcamsrc_dev_is_running (GstDroidCamSrcDev * dev);
+
 G_END_DECLS
 
 #endif /* __GST_DROIDCAMSRC_DEV_H__ */

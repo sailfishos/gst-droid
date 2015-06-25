@@ -1043,3 +1043,15 @@ gst_droidcamsrc_dev_send_command (GstDroidCamSrcDev * dev, gint cmd, gint arg1,
   droid_media_camera_send_command (dev->cam, cmd, arg1, arg2);
   g_rec_mutex_unlock (dev->lock);
 }
+
+gboolean
+gst_droidcamsrc_dev_is_running (GstDroidCamSrcDev * dev)
+{
+  gboolean ret;
+
+  g_rec_mutex_lock (dev->lock);
+  ret = dev->running;
+  g_rec_mutex_unlock (dev->lock);
+
+  return ret;
+}
