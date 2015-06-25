@@ -280,7 +280,7 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
     {
       GstCameraBinMode mode = g_value_get_enum (value);
 
-      GST_INFO_OBJECT (src, "setting capture mode to : %d", mode);
+      GST_INFO_OBJECT (src, "setting capture mode to: %d", mode);
 
       if (src->mode == mode) {
         GST_INFO_OBJECT (src, "not resetting the same mode");
