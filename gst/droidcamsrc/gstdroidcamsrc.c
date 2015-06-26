@@ -1828,7 +1828,7 @@ gst_droidcamsrc_timestamp (GstDroidCamSrc * src, GstBuffer * buffer)
   GST_BUFFER_DTS (buffer) = ts;
   GST_BUFFER_PTS (buffer) = ts;
 
-  GST_DEBUG_OBJECT (src,
+  GST_LOG_OBJECT (src,
       "timestamp %" GST_TIME_FORMAT "for buffer %" GST_PTR_FORMAT,
       GST_TIME_ARGS (ts), buffer);
 }
