@@ -1174,7 +1174,7 @@ gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent, GstEvent * event)
   gboolean ret = FALSE;
   GstDroidCamSrcPad *data = gst_pad_get_element_private (pad);
 
-  GST_DEBUG_OBJECT (src, "pad %s %" GST_PTR_FORMAT, GST_PAD_NAME (pad), event);
+  GST_LOG_OBJECT (src, "pad %s %" GST_PTR_FORMAT, GST_PAD_NAME (pad), event);
 
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_SEEK:
