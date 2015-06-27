@@ -119,6 +119,8 @@ gst_droidadec_create_codec (GstDroidADec * dec, GstBuffer * input)
     return FALSE;
   }
 
+  dec->running = TRUE;
+
   return TRUE;
 }
 
