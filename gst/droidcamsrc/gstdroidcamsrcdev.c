@@ -366,8 +366,9 @@ gst_droidcamsrc_dev_preview_metadata_callback (void *user,
     g_value_init (&region, GST_TYPE_STRUCTURE);
 
     GST_DEBUG_OBJECT (src,
-        "face %d: left = %d, top = %d, right = %d, bottom = %d", i,
-        faces[i].left, faces[i].top, faces[i].right, faces[i].bottom);
+        "face %d: score=%d, left=%d, top=%d, right=%d, bottom=%d", i,
+        faces[i].score, faces[i].left, faces[i].top, faces[i].right,
+        faces[i].bottom);
     x = gst_util_uint64_scale (faces[i].left + 1000, width, 2000);
     y = gst_util_uint64_scale (faces[i].top + 1000, height, 2000);
     r = gst_util_uint64_scale (faces[i].right + 1000, width, 2000);
