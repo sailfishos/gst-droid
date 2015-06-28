@@ -1312,8 +1312,13 @@ gst_droidcamsrc_photography_set_flash_to_droid (GstDroidCamSrc * src)
     return;
   }
 
-  if (src->mode == MODE_VIDEO && src->video_torch) {
-    gst_droidcamsrc_params_set_string (src->dev->params, "flash-mode", "torch");
+  if (src->mode == MODE_VIDEO) {
+    if (src->video_torch) {
+      gst_droidcamsrc_params_set_string (src->dev->params, "flash-mode",
+          "torch");
+    } else {
+      gst_droidcamsrc_params_set_string (src->dev->params, "flash-mode", "off");
+    }
     return;
   }
 
