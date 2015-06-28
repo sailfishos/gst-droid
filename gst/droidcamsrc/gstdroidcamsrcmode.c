@@ -94,7 +94,7 @@ gst_droidcamsrc_mode_activate (GstDroidCamSrcMode * mode)
   if (running) {
     ret = gst_droidcamsrc_dev_start (mode->src->dev, FALSE);
   } else {
-    ret = TRUE;
+    ret = gst_droidcamsrc_apply_params (mode->src);
   }
 
   /* now update max-zoom that we have a preview size */
@@ -141,7 +141,7 @@ gst_droidcamsrc_mode_negotiate (GstDroidCamSrcMode * mode, GstPad * pad)
     if (running) {
       ret = gst_droidcamsrc_dev_start (mode->src->dev, FALSE);
     } else {
-      ret = TRUE;
+      ret = gst_droidcamsrc_apply_params (mode->src);
     }
 
     /* now update max-zoom that we have a preview size */
