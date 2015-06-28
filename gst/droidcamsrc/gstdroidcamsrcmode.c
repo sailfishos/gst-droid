@@ -123,10 +123,14 @@ gboolean
 gst_droidcamsrc_mode_negotiate (GstDroidCamSrcMode * mode, GstPad * pad)
 {
   gboolean ret;
+  gboolean running;
 
-  if (pad == mode->vfsrc) {
+  g_rec_mutex_lock (&mode->src->dev_lock);
+
+  running = gst_droidcamsrc_dev_is_running (mode->src->dev);
+
+  if (running && pad == mode->vfsrc) {
     /* stop preview */
-    g_rec_mutex_lock (&mode->src->dev_lock);
     gst_droidcamsrc_dev_stop (mode->src->dev);
   }
 
@@ -134,17 +138,21 @@ gst_droidcamsrc_mode_negotiate (GstDroidCamSrcMode * mode, GstPad * pad)
 
   if (pad == mode->vfsrc) {
     /* start which will also apply the settings */
-    ret = gst_droidcamsrc_dev_start (mode->src->dev, FALSE);
+    if (running) {
+      ret = gst_droidcamsrc_dev_start (mode->src->dev, FALSE);
+    } else {
+      ret = TRUE;
+    }
 
     /* now update max-zoom that we have a preview size */
     gst_droidcamsrc_dev_update_params (mode->src->dev);
     gst_droidcamsrc_update_max_zoom (mode->src);
-
-    g_rec_mutex_unlock (&mode->src->dev_lock);
   } else {
     /* apply settings */
     ret = gst_droidcamsrc_dev_set_params (mode->src->dev);
   }
+
+  g_rec_mutex_unlock (&mode->src->dev_lock);
 
   return ret;
 }
