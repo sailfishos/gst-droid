@@ -195,7 +195,9 @@ write_section (int fd, struct Node *n, const gchar * params)
   while (e->name) {
     gchar **tmp = p;
     while (*tmp) {
+#if 0
       g_print ("comparing %s and %s\n", e->droid, *tmp);
+#endif
 
       /* focus needs special handling because we use continuous to indicate continuous-picture
        * or continuous-video and droidcamsrc decides depending on the mode */
