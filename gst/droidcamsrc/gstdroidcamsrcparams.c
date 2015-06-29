@@ -432,6 +432,19 @@ gst_droidcamsrc_params_set_string (GstDroidCamSrcParams * params,
   g_mutex_unlock (&params->lock);
 }
 
+const gchar *
+gst_droidcamsrc_params_get_string (GstDroidCamSrcParams * params,
+    const char *key)
+{
+  const gchar *value;
+
+  g_mutex_lock (&params->lock);
+  value = g_hash_table_lookup (params->params, key);
+  g_mutex_unlock (&params->lock);
+
+  return value;
+}
+
 void
 gst_droidcamsrc_params_choose_image_framerate (GstDroidCamSrcParams * params,
     GstCaps * caps)
