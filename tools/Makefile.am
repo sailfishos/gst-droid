@@ -1,0 +1,1 @@
+SUBDIRS = mk-cam-conf
