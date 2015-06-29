@@ -199,8 +199,7 @@ write_section (int fd, struct Node *n, const gchar * params)
 
       /* focus needs special handling because we use continuous to indicate continuous-picture
        * or continuous-video and droidcamsrc decides depending on the mode */
-      if (!g_strcmp0 (*tmp, e->droid) ||
-          (!g_strcmp0 (e->droid, "continuous")
+      if (!g_strcmp0 (*tmp, e->droid) || (!g_strcmp0 (e->droid, "continuous")
               && (!g_strcmp0 (*tmp, "continuous-picture")
                   || !g_strcmp0 (*tmp, "continuous-video")))) {
         if (!add_line (fd, g_strdup_printf ("%d = %s", e->val, e->droid))) {
@@ -256,15 +255,6 @@ write_configuration (Data * data)
 
     ++n;
   }
-  /* flash-mode */
-
-  /* focus-mode */
-
-  /* white-balance-mode */
-  /* scene-mode */
-  /* color-tone-mode */
-  /* iso-speed */
-  /* flicker-mode */
 
 out:
   close (fd);
