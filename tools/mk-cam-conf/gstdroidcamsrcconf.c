@@ -248,8 +248,10 @@ write_configuration (Data * data)
   while (n->droid) {
     const gchar *p = gst_droidcamsrc_params_get_string (params, n->droid);
 
-    if (!write_section (fd, n, p)) {
-      goto error;
+    if (p) {
+      if (!write_section (fd, n, p)) {
+        goto error;
+      }
     }
 
     ++n;
