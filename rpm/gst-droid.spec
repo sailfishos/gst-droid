@@ -35,6 +35,14 @@ Requires:  %{gstreamer}%{majorminor}-droid = %{version}-%{release}
 %description devel
 %{summary}
 
+%package tools
+Summary: Tools for gst-droid
+Group: Applications/Multimedia
+Requires:  %{gstreamer}%{majorminor}-droid = %{version}-%{release}
+
+%description tools
+%{summary}
+
 %prep
 %setup -q
 
@@ -63,3 +71,6 @@ rm -rf $RPM_BUILD_ROOT%{_sysconfdir}/gst-droid
 %{_includedir}/gstreamer-%{majorminor}/gst/
 %{_libdir}/*.so
 
+%files tools
+%defattr(-,root,root,-)
+%{_bindir}/mk-cam-conf
