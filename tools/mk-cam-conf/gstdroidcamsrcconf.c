@@ -178,12 +178,14 @@ write_section (int fd, struct Node *n, const gchar * params)
 
   add_line (fd, g_strdup_printf ("[%s]", n->gst));
 
-  /* first we add the comments */
-  while (e->name) {
-    if (!add_line (fd, g_strdup_printf ("# %d = %s", e->val, e->name))) {
-      return FALSE;
+  /* first we add the comments but not for iso-speed */
+  if (g_strcmp0 (n->gst, "iso-speed")) {
+    while (e->name) {
+      if (!add_line (fd, g_strdup_printf ("# %d = %s", e->val, e->name))) {
+        return FALSE;
+      }
+      ++e;
     }
-    ++e;
   }
 
   /* now the actual work */
