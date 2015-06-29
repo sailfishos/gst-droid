@@ -112,7 +112,7 @@ struct Node
       ADD_ENTRY(GST_PHOTOGRAPHY_SCENE_MODE_FIREWORKS, "fireworks"),
       ADD_ENTRY(GST_PHOTOGRAPHY_SCENE_MODE_PARTY, "party"),
       ADD_ENTRY(GST_PHOTOGRAPHY_SCENE_MODE_CANDLELIGHT, "candlelight"),
-      ADD_ENTRY(GST_PHOTOGRAPHY_SCENE_MODE_BARCODE, NULL),
+      ADD_ENTRY(GST_PHOTOGRAPHY_SCENE_MODE_BARCODE, "barcode"),
       {NULL, -1}
     }},
   {"effect-values", "color-tone-mode", {
