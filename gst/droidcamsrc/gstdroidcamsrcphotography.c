@@ -113,9 +113,12 @@ static GList *gst_droidcamsrc_photography_load (GKeyFile * file,
 	break;								\
       }									\
     }									\
+									\
     if (value) {							\
       GST_INFO_OBJECT (src, "setting %s to %s", droid, value);		\
       gst_droidcamsrc_params_set_string (src->dev->params, droid, value); \
+    } else {								\
+      GST_WARNING_OBJECT (src, "setting %s to %d is not supported", droid, val); \
     }									\
   }
 
@@ -130,9 +133,12 @@ static GList *gst_droidcamsrc_photography_load (GKeyFile * file,
       break;								\
     }									\
   }									\
+									\
   if (!value) {								\
+    GST_WARNING_OBJECT (src, "setting %s to %d is not supported", droid, val); \
     return FALSE;							\
   }									\
+									\
   GST_OBJECT_LOCK (src);						\
   src->photo->settings.memb = val;					\
   GST_OBJECT_UNLOCK (src);						\
@@ -1000,6 +1006,7 @@ gst_droidcamsrc_set_iso_speed (GstDroidCamSrc * src, guint iso_speed)
   }
 
   if (!value) {
+    GST_WARNING_OBJECT (src, "setting iso to %d is not supported", iso_speed);
     return FALSE;
   }
 
@@ -1069,6 +1076,8 @@ gst_droidcamsrc_set_zoom (GstDroidCamSrc * src, gfloat zoom)
   GST_OBJECT_UNLOCK (src);
 
   if (step > max_zoom) {
+    GST_WARNING_OBJECT (src, "requested zoom (%d) is larger than max zoom (%d)",
+        step, max_zoom);
     return FALSE;
   }
 
@@ -1111,6 +1120,8 @@ gst_droidcamsrc_set_focus_mode (GstDroidCamSrc
   }
 
   if (!value) {
+    GST_WARNING_OBJECT (src, "setting focus-mode to %d is not supported",
+        focus_mode);
     return FALSE;
   }
 
@@ -1284,6 +1295,8 @@ gst_droidcamsrc_photography_set_focus_to_droid (GstDroidCamSrc * src)
   }
 
   if (!value) {
+    GST_WARNING_OBJECT (src, "setting focus-mode to %d is not supported",
+        src->photo->settings.focus_mode);
     return;
   }
 
@@ -1331,10 +1344,14 @@ gst_droidcamsrc_photography_set_flash_to_droid (GstDroidCamSrc * src)
     }
   }
 
-  if (value) {
-    GST_INFO_OBJECT (src, "setting flash-mode to %s", value);
-    gst_droidcamsrc_params_set_string (src->dev->params, "flash-mode", value);
+  if (!value) {
+    GST_WARNING_OBJECT (src, "setting flash-mode to %d is not supported",
+        src->photo->settings.flash_mode);
+    return;
   }
+
+  GST_INFO_OBJECT (src, "setting flash-mode to %s", value);
+  gst_droidcamsrc_params_set_string (src->dev->params, "flash-mode", value);
 }
 
 static void
@@ -1354,6 +1371,8 @@ gst_droidcamsrc_photography_set_iso_to_droid (GstDroidCamSrc * src)
   }
 
   if (!value) {
+    GST_WARNING_OBJECT (src, "setting iso to %d is not supported",
+        src->photo->settings.iso_speed);
     return;
   }
 
