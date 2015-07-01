@@ -139,6 +139,8 @@ static GList *gst_droidcamsrc_photography_load (GKeyFile * file,
     return FALSE;							\
   }									\
 									\
+  GST_DEBUG_OBJECT (src, "setting %s to %s (%d)", droid, value, val);	\
+									\
   GST_OBJECT_LOCK (src);						\
   src->photo->settings.memb = val;					\
   GST_OBJECT_UNLOCK (src);						\
