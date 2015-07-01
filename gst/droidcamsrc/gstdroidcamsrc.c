@@ -170,7 +170,7 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   src->fps_n = 0;
   src->fps_d = 1;
 
-  gst_droidcamsrc_photography_init (src);
+  gst_droidcamsrc_photography_init (src, DEFAULT_CAMERA_DEVICE);
 
   src->vfsrc = gst_droidcamsrc_create_pad (src,
       &vf_src_template_factory, GST_BASE_CAMERA_SRC_VIEWFINDER_PAD_NAME, FALSE);
@@ -271,7 +271,9 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
             "cannot change camera-device while camera is running");
       } else {
         src->camera_device = g_value_get_enum (value);
-        GST_DEBUG_OBJECT (src, "camera device set to %d", src->camera_device);
+        GST_INFO_OBJECT (src, "camera device set to %d", src->camera_device);
+        /* load our configuration file */
+        gst_droidcamsrc_photography_init (src, src->camera_device);
       }
       g_rec_mutex_unlock (&src->dev_lock);
       break;
