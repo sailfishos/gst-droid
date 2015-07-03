@@ -185,9 +185,21 @@ gst_droid_codec_get_all_caps (GstDroidCodecType type)
   GstCaps *caps = gst_caps_new_empty ();
   int x = 0;
   int len = G_N_ELEMENTS (codecs);
+  GKeyFile *file = g_key_file_new ();
+  gchar *path = g_strdup_printf ("%s/gst-droid/gstdroidcodec.conf", SYSCONFDIR);
+  gchar *group = type == GST_DROID_CODEC_DECODER_AUDIO
+      || type == GST_DROID_CODEC_DECODER_VIDEO ? "decoders" : "encoders";
+
+  g_key_file_load_from_file (file, path, G_KEY_FILE_NONE, NULL);
+  g_free (path);
 
   for (x = 0; x < len; x++) {
     if (codecs[x].type != type) {
+      continue;
+    }
+
+    if (g_key_file_has_key (file, group, codecs[x].droid, NULL)) {
+      GST_INFO ("%s is disabled", codecs[x].droid);
       continue;
     }
 
@@ -196,6 +208,8 @@ gst_droid_codec_get_all_caps (GstDroidCodecType type)
   }
 
   GST_INFO ("caps %" GST_PTR_FORMAT, caps);
+
+  g_key_file_free (file);
 
   return caps;
 }
