@@ -161,7 +161,11 @@ gst_droidcamsrc_exif_tags_from_jpeg_data (void *data, size_t size)
       EXIF_TAG_ISO_SPEED_RATINGS);
 
   if (iso) {
+#ifdef __arm__
     guint16 val = exif_get_short (iso->data, EXIF_BYTE_ORDER_MOTOROLA);
+#else
+    guint16 val = exif_get_short (iso->data, EXIF_BYTE_ORDER_INTEL);
+#endif
     gst_tag_list_add (tags, GST_TAG_MERGE_REPLACE,
         GST_TAG_CAPTURING_ISO_SPEED, val, NULL);
   }
