@@ -882,16 +882,12 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
 
   GST_INFO ("waiting for queued frames %i", dev->vid->queued_frames);
 
-  if (dev->vid->queued_frames > 0) {
+  while (dev->vid->queued_frames > 0) {
     GST_INFO ("waiting for queued frames to reach 0 from %i",
         dev->vid->queued_frames);
     g_rec_mutex_unlock (dev->lock);
     usleep (VIDEO_RECORDING_STOP_TIMEOUT);
     g_rec_mutex_lock (dev->lock);
-  }
-
-  if (dev->vid->queued_frames > 0) {
-    GST_WARNING ("video queue still has %i frames", dev->vid->queued_frames);
   }
 
   g_rec_mutex_unlock (dev->lock);
