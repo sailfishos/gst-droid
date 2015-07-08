@@ -24,32 +24,20 @@
 #include <config.h>
 #endif
 
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdio.h>
-#include <gst/gst.h>
+#include "common.h"
 #ifndef GST_USE_UNSTABLE_API
 #define GST_USE_UNSTABLE_API
 #endif
 #include <gst/interfaces/photography.h>
-#include "gst/droidcamsrc/gstdroidcamsrc.h"
-#include "gst/droidcamsrc/gstdroidcamsrcdev.h"
-#include "gst/droidcamsrc/gstdroidcamsrcparams.h"
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <string.h>             /* strlen() */
+#include <unistd.h>             /* write() */
+#include <stdio.h>              /* perror() */
 
 #define ADD_ENTRY(val, droid) {#val, val, droid}
-
-typedef struct
-{
-  GMainLoop *loop;
-  GstElement *bin;
-  GstElement *src;
-  const gchar *out;
-  int dev;
-} Data;
 
 typedef struct
 {
@@ -159,6 +147,12 @@ struct Node
   /* *INDENT-ON* */
 };
 
+static const gchar *
+params_get_string (GHashTable * params, const gchar * key)
+{
+  return g_hash_table_lookup (params, key);
+}
+
 static gboolean
 add_line (int fd, gchar * line)
 {
@@ -232,31 +226,31 @@ write_section (int fd, struct Node *n, const gchar * params)
 }
 
 static gboolean
-write_configuration (Data * data)
+write_configuration (Common * c, gchar * out, int dev)
 {
   int fd;
   gboolean ret;
-  GstDroidCamSrc *src;
-  GstDroidCamSrcParams *params;
+  GHashTable *params;
 
-  fd = open (data->out, O_WRONLY | O_CREAT,
-      S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+  fd = open (out, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
   if (fd == -1) {
     perror ("open");
     return FALSE;
   }
 
-  if (!add_line (fd, g_strdup_printf ("# configuration for device %d\n",
-              data->dev))) {
+  if (!add_line (fd, g_strdup_printf ("# configuration for device %d\n", dev))) {
     goto error;
   }
 
-  src = (GstDroidCamSrc *) data->src;
-  params = src->dev->params;
+  g_object_get (c->cam_src, "device-parameters", &params, NULL);
+  if (!params) {
+    g_print ("Failed to get device parameters\n");
+    goto error;
+  }
 
   struct Node *n = Nodes;
   while (n->droid) {
-    const gchar *p = gst_droidcamsrc_params_get_string (params, n->droid);
+    const gchar *p = params_get_string (params, n->droid);
 
     if (p) {
       if (!write_section (fd, n, p)) {
@@ -277,56 +271,24 @@ error:
   goto out;
 }
 
-static gboolean
-bus_watch (GstBus * bus, GstMessage * message, gpointer user_data)
+gchar *out = NULL;
+int dev = 0;
+
+static void
+pipeline_started (Common * c)
 {
-  Data *data = (Data *) user_data;
+  int ret = 0;
 
-  switch (GST_MESSAGE_TYPE (message)) {
-    case GST_MESSAGE_ERROR:{
-      GError *err = NULL;
-      gchar *debug;
-      gst_message_parse_error (message, &err, &debug);
-      g_error ("error: %s (%s)\n", err->message, debug);
-      g_error_free (err);
-      g_free (debug);
-      g_main_loop_quit (data->loop);
-    }
-      break;
-
-    case GST_MESSAGE_STATE_CHANGED:{
-      GstState oldState, newState, pending;
-      if (GST_ELEMENT (GST_MESSAGE_SRC (message)) != data->bin) {
-        break;
-      }
-
-      gst_message_parse_state_changed (message, &oldState, &newState, &pending);
-      if (oldState == GST_STATE_READY && newState == GST_STATE_PAUSED
-          && pending == GST_STATE_VOID_PENDING) {
-        write_configuration (data);
-
-        /* we are done */
-        g_main_loop_quit (data->loop);
-      }
-    }
-      break;
-
-    default:
-      break;
+  if (!write_configuration (c, out, dev)) {
+    ret = 1;
   }
 
-  return TRUE;
+  common_quit (c, ret);
 }
 
 int
 main (int argc, char *argv[])
 {
-  GMainLoop *loop;
-  GstBus *bus;
-  GstElement *src, *bin;
-  Data *data;
-  int ret = 0;
-
   if (argc != 3) {
     g_print ("usage: %s <camera device> <output file>\n"
         " Examples:\n"
@@ -338,46 +300,21 @@ main (int argc, char *argv[])
     return 0;
   }
 
-  data = g_malloc (sizeof (Data));
-  data->out = argv[2];
-  data->dev = atoi (argv[1]);
+  dev = atoi (argv[1]);
+  out = argv[2];
 
-  loop = g_main_loop_new (NULL, FALSE);
-  data->loop = loop;
-
-  gst_init (&argc, &argv);
-
-  src = gst_element_factory_make ("droidcamsrc", NULL);
-  if (!src) {
-    g_error ("Failed to create an instance of droidcamsrc\n");
-    ret = 1;
-    goto out;
-  }
-  data->src = src;
-  g_object_set (src, "camera-device", data->dev, NULL);
-
-  bin = gst_pipeline_new (NULL);
-  data->bin = bin;
-
-  gst_bin_add (GST_BIN (bin), src);
-
-  bus = gst_pipeline_get_bus (GST_PIPELINE (bin));
-  gst_bus_add_watch (bus, bus_watch, data);
-  gst_object_unref (bus);
-  bus = NULL;
-
-  if (gst_element_set_state (bin, GST_STATE_PAUSED) == GST_STATE_CHANGE_FAILURE) {
-    g_error ("error starting pipeline\n");
-    ret = 1;
-    goto out;
+  Common *common = common_init (&argc, &argv, "camerabin");
+  if (!common) {
+    return 1;
   }
 
-  g_main_loop_run (loop);
+  common_set_device_mode (common, dev, IMAGE);
 
-  gst_element_set_state (bin, GST_STATE_NULL);
+  common->started = pipeline_started;
 
-out:
-  g_free (data);
+  if (!common_run (common)) {
+    return 1;
+  }
 
-  return ret;
+  return common_destroy (common);
 }
