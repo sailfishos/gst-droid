@@ -7,7 +7,11 @@ libcommon_la_LIBADD = $(GST_LIBS) $(GSTPB_LIBS)
 noinst_HEADERS = common.h
 
 bin_PROGRAMS = \
-	mk-cam-conf
+	mk-cam-conf \
+	record-video
 
 mk_cam_conf_SOURCES = gstdroidcamsrcconf.c
 mk_cam_conf_LDADD = libcommon.la
+
+record_video_SOURCES = record.c
+record_video_LDADD = libcommon.la
