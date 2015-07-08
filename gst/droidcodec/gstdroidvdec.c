@@ -133,7 +133,7 @@ gst_droidvdec_create_codec (GstDroidVDec * dec, GstBuffer * input)
       DROID_MEDIA_CODEC_HW_ONLY | DROID_MEDIA_CODEC_USE_EXTERNAL_LOOP;
   md.codec_data.size = 0;
 
-  if (dec->info.finfo->format == GST_VIDEO_FORMAT_I420) {
+  if (dec->format == GST_VIDEO_FORMAT_I420) {
     md.parent.flags |= DROID_MEDIA_CODEC_NO_MEDIA_BUFFER;
   }
 
@@ -600,7 +600,7 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
       "codec reported state: width: %d, height: %d, crop: %d,%d %d,%d",
       md.width, md.height, rect.left, rect.top, rect.right, rect.bottom);
 
-  if (dec->info.finfo->format == GST_VIDEO_FORMAT_I420) {
+  if (dec->format == GST_VIDEO_FORMAT_I420) {
     width = rect.right - rect.left;
     height = rect.bottom - rect.top;
   }
@@ -609,7 +609,7 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
       height);
 
   dec->out_state = gst_video_decoder_set_output_state (decoder,
-      dec->info.finfo->format, width, height, dec->in_state);
+      dec->format, width, height, dec->in_state);
 
   /* now the caps */
   g_assert (dec->out_state->caps == NULL);
@@ -785,6 +785,7 @@ gst_droidvdec_start (GstVideoDecoder * decoder)
   dec->codec_type = NULL;
   dec->dirty = TRUE;
   dec->running = TRUE;
+  dec->format = GST_VIDEO_FORMAT_UNKNOWN;
 
   return TRUE;
 }
@@ -794,6 +795,8 @@ gst_droidvdec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 {
   GstDroidVDec *dec = GST_DROIDVDEC (decoder);
   GstCaps *caps, *template_caps;
+  GstStructure *s;
+  const gchar *format;
 
   /*
    * destroying the droidmedia codec here will cause stagefright to call abort.
@@ -831,13 +834,15 @@ gst_droidvdec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   caps = gst_caps_truncate (caps);
   caps = gst_caps_fixate (caps);
 
-  if (!gst_video_info_from_caps (&dec->info, caps)) {
+  s = gst_caps_get_structure (caps, 0);
+  format = gst_structure_get_string (s, "format");
+  dec->format = gst_video_format_from_string (format);
+  gst_caps_unref (caps);
+
+  if (G_UNLIKELY (format == GST_VIDEO_FORMAT_UNKNOWN)) {
     GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL), ("Failed to parse caps"));
-    gst_caps_unref (caps);
     return FALSE;
   }
-
-  gst_caps_unref (caps);
 
   dec->in_state = gst_video_codec_state_ref (state);
 
