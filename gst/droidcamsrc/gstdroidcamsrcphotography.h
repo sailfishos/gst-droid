@@ -32,6 +32,7 @@ typedef enum _GstDroidCamSrcApplyType GstDroidCamSrcApplyType;
 typedef enum
 {
   PROP_0,
+  PROP_DEVICE_PARAMETERS,
   PROP_CAMERA_DEVICE,
   PROP_MODE,
   PROP_READY_FOR_CAPTURE,

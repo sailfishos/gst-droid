@@ -204,6 +204,13 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
   }
 
   switch (prop_id) {
+    case PROP_DEVICE_PARAMETERS:
+      g_rec_mutex_lock (&src->dev_lock);
+      g_value_set_pointer (value, src->dev
+          && src->dev->params ? src->dev->params->params : NULL);
+      g_rec_mutex_unlock (&src->dev_lock);
+      break;
+
     case PROP_CAMERA_DEVICE:
       g_value_set_enum (value, src->camera_device);
       break;
@@ -941,6 +948,11 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
           "Sensor orientation as reported by HAL (deprecated, use sensor-orientation)",
           0, 270, DEFAULT_SENSOR_ORIENTATION,
           G_PARAM_READABLE | G_PARAM_STATIC_STRINGS | G_PARAM_DEPRECATED));
+
+  g_object_class_install_property (gobject_class, PROP_DEVICE_PARAMETERS,
+      g_param_spec_pointer ("device-parameters", "Device parameters",
+          "The GHash table of the GstDroidCamSrcParams struct currently used",
+          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS | G_PARAM_PRIVATE));
 
   gst_droidcamsrc_photography_add_overrides (gobject_class);
 
