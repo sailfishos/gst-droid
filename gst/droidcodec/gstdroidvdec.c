@@ -220,8 +220,8 @@ static gboolean
 gst_droidvdec_convert_buffer (GstDroidVDec * dec,
     GstBuffer * out, DroidMediaData * in, GstVideoInfo * info)
 {
-  gboolean use_external_buffer =
-      GST_VIDEO_INFO_COMP_STRIDE (info, 0) != info->width;
+  gsize size = info->width * info->height * 3 / 2;
+  gboolean use_external_buffer = gst_buffer_get_size (out) != size;
   guint8 *data = NULL;
   gboolean ret;
   GstMapInfo map_info;
@@ -238,7 +238,7 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
 
   if (use_external_buffer) {
     GST_DEBUG_OBJECT (dec, "using an external buffer for I420 conversion.");
-    data = g_malloc (info->width * info->height * 3 / 2);
+    data = g_malloc (size);
   } else {
     data = map_info.data;
   }
