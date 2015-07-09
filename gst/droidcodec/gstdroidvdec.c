@@ -221,8 +221,7 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
     GstBuffer * out, DroidMediaData * in, GstVideoInfo * info)
 {
   gboolean use_external_buffer =
-      GST_VIDEO_INFO_COMP_STRIDE (info, 0) != info->width
-      || info->height != dec->height;
+      GST_VIDEO_INFO_COMP_STRIDE (info, 0) != info->width;
   guint8 *data = NULL;
   gboolean ret;
   GstMapInfo map_info;
@@ -357,9 +356,6 @@ gst_droidvdec_frame_available (void *user)
 
   /* Now we can configure the state */
   if (G_UNLIKELY (!dec->out_state)) {
-    /* store decoder provided height because convert_buffer() needs it. */
-    dec->height = height;
-
     if (!gst_droidvdec_configure_state (decoder, width, height)) {
       dec->downstream_flow_ret = GST_FLOW_ERROR;
       gst_buffer_unref (buff);
@@ -790,7 +786,6 @@ gst_droidvdec_start (GstVideoDecoder * decoder)
   dec->dirty = TRUE;
   dec->running = TRUE;
   dec->format = GST_VIDEO_FORMAT_UNKNOWN;
-  dec->height = -1;
 
   return TRUE;
 }

@@ -75,7 +75,6 @@ struct _GstDroidVDec
   DroidMediaRect crop_rect;
   gboolean running;
   GstVideoFormat format;
-  guint height;
 
   GstVideoCodecState *in_state;
   GstVideoCodecState *out_state;
