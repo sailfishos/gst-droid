@@ -802,10 +802,6 @@ create_aacdec_codec_data_from_codec_data (GstDroidCodec * codec G_GNUC_UNUSED,
   ret = TRUE;
 
 out:
-  if (data && codec->data->aac_adts) {
-    gst_buffer_unref (data);
-  }
-
   return ret;
 }
 
