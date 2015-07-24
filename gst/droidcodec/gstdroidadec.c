@@ -361,9 +361,20 @@ gst_droidadec_set_format (GstAudioDecoder * decoder, GstCaps * caps)
   GST_DEBUG_OBJECT (dec, "set format %" GST_PTR_FORMAT, caps);
 
   if (dec->codec) {
-    GST_FIXME_OBJECT (dec, "What to do here?");
-    GST_ERROR_OBJECT (dec, "codec already configured");
-    return FALSE;
+    /* If we get a format change then we stop */
+    GstCaps *current =
+        gst_pad_get_current_caps (GST_AUDIO_DECODER_SINK_PAD (decoder));
+    gboolean equal = gst_caps_is_equal_fixed (caps, current);
+    gst_caps_unref (current);
+
+    GST_DEBUG_OBJECT (dec, "new format is similar to old format? %d", equal);
+
+    if (!equal) {
+      GST_ELEMENT_ERROR (dec, LIBRARY, SETTINGS, (NULL),
+          ("codec already configured"));
+    }
+
+    return equal;
   }
 
   dec->codec_type =
