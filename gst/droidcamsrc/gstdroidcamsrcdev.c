@@ -307,13 +307,10 @@ gst_droidcamsrc_dev_video_frame_callback (void *user,
   gst_droidcamsrc_timestamp (src, buffer);
 
   g_rec_mutex_lock (dev->lock);
+  ++dev->vid->queued_frames;
+  g_rec_mutex_unlock (dev->lock);
 
   drop_buffer = !dev->vid->running;
-  if (!drop_buffer) {
-    ++dev->vid->queued_frames;
-  }
-
-  g_rec_mutex_unlock (dev->lock);
 
   if (drop_buffer) {
     GST_INFO_OBJECT (src,
