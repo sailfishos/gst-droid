@@ -867,6 +867,7 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
   /* our pad task is either sleeping or still pushing buffers. We empty the queue. */
   g_mutex_lock (&dev->vidsrc->lock);
   g_queue_foreach (dev->vidsrc->queue, (GFunc) gst_buffer_unref, NULL);
+  g_queue_clear (dev->vidsrc->queue);
   g_mutex_unlock (&dev->vidsrc->lock);
 
   /* now we are done. We just push eos */
