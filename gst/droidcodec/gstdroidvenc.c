@@ -36,6 +36,8 @@ G_DEFINE_TYPE (GstDroidVEnc, gst_droidvenc, GST_TYPE_VIDEO_ENCODER);
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_venc_debug);
 #define GST_CAT_DEFAULT gst_droid_venc_debug
 
+#define GST_DROIDVENC_EOS_TIMEOUT_SEC          2
+
 static GstStaticPadTemplate gst_droidvenc_sink_template_factory =
 GST_STATIC_PAD_TEMPLATE (GST_VIDEO_ENCODER_SINK_NAME,
     GST_PAD_SINK,
@@ -503,6 +505,7 @@ static GstFlowReturn
 gst_droidvenc_finish (GstVideoEncoder * encoder)
 {
   GstDroidVEnc *enc = GST_DROIDVENC (encoder);
+  GTimeVal tv;
 
   GST_DEBUG_OBJECT (enc, "finish");
 
@@ -515,10 +518,17 @@ gst_droidvenc_finish (GstVideoEncoder * encoder)
     goto out;
   }
 
+  g_get_current_time (&tv);
+  g_time_val_add (&tv, G_USEC_PER_SEC * GST_DROIDVENC_EOS_TIMEOUT_SEC);
+
   /* release the lock to allow _frame_available () to do its job */
   GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
-  /* Now we wait for the codec to signal EOS */
-  g_cond_wait (&enc->eos_cond, &enc->eos_lock);
+  /* Now we wait for the codec to signal EOS. We cannot wait forever because sometimes
+   * we never hear anything from the video encoders. */
+  if (!g_cond_timed_wait (&enc->eos_cond, &enc->eos_lock, &tv)) {
+    GST_WARNING_OBJECT (enc, "timeout waiting for eos");
+  }
+
   GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
 
 out:
