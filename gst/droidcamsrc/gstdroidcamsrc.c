@@ -83,6 +83,8 @@ static void gst_droidcamsrc_add_vfsrc_orientation_tag (GstDroidCamSrc * src);
 static gboolean gst_droidcamsrc_select_and_activate_mode (GstDroidCamSrc * src);
 static GstCaps *gst_droidcamsrc_pick_largest_resolution (GstDroidCamSrc * src,
     GstCaps * caps);
+static gchar *gst_droidcamsrc_find_picture_resolution (GstDroidCamSrc * src,
+    const gchar * resolution);
 
 enum
 {
@@ -1556,7 +1558,7 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
   gboolean ret = FALSE;
   GstCaps *peer = NULL;
   GstCaps *our_caps = NULL;
-  gchar *vid;
+  gchar *vid, *pic;
   GstVideoInfo info;
 
   g_rec_mutex_lock (&src->dev_lock);
@@ -1610,7 +1612,17 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
 
   vid = g_strdup_printf ("%ix%i", info.width, info.height);
   gst_droidcamsrc_params_set_string (src->dev->params, "video-size", vid);
+
+  /* Now we need to find a picture size that is equal to our video size.
+   * Some devices need to have a picture size otherwise the video mode viewfinder
+   * behaves in a funny way and can be stretched or squeezed */
+  pic = gst_droidcamsrc_find_picture_resolution (src, vid);
   g_free (vid);
+
+  if (pic) {
+    gst_droidcamsrc_params_set_string (src->dev->params, "picture-size", pic);
+    g_free (pic);
+  }
 
   ret = TRUE;
 
@@ -2108,4 +2120,43 @@ gst_droidcamsrc_pick_largest_resolution (GstDroidCamSrc * src, GstCaps * caps)
   out_caps = gst_caps_copy_nth (caps, index);
   gst_caps_unref (caps);
   return out_caps;
+}
+
+static gchar *
+gst_droidcamsrc_find_picture_resolution (GstDroidCamSrc * src,
+    const gchar * resolution)
+{
+  const gchar *supported;
+  gchar **vals = NULL, **tmp;
+  gchar *ret = NULL;
+
+  GST_DEBUG_OBJECT (src, "find picture resolution for %s", resolution);
+
+  supported =
+      gst_droidcamsrc_params_get_string (src->dev->params,
+      "picture-size-values");
+
+  GST_LOG_OBJECT (src, "supported picture sizes: %s", supported);
+
+  vals = g_strsplit (supported, ",", -1);
+
+  tmp = vals;
+  while (*tmp) {
+    if (!g_strcmp0 (*tmp, resolution)) {
+      GST_DEBUG_OBJECT (src, "found resolution %s", *tmp);
+      ret = g_strdup (*tmp);
+      goto out;
+    }
+    ++tmp;
+  }
+
+out:
+  g_strfreev (vals);
+
+  if (!ret) {
+    GST_WARNING_OBJECT (src, "no picture resolution corresponding to %s",
+        resolution);
+  }
+
+  return ret;
 }
