@@ -619,7 +619,7 @@ gst_droidcamsrc_photography_init (GstDroidCamSrc * src, gint dev)
     src->photo->settings.ev_compensation = 0.0;
     src->photo->settings.iso_speed = 0;
     src->photo->settings.zoom = 1.0;
-    src->photo->settings.flicker_mode = GST_PHOTOGRAPHY_FLICKER_REDUCTION_OFF;
+    src->photo->settings.flicker_mode = GST_PHOTOGRAPHY_FLICKER_REDUCTION_AUTO;
     src->photo->settings.focus_mode =
         GST_PHOTOGRAPHY_FOCUS_MODE_CONTINUOUS_NORMAL;
 
