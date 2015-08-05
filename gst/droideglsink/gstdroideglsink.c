@@ -468,8 +468,10 @@ gst_droideglsink_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
 
   data.size = info.size;
   data.data = info.data;
+
   mem = gst_droid_media_buffer_allocator_alloc_from_data (sink->allocator,
-      format.width, format.height, &data, &cb);
+      format.width, format.height, GST_VIDEO_INFO_COMP_STRIDE (&format, 0),
+      GST_VIDEO_INFO_COMP_STRIDE (&format, 1), &data, &cb);
 
   if (!mem) {
     goto free_and_out;

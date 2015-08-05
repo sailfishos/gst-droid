@@ -137,7 +137,8 @@ gst_droid_media_buffer_allocator_alloc (GstAllocator * allocator,
 
 GstMemory *
 gst_droid_media_buffer_allocator_alloc_from_data (GstAllocator * allocator,
-    gsize w, gsize h, DroidMediaData * data, DroidMediaBufferCallbacks * cb)
+    gsize w, gsize h, gsize strideY, gsize strideUV, DroidMediaData * data,
+    DroidMediaBufferCallbacks * cb)
 {
   GstDroidMediaBufferMemory *mem;
   DroidMediaBuffer *buffer;
@@ -150,7 +151,9 @@ gst_droid_media_buffer_allocator_alloc_from_data (GstAllocator * allocator,
 
   mem = g_slice_new0 (GstDroidMediaBufferMemory);
 
-  buffer = droid_media_buffer_create_from_yv12_data (w, h, data, cb);
+  buffer =
+      droid_media_buffer_create_from_yv12_data (w, h, strideY, strideUV, data,
+      cb);
   if (!buffer) {
     GST_ERROR_OBJECT (allocator, "failed to acquire media buffer");
     g_slice_free (GstDroidMediaBufferMemory, mem);

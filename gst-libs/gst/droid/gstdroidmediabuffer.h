@@ -37,6 +37,7 @@ GstMemory    * gst_droid_media_buffer_allocator_alloc (GstAllocator * allocator,
 						       DroidMediaBufferCallbacks *cb);
 GstMemory    * gst_droid_media_buffer_allocator_alloc_from_data (GstAllocator * allocator,
 								 gsize w, gsize h,
+								 gsize strideY, gsize strideUV,
 								 DroidMediaData * data,
 								 DroidMediaBufferCallbacks *cb);
 
