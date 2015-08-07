@@ -730,6 +730,12 @@ gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev)
     GST_DEBUG ("stopped preview");
   }
 
+  /* Now we need to empty the queue */
+  g_mutex_lock (&dev->vfsrc->lock);
+  g_queue_foreach (dev->vfsrc->queue, (GFunc) gst_buffer_unref, NULL);
+  g_queue_clear (dev->vfsrc->queue);
+  g_mutex_unlock (&dev->vfsrc->lock);
+
   g_rec_mutex_unlock (dev->lock);
 }
 
