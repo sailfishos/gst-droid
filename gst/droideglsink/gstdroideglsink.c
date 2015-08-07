@@ -44,7 +44,7 @@ static GstStaticPadTemplate gst_droideglsink_sink_template_factory =
     GST_STATIC_PAD_TEMPLATE ("sink",
     GST_PAD_SINK,
     GST_PAD_ALWAYS,
-    GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE ("YV12") "; "
+    GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE ("{YV12, NV21}") "; "
         GST_VIDEO_CAPS_MAKE_WITH_FEATURES
         (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER, "{YV12}")));
 
@@ -470,8 +470,7 @@ gst_droideglsink_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
   data.data = info.data;
 
   mem = gst_droid_media_buffer_allocator_alloc_from_data (sink->allocator,
-      format.width, format.height, GST_VIDEO_INFO_COMP_STRIDE (&format, 0),
-      GST_VIDEO_INFO_COMP_STRIDE (&format, 1), &data, &cb);
+      &format, &data, &cb);
 
   if (!mem) {
     goto free_and_out;

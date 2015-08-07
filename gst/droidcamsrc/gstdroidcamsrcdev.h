@@ -26,6 +26,7 @@
 #include <gst/gst.h>
 #include "gstdroidcamsrcparams.h"
 #include "droidmediacamera.h"
+#include "droidmediaconstants.h"
 
 G_BEGIN_DECLS
 
