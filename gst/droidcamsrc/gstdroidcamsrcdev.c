@@ -261,9 +261,44 @@ gst_droidcamsrc_dev_preview_frame_callback (void *user,
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+  GstDroidCamSrcPad *pad = dev->vfsrc;
+  GstBuffer *buffer;
+  gsize width, height;
 
   GST_DEBUG_OBJECT (src, "dev preview frame callback");
-  GST_FIXME_OBJECT (src, "implement me");
+
+  /* We are accessing this without a lock because:
+   * 1) We should not be called while preview is stopped and this is when we manipulate this flag
+   * 2) We can get called when we start the preview and we will deadlock because the lock is already held
+   */
+  if (!dev->use_raw_data) {
+    GST_WARNING_OBJECT (src,
+        "preview frame callback called while not when we do not expect it");
+    return;
+  }
+
+  buffer = gst_buffer_new_allocate (NULL, mem->size, NULL);
+  gst_buffer_fill (buffer, 0, mem->data, mem->size);
+
+  gst_droidcamsrc_timestamp (src, buffer);
+
+  gst_buffer_add_gst_buffer_orientation_meta (buffer,
+      dev->info->orientation, dev->info->direction);
+
+  GST_OBJECT_LOCK (src);
+  width = src->width;
+  height = src->height;
+  GST_OBJECT_UNLOCK (src);
+
+  gst_buffer_add_video_meta (buffer, GST_VIDEO_FRAME_FLAG_NONE,
+      GST_VIDEO_FORMAT_NV21, width, height);
+
+  GST_LOG_OBJECT (src, "preview info: w=%d, h=%d", width, height);
+
+  g_mutex_lock (&pad->lock);
+  g_queue_push_tail (pad->queue, buffer);
+  g_cond_signal (&pad->cond);
+  g_mutex_unlock (&pad->lock);
 }
 
 static void
@@ -421,6 +456,14 @@ gst_droidcamsrc_dev_frame_available (void *user)
     goto acquire_and_release;
   }
 
+  /* We are accessing this without a lock because:
+   * 1) We should not be called while preview is stopped and this is when we manipulate this flag
+   * 2) We can get called when we start the preview and we will deadlock because the lock is already held
+   */
+  if (dev->use_raw_data) {
+    goto acquire_and_release;
+  }
+
   flow_ret = gst_buffer_pool_acquire_buffer (dev->pool, &buff, NULL);
   if (flow_ret != GST_FLOW_OK) {
     GST_WARNING_OBJECT (src, "failed to acquire buffer from pool: %s",
@@ -468,11 +511,8 @@ gst_droidcamsrc_dev_frame_available (void *user)
       crop_meta->height);
 
   g_mutex_lock (&pad->lock);
-
   g_queue_push_tail (pad->queue, buff);
-
   g_cond_signal (&pad->cond);
-
   g_mutex_unlock (&pad->lock);
 
   return;
@@ -493,6 +533,7 @@ gst_droidcamsrc_dev_new (GstDroidCamSrcPad * vfsrc,
   dev->cam = NULL;
   dev->queue = NULL;
   dev->running = FALSE;
+  dev->use_raw_data = FALSE;
   dev->info = NULL;
   dev->img = g_slice_new0 (GstDroidCamSrcImageCaptureState);
   dev->vid = g_slice_new0 (GstDroidCamSrcVideoCaptureState);
@@ -694,9 +735,16 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
     goto out;
   }
 
-  /* We don't want the preview frame. We will render it using the GraphicBuffers we get */
-  droid_media_camera_set_preview_callback_flags (dev->cam,
-      dev->c.CAMERA_FRAME_CALLBACK_FLAG_NOOP);
+  if (dev->use_raw_data) {
+    GST_INFO_OBJECT (src, "Using raw data mode");
+    droid_media_camera_set_preview_callback_flags (dev->cam,
+        dev->c.CAMERA_FRAME_CALLBACK_FLAG_CAMERA);
+  } else {
+    GST_INFO_OBJECT (src, "Using native buffers mode");
+    droid_media_camera_set_preview_callback_flags (dev->cam,
+        dev->c.CAMERA_FRAME_CALLBACK_FLAG_NOOP);
+  }
+
   if (!droid_media_camera_start_preview (dev->cam)) {
     GST_ERROR_OBJECT (src, "error starting preview");
     goto out;

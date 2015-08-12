@@ -47,11 +47,12 @@ GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
 #define GST_CAT_DEFAULT gst_droid_camsrc_debug
 
 static GstStaticPadTemplate vf_src_template_factory =
-GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_VIEWFINDER_PAD_NAME,
+    GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_VIEWFINDER_PAD_NAME,
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
-        (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER, "{YV12}")));
+        (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER, "{YV12}") ";"
+        GST_VIDEO_CAPS_MAKE ("{NV21}")));
 
 static GstStaticPadTemplate img_src_template_factory =
 GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_IMAGE_PAD_NAME,
@@ -1459,6 +1460,10 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   preview = g_strdup_printf ("%ix%i", info.width, info.height);
   gst_droidcamsrc_params_set_string (src->dev->params, "preview-size", preview);
   g_free (preview);
+
+  g_rec_mutex_lock (&src->dev_lock);
+  src->dev->use_raw_data = info.finfo->format == GST_VIDEO_FORMAT_NV21;
+  g_rec_mutex_unlock (&src->dev_lock);
 
   ret = TRUE;
 
