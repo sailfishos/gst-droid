@@ -71,6 +71,9 @@ typedef struct _GstDroidCamSrcDevVideoData
 static void gst_droidcamsrc_dev_release_recording_frame (void *data,
     GstDroidCamSrcDevVideoData * video_data);
 void gst_droidcamsrc_dev_update_params_locked (GstDroidCamSrcDev * dev);
+static void
+gst_droidcamsrc_dev_prepare_buffer (GstDroidCamSrcDev * dev, GstBuffer * buffer,
+    DroidMediaRect rect, int width, int height, GstVideoFormat format);
 
 static void
 gst_droidcamsrc_dev_shutter_callback (void *user)
@@ -441,7 +444,6 @@ gst_droidcamsrc_dev_frame_available (void *user)
   GstDroidCamSrcPad *pad = dev->vfsrc;
   DroidMediaBuffer *buffer;
   GstMemory *mem;
-  GstVideoCropMeta *crop_meta;
   DroidMediaRect rect;
   guint width, height;
   GstBuffer *buff;
@@ -491,24 +493,11 @@ gst_droidcamsrc_dev_frame_available (void *user)
   gst_droidcamsrc_timestamp (src, buff);
 
   rect = droid_media_buffer_get_crop_rect (buffer);
-  crop_meta = gst_buffer_add_video_crop_meta (buff);
-  crop_meta->x = rect.left;
-  crop_meta->y = rect.top;
-  crop_meta->width = rect.right - rect.left;
-  crop_meta->height = rect.bottom - rect.top;
-
-  gst_buffer_add_gst_buffer_orientation_meta (buff,
-      dev->info->orientation, dev->info->direction);
-
   width = droid_media_buffer_get_width (buffer);
   height = droid_media_buffer_get_height (buffer);
 
-  gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE,
-      GST_VIDEO_FORMAT_YV12, width, height);
-
-  GST_LOG_OBJECT (src, "preview info: w=%d, h=%d, crop: x=%d, y=%d, w=%d, h=%d",
-      width, height, crop_meta->x, crop_meta->y, crop_meta->width,
-      crop_meta->height);
+  gst_droidcamsrc_dev_prepare_buffer (dev, buff, rect, width, height,
+      GST_VIDEO_FORMAT_YV12);
 
   g_mutex_lock (&pad->lock);
   g_queue_push_tail (pad->queue, buff);
@@ -1102,4 +1091,31 @@ gst_droidcamsrc_dev_is_running (GstDroidCamSrcDev * dev)
   g_rec_mutex_unlock (dev->lock);
 
   return ret;
+}
+
+static void
+gst_droidcamsrc_dev_prepare_buffer (GstDroidCamSrcDev * dev, GstBuffer * buffer,
+    DroidMediaRect rect, int width, int height, GstVideoFormat format)
+{
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+  GstVideoCropMeta *crop;
+
+  GST_LOG_OBJECT (src, "prepare buffer %" GST_PTR_FORMAT, buffer);
+
+  gst_droidcamsrc_timestamp (src, buffer);
+
+  crop = gst_buffer_add_video_crop_meta (buffer);
+  crop->x = rect.left;
+  crop->y = rect.top;
+  crop->width = rect.right - rect.left;
+  crop->height = rect.bottom - rect.top;
+
+  gst_buffer_add_gst_buffer_orientation_meta (buffer,
+      dev->info->orientation, dev->info->direction);
+
+  gst_buffer_add_video_meta (buffer, GST_VIDEO_FRAME_FLAG_NONE,
+      format, width, height);
+
+  GST_LOG_OBJECT (src, "preview info: w=%d, h=%d, crop: x=%d, y=%d, w=%d, h=%d",
+      width, height, crop->x, crop->y, crop->width, crop->height);
 }
