@@ -504,10 +504,13 @@ gst_droidcamsrc_dev_frame_available (void *user)
   g_cond_signal (&pad->cond);
   g_mutex_unlock (&pad->lock);
 
+  GST_OBJECT_LOCK (src);
+  src->crop_rect = rect;
+  GST_OBJECT_UNLOCK (src);
   return;
 
 acquire_and_release:
-  droid_media_buffer_queue_acquire_and_release (dev->queue);
+  droid_media_buffer_queue_acquire_and_release (dev->queue, NULL);
 }
 
 GstDroidCamSrcDev *

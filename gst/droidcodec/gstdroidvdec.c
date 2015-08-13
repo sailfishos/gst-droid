@@ -406,7 +406,7 @@ gst_droidvdec_frame_available (void *user)
 acquire_and_release:
   /* we can not use our cb struct here so ask droidmedia to do
    * the work instead */
-  droid_media_buffer_queue_acquire_and_release (dec->queue);
+  droid_media_buffer_queue_acquire_and_release (dec->queue, NULL);
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
 }
 
