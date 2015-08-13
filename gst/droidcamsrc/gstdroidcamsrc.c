@@ -1455,6 +1455,10 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   src->height = info.height;
   src->fps_n = info.fps_n;
   src->fps_d = info.fps_d;
+  src->crop_rect.left = 0;
+  src->crop_rect.top = 0;
+  src->crop_rect.right = info.width;
+  src->crop_rect.bottom = info.height;
   GST_OBJECT_UNLOCK (src);
 
   preview = g_strdup_printf ("%ix%i", info.width, info.height);

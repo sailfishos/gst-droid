@@ -267,6 +267,7 @@ gst_droidcamsrc_dev_preview_frame_callback (void *user,
   GstDroidCamSrcPad *pad = dev->vfsrc;
   GstBuffer *buffer;
   gsize width, height;
+  DroidMediaRect rect;
 
   GST_DEBUG_OBJECT (src, "dev preview frame callback");
 
@@ -283,20 +284,14 @@ gst_droidcamsrc_dev_preview_frame_callback (void *user,
   buffer = gst_buffer_new_allocate (NULL, mem->size, NULL);
   gst_buffer_fill (buffer, 0, mem->data, mem->size);
 
-  gst_droidcamsrc_timestamp (src, buffer);
-
-  gst_buffer_add_gst_buffer_orientation_meta (buffer,
-      dev->info->orientation, dev->info->direction);
-
   GST_OBJECT_LOCK (src);
   width = src->width;
   height = src->height;
+  rect = src->crop_rect;
   GST_OBJECT_UNLOCK (src);
 
-  gst_buffer_add_video_meta (buffer, GST_VIDEO_FRAME_FLAG_NONE,
-      GST_VIDEO_FORMAT_NV21, width, height);
-
-  GST_LOG_OBJECT (src, "preview info: w=%d, h=%d", width, height);
+  gst_droidcamsrc_dev_prepare_buffer (dev, buffer, rect, width, height,
+      GST_VIDEO_FORMAT_NV21);
 
   g_mutex_lock (&pad->lock);
   g_queue_push_tail (pad->queue, buffer);
@@ -449,6 +444,7 @@ gst_droidcamsrc_dev_frame_available (void *user)
   GstBuffer *buff;
   DroidMediaBufferCallbacks cb;
   GstFlowReturn flow_ret;
+  DroidMediaBufferInfo info;
 
   GST_DEBUG_OBJECT (src, "frame available");
 
@@ -510,7 +506,11 @@ gst_droidcamsrc_dev_frame_available (void *user)
   return;
 
 acquire_and_release:
-  droid_media_buffer_queue_acquire_and_release (dev->queue, NULL);
+  if (droid_media_buffer_queue_acquire_and_release (dev->queue, &info)) {
+    GST_OBJECT_LOCK (src);
+    src->crop_rect = info.crop_rect;
+    GST_OBJECT_UNLOCK (src);
+  }
 }
 
 GstDroidCamSrcDev *

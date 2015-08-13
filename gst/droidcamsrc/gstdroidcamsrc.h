@@ -123,6 +123,7 @@ struct _GstDroidCamSrc
   gint width;
   gint height;
   gint fps_n, fps_d;
+  DroidMediaRect crop_rect;
 };
 
 struct _GstDroidCamSrcClass
