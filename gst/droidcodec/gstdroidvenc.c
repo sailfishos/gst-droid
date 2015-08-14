@@ -535,6 +535,13 @@ gst_droidvenc_finish (GstVideoEncoder * encoder)
 out:
   enc->eos = FALSE;
 
+  if (enc->codec) {
+    droid_media_codec_stop (enc->codec);
+    droid_media_codec_destroy (enc->codec);
+    enc->codec = NULL;
+    enc->dirty = TRUE;
+  }
+
   g_mutex_unlock (&enc->eos_lock);
 
   return GST_FLOW_OK;
