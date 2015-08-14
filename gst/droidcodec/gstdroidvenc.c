@@ -292,6 +292,7 @@ gst_droidvenc_data_available (void *data, DroidMediaCodecData * encoded)
     GST_ELEMENT_ERROR (enc, LIBRARY, ENCODE, (NULL),
         ("failed to process encoded data"));
     gst_video_codec_frame_unref (frame);
+    gst_video_encoder_finish_frame (GST_VIDEO_ENCODER (enc), frame);
     enc->downstream_flow_ret = GST_FLOW_ERROR;
     GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
     return;
