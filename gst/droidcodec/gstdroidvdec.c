@@ -872,7 +872,7 @@ gst_droidvdec_finish (GstVideoDecoder * decoder)
   if (dec->state == GST_DROID_VDEC_STATE_WAITING_FOR_EOS) {
     GST_DEBUG_OBJECT (dec, "already finishing");
     g_mutex_unlock (&dec->state_lock);
-    return GST_FLOW_OK;
+    return GST_FLOW_NOT_SUPPORTED;
   }
 
   if (dec->codec && dec->state == GST_DROID_VDEC_STATE_OK) {
@@ -1078,6 +1078,7 @@ gst_droidvdec_change_state (GstElement * element, GstStateChange transition)
 
   if (transition == GST_STATE_CHANGE_PAUSED_TO_READY) {
     GstVideoDecoder *decoder = GST_VIDEO_DECODER (dec);
+    GstFlowReturn finish_res = GST_FLOW_OK;
 
     GST_VIDEO_DECODER_STREAM_LOCK (decoder);
     /*
@@ -1086,10 +1087,12 @@ gst_droidvdec_change_state (GstElement * element, GstStateChange transition)
      * gst_droidvdec_stop_loop() will deadlock
      */
     if (dec->codec) {
-      gst_droidvdec_finish (decoder);
+      finish_res = gst_droidvdec_finish (decoder);
     }
 
-    gst_droidvdec_stop_loop (dec);
+    if (finish_res != GST_FLOW_NOT_SUPPORTED) {
+      gst_droidvdec_stop_loop (dec);
+    }
 
     GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
   }
