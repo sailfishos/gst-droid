@@ -861,6 +861,11 @@ gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
   g_mutex_unlock (&dev->vidsrc->lock);
 
   g_rec_mutex_lock (dev->lock);
+  if (dev->use_raw_data) {
+    GST_ERROR ("Cannot record video in raw mode");
+    goto out;
+  }
+
   dev->vid->running = TRUE;
   dev->vid->eos_sent = FALSE;
   dev->vid->video_frames = 0;
