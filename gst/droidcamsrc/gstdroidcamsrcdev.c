@@ -850,6 +850,7 @@ out:
 gboolean
 gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
 {
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
   gboolean ret = FALSE;
 
   GST_DEBUG ("dev start video recording");
@@ -862,7 +863,8 @@ gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
 
   g_rec_mutex_lock (dev->lock);
   if (dev->use_raw_data) {
-    GST_ERROR ("Cannot record video in raw mode");
+    GST_ELEMENT_ERROR (src, STREAM, FORMAT, ("Cannot record video in raw mode"),
+        (NULL));
     goto out;
   }
 
@@ -873,12 +875,14 @@ gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
 
   /* TODO: get that from caps */
   if (!droid_media_camera_store_meta_data_in_buffers (dev->cam, true)) {
-    GST_ERROR ("error storing meta data in buffers for video recording");
+    GST_ELEMENT_ERROR (src, LIBRARY, SETTINGS,
+        ("error storing meta data in buffers for video recording"), (NULL));
     goto out;
   }
 
   if (!droid_media_camera_start_recording (dev->cam)) {
-    GST_ERROR ("error starting video recording");
+    GST_ELEMENT_ERROR (src, LIBRARY, FAILED, ("error starting video recording"),
+        (NULL));
     goto out;
   }
 
