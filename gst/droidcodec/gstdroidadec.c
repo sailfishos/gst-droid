@@ -57,7 +57,8 @@ gst_droidadec_create_codec (GstDroidADec * dec, GstBuffer * input)
   DroidMediaCodecDecoderMetaData md;
   const gchar *droid = gst_droid_codec_get_droid_type (dec->codec_type);
 
-  GST_INFO_OBJECT (dec, "create codec of type %s", droid);
+  GST_INFO_OBJECT (dec, "create codec of type %s. Channels: %d, Rate: %d",
+      droid, dec->channels, dec->rate);
 
   memset (&md, 0x0, sizeof (md));
 
