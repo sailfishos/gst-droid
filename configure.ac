@@ -19,7 +19,6 @@ AM_MAINTAINER_MODE([enable])
 
 dnl check for tools (compiler etc.)
 AC_PROG_CC
-AM_PROG_CC_C_O
 
 dnl required version of libtool
 LT_PREREQ([2.2.6])
