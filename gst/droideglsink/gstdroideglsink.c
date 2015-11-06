@@ -665,12 +665,18 @@ gst_droideglsink_unbind_frame (NemoGstVideoTexture * iface)
 
   g_mutex_lock (&sink->lock);
 
+  if (sink->image == EGL_NO_IMAGE_KHR) {
+    GST_WARNING_OBJECT (sink, "Cannot unbind without a valid EGLImageKHR");
+    goto out;
+  }
+
   if (sink->eglDestroyImageKHR (sink->dpy, sink->image) != EGL_TRUE) {
     GST_WARNING_OBJECT (sink, "failed to destroy EGLImageKHR %p", sink->image);
   }
 
   sink->image = EGL_NO_IMAGE_KHR;
 
+out:
   g_mutex_unlock (&sink->lock);
 }
 
