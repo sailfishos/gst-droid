@@ -60,6 +60,7 @@ static gboolean process_h264enc_data (DroidMediaData * in,
     DroidMediaData * out);
 static void gst_droid_codec_release_input_frame (void *data);
 static void gst_droid_codec_free (GstDroidCodec * codec);
+static void gst_droid_codec_type_fill_quirks (GstDroidCodec * codec);
 
 GST_DEFINE_MINI_OBJECT_TYPE (GstDroidCodec, gst_droid_codec);
 
@@ -170,6 +171,10 @@ gst_droid_codec_new_from_caps (GstCaps * caps, GstDroidCodecType type)
           (GstMiniObjectFreeFunction) gst_droid_codec_free);
 
       codec->info = &codecs[x];
+
+      /* Fill codec quirks */
+      gst_droid_codec_type_fill_quirks (codec);
+
       return codec;
     }
   }
@@ -1028,4 +1033,49 @@ gst_droid_codec_release_input_frame (void *data)
   g_free (info->data);
 
   g_slice_free (GstDroidCodecFrameReleaseData, info);
+}
+
+static void
+gst_droid_codec_type_fill_quirks (GstDroidCodec * codec)
+{
+  GKeyFile *file = g_key_file_new ();
+  gchar *path = g_strdup_printf ("%s/gst-droid/gstdroidcodec.conf", SYSCONFDIR);
+  gchar **quirks_string = NULL;
+  const gchar *group
+      = (codec->info->type == GST_DROID_CODEC_DECODER_AUDIO
+      || codec->info->type ==
+      GST_DROID_CODEC_DECODER_VIDEO) ? "decoder-quirks" : "encoder-quirks";
+  gsize quirks_length = 0;
+  int x;
+
+  g_key_file_load_from_file (file, path, G_KEY_FILE_NONE, NULL);
+  g_free (path);
+
+  if (!g_key_file_has_group (file, group)) {
+    GST_LOG ("no quirks");
+    goto out;
+  }
+
+  quirks_string =
+      g_key_file_get_string_list (file, group, codec->info->droid,
+      &quirks_length, NULL);
+  if (!quirks_string) {
+    GST_LOG ("no quirks for %s", codec->info->droid);
+    goto out;
+  }
+
+  for (x = 0; x < quirks_length; x++) {
+    if (!g_strcmp0 (quirks_string[x], USE_CODEC_SUPPLIED_HEIGHT_NAME)) {
+      codec->quirks |= USE_CODEC_SUPPLIED_HEIGHT_VALUE;
+    }
+  }
+
+out:
+  g_key_file_free (file);
+  file = NULL;
+
+  if (quirks_string) {
+    g_strfreev (quirks_string);
+    quirks_string = NULL;
+  }
 }

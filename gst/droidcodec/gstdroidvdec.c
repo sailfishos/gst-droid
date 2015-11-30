@@ -220,14 +220,22 @@ static gboolean
 gst_droidvdec_convert_buffer (GstDroidVDec * dec,
     GstBuffer * out, DroidMediaData * in, GstVideoInfo * info)
 {
-  gsize size = info->width * info->height * 3 / 2;
-  gboolean use_external_buffer = gst_buffer_get_size (out) != size;
+  gsize height = info->height;
+  gsize size;
+  gboolean use_external_buffer;
   guint8 *data = NULL;
   gboolean ret;
   GstMapInfo map_info;
 
   GST_DEBUG_OBJECT (dec, "convert buffer");
 
+  if (dec->codec_type->quirks & USE_CODEC_SUPPLIED_HEIGHT_VALUE) {
+    height = dec->codec_reported_height;
+    GST_INFO_OBJECT (dec, "using codec supplied height %d", height);
+  }
+
+  size = info->width * height * 3 / 2;
+  use_external_buffer = gst_buffer_get_size (out) != size;
   map_info.data = NULL;
 
   if (!gst_buffer_map (out, &map_info, GST_MAP_WRITE)) {
@@ -269,6 +277,8 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
       p += info->width;
     }
 
+    /* NOP if height == info->height */
+    p += (height - info->height) * info->width;
     /* U and V */
     for (x = 0; x < 2; x++) {
       for (i = 0; i < info->height / 2; i++) {
@@ -276,6 +286,9 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
         dst += strideUV;
         p += info->width / 2;
       }
+
+      /* NOP if height == info->height */
+      p += (height - info->height) / 2 * info->width / 2;
     }
   }
 

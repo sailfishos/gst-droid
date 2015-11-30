@@ -29,6 +29,10 @@
 
 G_BEGIN_DECLS
 
+/* quirks */
+#define USE_CODEC_SUPPLIED_HEIGHT_NAME    "use-codec-supplied-height"
+#define USE_CODEC_SUPPLIED_HEIGHT_VALUE   0x1
+
 typedef struct _GstDroidCodec GstDroidCodec;
 typedef struct _GstDroidCodecInfo GstDroidCodecInfo;
 typedef struct _GstDroidCodecPrivate GstDroidCodecPrivate;
@@ -56,6 +60,8 @@ struct _GstDroidCodec {
   GstDroidCodecInfo *info;
 
   GstDroidCodecPrivate *data;
+
+  gint quirks;
 };
 
 GType gst_droid_codec_get_type (void);
