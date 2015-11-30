@@ -76,6 +76,8 @@ struct _GstDroidVDec
   gboolean running;
   GstVideoFormat format;
 
+  gsize codec_reported_height;
+
   GstVideoCodecState *in_state;
   GstVideoCodecState *out_state;
   DroidMediaConvert *convert;

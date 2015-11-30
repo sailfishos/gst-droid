@@ -600,6 +600,8 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
       "codec reported state: width: %d, height: %d, crop: %d,%d %d,%d",
       md.width, md.height, rect.left, rect.top, rect.right, rect.bottom);
 
+  dec->codec_reported_height = md.height;
+
   if (dec->format == GST_VIDEO_FORMAT_I420) {
     width = rect.right - rect.left;
     height = rect.bottom - rect.top;
@@ -786,6 +788,7 @@ gst_droidvdec_start (GstVideoDecoder * decoder)
   dec->dirty = TRUE;
   dec->running = TRUE;
   dec->format = GST_VIDEO_FORMAT_UNKNOWN;
+  dec->codec_reported_height = -1;
 
   return TRUE;
 }
@@ -1113,6 +1116,7 @@ gst_droidvdec_init (GstDroidVDec * dec)
   dec->downstream_flow_ret = GST_FLOW_OK;
   dec->state = GST_DROID_VDEC_STATE_OK;
   dec->codec_data = NULL;
+  dec->codec_reported_height = -1;
 
   g_mutex_init (&dec->state_lock);
   g_cond_init (&dec->state_cond);
