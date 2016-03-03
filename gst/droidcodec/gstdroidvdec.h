@@ -76,6 +76,7 @@ struct _GstDroidVDec
   GstVideoFormat format;
 
   gsize codec_reported_height;
+  gsize codec_reported_width;
 
   GstVideoCodecState *in_state;
   GstVideoCodecState *out_state;

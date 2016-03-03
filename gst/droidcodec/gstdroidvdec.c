@@ -220,6 +220,7 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
     GstBuffer * out, DroidMediaData * in, GstVideoInfo * info)
 {
   gsize height = info->height;
+  gsize width = info->width;
   gsize size;
   gboolean use_external_buffer;
   guint8 *data = NULL;
@@ -228,12 +229,17 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
 
   GST_DEBUG_OBJECT (dec, "convert buffer");
 
+  if (dec->codec_type->quirks & USE_CODEC_SUPPLIED_WIDTH_VALUE) {
+    width = dec->codec_reported_width;
+    GST_INFO_OBJECT (dec, "using codec supplied width %d", height);
+  }
+
   if (dec->codec_type->quirks & USE_CODEC_SUPPLIED_HEIGHT_VALUE) {
     height = dec->codec_reported_height;
     GST_INFO_OBJECT (dec, "using codec supplied height %d", height);
   }
 
-  size = info->width * height * 3 / 2;
+  size = width * height * 3 / 2;
   use_external_buffer = gst_buffer_get_size (out) != size;
   map_info.data = NULL;
 
@@ -273,21 +279,21 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
     for (i = 0; i < info->height; i++) {
       orc_memcpy (dst, p, info->width);
       dst += stride;
-      p += info->width;
+      p += width;
     }
 
     /* NOP if height == info->height */
-    p += (height - info->height) * info->width;
+    p += (height - info->height) * width;
     /* U and V */
     for (x = 0; x < 2; x++) {
       for (i = 0; i < info->height / 2; i++) {
         orc_memcpy (dst, p, info->width / 2);
         dst += strideUV;
-        p += info->width / 2;
+        p += width / 2;
       }
 
       /* NOP if height == info->height */
-      p += (height - info->height) / 2 * info->width / 2;
+      p += (height - info->height) / 2 * width / 2;
     }
   }
 
@@ -613,6 +619,7 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
       md.width, md.height, rect.left, rect.top, rect.right, rect.bottom);
 
   dec->codec_reported_height = md.height;
+  dec->codec_reported_width = md.width;
 
   if (dec->format == GST_VIDEO_FORMAT_I420) {
     width = rect.right - rect.left;
@@ -801,6 +808,7 @@ gst_droidvdec_start (GstVideoDecoder * decoder)
   dec->running = TRUE;
   dec->format = GST_VIDEO_FORMAT_UNKNOWN;
   dec->codec_reported_height = -1;
+  dec->codec_reported_width = -1;
 
   return TRUE;
 }
@@ -1129,6 +1137,7 @@ gst_droidvdec_init (GstDroidVDec * dec)
   dec->state = GST_DROID_VDEC_STATE_OK;
   dec->codec_data = NULL;
   dec->codec_reported_height = -1;
+  dec->codec_reported_width = -1;
 
   g_mutex_init (&dec->state_lock);
   g_cond_init (&dec->state_cond);

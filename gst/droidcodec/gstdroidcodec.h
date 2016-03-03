@@ -32,6 +32,9 @@ G_BEGIN_DECLS
 #define USE_CODEC_SUPPLIED_HEIGHT_NAME    "use-codec-supplied-height"
 #define USE_CODEC_SUPPLIED_HEIGHT_VALUE   0x1
 
+#define USE_CODEC_SUPPLIED_WIDTH_NAME    "use-codec-supplied-width"
+#define USE_CODEC_SUPPLIED_WIDTH_VALUE   0x2
+
 typedef struct _GstDroidCodec GstDroidCodec;
 typedef struct _GstDroidCodecInfo GstDroidCodecInfo;
 typedef struct _GstDroidCodecPrivate GstDroidCodecPrivate;
