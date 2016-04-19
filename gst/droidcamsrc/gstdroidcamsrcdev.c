@@ -221,11 +221,10 @@ gst_droidcamsrc_dev_compressed_image_callback (void *user, DroidMediaData * mem)
   /* we need to start restart the preview
    * android demands this but GStreamer does not know about it.
    */
-  g_rec_mutex_lock (dev->lock);
-  dev->running = FALSE;
-  g_rec_mutex_unlock (dev->lock);
-
   if (!src->fast_capture_enabled) {
+    g_rec_mutex_lock (dev->lock);
+    dev->running = FALSE;
+    g_rec_mutex_unlock (dev->lock);
     gst_droidcamsrc_dev_start (dev, TRUE);
   }
 
