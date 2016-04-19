@@ -111,6 +111,7 @@ struct _GstDroidCamSrc
   gboolean video_torch;
   gboolean face_detection;
   gboolean image_noise_reduction;
+  gboolean fast_capture_enabled;
 
   GstDroidCamSrcPhotography * photo;
   gfloat max_zoom;

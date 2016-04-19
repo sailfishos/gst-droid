@@ -166,6 +166,7 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   src->video_torch = DEFAULT_VIDEO_TORCH;
   src->face_detection = DEFAULT_FACE_DETECTION;
   src->image_noise_reduction = DEFAULT_IMAGE_NOISE_REDUCTION;
+  src->fast_capture_enabled = DEFAULT_FAST_CAPTURE;
   src->min_ev_compensation = DEFAULT_MIN_EV_COMPENSATION;
   src->max_ev_compensation = DEFAULT_MAX_EV_COMPENSATION;
   src->ev_step = 0.0f;
@@ -256,6 +257,10 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
     case PROP_SENSOR_MOUNT_ANGLE:
     case PROP_SENSOR_ORIENTATION:
       g_value_set_int (value, src->info[src->camera_device].orientation * 90);
+      break;
+
+    case PROP_FAST_CAPTURE:
+      g_value_set_boolean (value, src->fast_capture_enabled);
       break;
 
     case PROP_FAST_CAPTURE_SUPPORTED:
@@ -351,6 +356,11 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
 
     case PROP_IMAGE_NOISE_REDUCTION:
       src->image_noise_reduction = g_value_get_boolean (value);
+      gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
+      break;
+
+    case PROP_FAST_CAPTURE:
+      src->fast_capture_enabled = g_value_get_boolean (value);
       gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
       break;
 
@@ -1981,6 +1991,9 @@ gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
   /* image noise reduction */
   gst_droidcamsrc_apply_quirk (src, "image-noise-reduction",
       src->image_noise_reduction);
+
+  /* fast capture quirk */
+  gst_droidcamsrc_apply_quirk (src, "fast-capture", src->fast_capture_enabled);
 
   if (type == SET_AND_APPLY) {
     gst_droidcamsrc_apply_params (src);
