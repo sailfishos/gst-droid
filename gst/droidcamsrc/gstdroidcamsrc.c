@@ -106,6 +106,8 @@ static guint droidcamsrc_signals[LAST_SIGNAL];
 #define DEFAULT_FACE_DETECTION         FALSE
 #define DEFAULT_IMAGE_NOISE_REDUCTION  TRUE
 #define DEFAULT_SENSOR_ORIENTATION     0
+#define DEFAULT_FAST_CAPTURE           FALSE
+#define DEFAULT_FAST_CAPTURE_SUPPORTED FALSE
 
 static GstDroidCamSrcPad *
 gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
@@ -254,6 +256,11 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
     case PROP_SENSOR_MOUNT_ANGLE:
     case PROP_SENSOR_ORIENTATION:
       g_value_set_int (value, src->info[src->camera_device].orientation * 90);
+      break;
+
+    case PROP_FAST_CAPTURE_SUPPORTED:
+      g_value_set_boolean (value, gst_droidcamsrc_quirks_get_quirk (src->quirks,
+              "fast-capture") != NULL);
       break;
 
     default:
@@ -955,6 +962,17 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
       g_param_spec_pointer ("device-parameters", "Device parameters",
           "The GHash table of the GstDroidCamSrcParams struct currently used",
           G_PARAM_READABLE | G_PARAM_STATIC_STRINGS | G_PARAM_PRIVATE));
+
+  g_object_class_install_property (gobject_class, PROP_FAST_CAPTURE,
+      g_param_spec_boolean ("fast-capture", "Fast Image Capture",
+          "Fast image capture mode enabled",
+          DEFAULT_FAST_CAPTURE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_FAST_CAPTURE_SUPPORTED,
+      g_param_spec_boolean ("fast-capture-supported",
+          "Fast Image Capture Supported", "Fast image capture mode supported",
+          DEFAULT_FAST_CAPTURE_SUPPORTED,
+          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   gst_droidcamsrc_photography_add_overrides (gobject_class);
 
