@@ -225,7 +225,9 @@ gst_droidcamsrc_dev_compressed_image_callback (void *user, DroidMediaData * mem)
   dev->running = FALSE;
   g_rec_mutex_unlock (dev->lock);
 
-  gst_droidcamsrc_dev_start (dev, TRUE);
+  if (!src->fast_capture_enabled) {
+    gst_droidcamsrc_dev_start (dev, TRUE);
+  }
 
   g_mutex_lock (&src->capture_lock);
   --src->captures;
