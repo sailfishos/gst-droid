@@ -278,7 +278,7 @@ gst_droidcamsrc_quirks_apply (GstDroidCamSrcQuirks * quirks,
   quirk = gst_droidcamsrc_quirks_get_quirk (quirks, quirk_id);
 
   if (!quirk) {
-    GST_DEBUG_OBJECT (src, "quirk %s not known", quirk_id);
+    GST_INFO_OBJECT (src, "quirk %s not known", quirk_id);
     return;
   }
 
