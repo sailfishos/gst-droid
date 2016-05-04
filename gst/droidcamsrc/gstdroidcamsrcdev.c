@@ -73,6 +73,7 @@ void gst_droidcamsrc_dev_update_params_locked (GstDroidCamSrcDev * dev);
 static void
 gst_droidcamsrc_dev_prepare_buffer (GstDroidCamSrcDev * dev, GstBuffer * buffer,
     DroidMediaRect rect, int width, int height, GstVideoFormat format);
+static void gst_droidcamsrc_dump_data (void *data, size_t size);
 
 static void
 gst_droidcamsrc_dev_shutter_callback (void *user)
@@ -186,6 +187,8 @@ gst_droidcamsrc_dev_compressed_image_callback (void *user, DroidMediaData * mem)
     GST_ERROR_OBJECT (src, "invalid memory from camera hal");
     return;
   }
+
+  gst_droidcamsrc_dump_data (data, size);
 
   /* TODO: research a way to get rid of the memcpy */
   d = g_malloc (size);
@@ -1130,4 +1133,32 @@ gst_droidcamsrc_dev_prepare_buffer (GstDroidCamSrcDev * dev, GstBuffer * buffer,
 
   GST_LOG_OBJECT (src, "preview info: w=%d, h=%d, crop: x=%d, y=%d, w=%d, h=%d",
       width, height, crop->x, crop->y, crop->width, crop->height);
+}
+
+static void
+gst_droidcamsrc_dump_data (void *data, size_t size)
+{
+  GDateTime *dt = NULL;
+  GTimeZone *tz = NULL;
+  gchar *fmt = NULL, *file_path = NULL;
+  const gchar *path = g_getenv ("GST_DROIDCAMSRC_DUMP");
+  if (!path) {
+    return;
+  }
+
+  tz = g_time_zone_new_local ();
+  dt = g_date_time_new_now (tz);
+
+  fmt = g_date_time_format (dt, "%s");
+
+  file_path = g_strdup_printf ("%s/%s.jpg", path, fmt);
+  g_free (fmt);
+
+  if (!g_file_set_contents (file_path, data, size, NULL)) {
+    GST_ERROR ("Failed to save file %s", file_path);
+  }
+
+  g_free (file_path);
+  g_time_zone_unref (tz);
+  g_date_time_unref (dt);
 }
