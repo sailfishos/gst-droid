@@ -1282,6 +1282,8 @@ gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent, GstEvent * event)
     GST_LOG_OBJECT (src, "discarding %" GST_PTR_FORMAT, event);
   }
 
+  gst_event_unref (event);
+
   return ret;
 }
 
