@@ -133,6 +133,8 @@ struct Node
       ADD_ENTRY (400, "iso-400"),
       ADD_ENTRY (800, "ISO800"),
       ADD_ENTRY (800, "iso-800"),
+      ADD_ENTRY (1600, "ISO1600"),
+      ADD_ENTRY (3200, "ISO3200"),
       {NULL, -1}
     }},
   {"antibanding-values", "flicker-mode", {
