@@ -64,5 +64,5 @@ main (int argc, char *argv[])
     return 1;
   }
 
-  return common_destroy (common);
+  return common_destroy (common, TRUE);
 }

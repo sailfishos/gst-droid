@@ -52,7 +52,7 @@ typedef enum {
 } Mode;
 
 Common *common_init (int *argc, char ***argv, char *bin);
-int common_destroy (Common *common);
+int common_destroy (Common *common, gboolean deinit);
 gboolean common_run (Common *c);
 
 void common_set_device_mode(Common *c, Device dev, Mode m);

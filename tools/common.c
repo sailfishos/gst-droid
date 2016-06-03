@@ -166,7 +166,7 @@ common_init (int *argc, char ***argv, char *bin)
   goto out;
 
 error:
-  common_destroy (common);
+  common_destroy (common, TRUE);
   common = NULL;
 
 out:
@@ -174,7 +174,7 @@ out:
 }
 
 int
-common_destroy (Common * common)
+common_destroy (Common * common, gboolean deinit)
 {
   int ret = common->ret;
 
@@ -200,7 +200,9 @@ common_destroy (Common * common)
 
   g_free (common);
 
-  gst_deinit ();
+  if (deinit) {
+    gst_deinit ();
+  }
 
   return ret;
 }
