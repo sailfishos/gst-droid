@@ -411,6 +411,7 @@ gst_droidadec_set_format (GstAudioDecoder * decoder, GstCaps * caps)
 static GstFlowReturn
 gst_droidadec_finish (GstAudioDecoder * decoder)
 {
+  gboolean locked = FALSE;      /* TODO: This is a hack */
   GstDroidADec *dec = GST_DROIDADEC (decoder);
   gint available;
 
@@ -422,6 +423,7 @@ gst_droidadec_finish (GstAudioDecoder * decoder)
   }
 
   g_mutex_lock (&dec->eos_lock);
+  locked = TRUE;
   dec->eos = TRUE;
 
   if (dec->codec) {
@@ -479,7 +481,9 @@ finish:
 out:
   dec->eos = FALSE;
 
-  g_mutex_unlock (&dec->eos_lock);
+  if (locked) {
+    g_mutex_unlock (&dec->eos_lock);
+  }
 
   return GST_FLOW_OK;
 }
