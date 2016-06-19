@@ -198,16 +198,24 @@ gst_droid_codec_get_all_caps (GstDroidCodecType type)
   g_free (path);
 
   for (x = 0; x < len; x++) {
+    gboolean codec_listed;
+    gint codec_enabled;
+    GstStructure *s;
+
     if (codecs[x].type != type) {
       continue;
     }
 
-    if (g_key_file_has_key (file, group, codecs[x].droid, NULL)) {
-      GST_INFO ("%s is disabled", codecs[x].droid);
-      continue;
+    codec_listed = g_key_file_has_key (file, group, codecs[x].droid, NULL);
+    codec_enabled = g_key_file_get_integer (file, group, codecs[x].droid, NULL);
+    if (codec_listed) {
+      if (!codec_enabled) {
+        GST_INFO ("%s is disabled", codecs[x].droid);
+        continue;
+      }
     }
 
-    GstStructure *s = gst_structure_new_from_string (codecs[x].caps);
+    s = gst_structure_new_from_string (codecs[x].caps);
     caps = gst_caps_merge_structure (caps, s);
   }
 
