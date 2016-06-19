@@ -81,6 +81,7 @@ struct _GstDroidCodecInfo
   const gchar *mime;
   const gchar *droid;
   const gchar *caps;
+  gboolean enabled;
 
     gboolean (*validate_structure) (GstDroidCodec * codec,
       const GstStructure * s);
@@ -104,41 +105,42 @@ static GstDroidCodecInfo codecs[] = {
   /* audio decoders */
   {GST_DROID_CODEC_DECODER_AUDIO, "audio/mpeg", "audio/mp4a-latm",
         "audio/mpeg, mpegversion=(int){2, 4}, stream-format=(string){raw, adts}",
+        TRUE,
         is_mpega, NULL, NULL, NULL, create_aacdec_codec_data_from_codec_data,
       create_aacdec_codec_data_from_frame_data, process_aacdec_data},
 
   {GST_DROID_CODEC_DECODER_AUDIO, "audio/mpeg", "audio/mpeg",
-        "audio/mpeg, mpegversion=(int)1, layer=[1, 3]",
+        "audio/mpeg, mpegversion=(int)1, layer=[1, 3]", TRUE,
       is_mp3, NULL, NULL, NULL, NULL, NULL, NULL},
 
   /* video decoders */
   {GST_DROID_CODEC_DECODER_VIDEO, "video/mpeg", "video/mp4v-es",
-        "video/mpeg, mpegversion=4",
+        "video/mpeg, mpegversion=4", TRUE,
         is_mpeg4v, NULL, NULL, NULL,
       create_mpeg4vdec_codec_data_from_codec_data, NULL, NULL},
 
   {GST_DROID_CODEC_DECODER_VIDEO, "video/x-h264", "video/avc",
-        "video/x-h264, stream-format=avc,alignment=au",
+        "video/x-h264, stream-format=avc,alignment=au", TRUE,
         is_h264_dec, NULL, NULL, NULL,
       create_h264dec_codec_data_from_codec_data, NULL, process_h264dec_data},
 
   {GST_DROID_CODEC_DECODER_VIDEO, "video/x-h263", "video/3gpp",
-        "video/x-h263", NULL,
+        "video/x-h263", TRUE, NULL,
       NULL, NULL, NULL, NULL, NULL, NULL},
 
   /* audio encoders */
   {GST_DROID_CODEC_ENCODER_AUDIO, "audio/mpeg", "audio/mp4a-latm",
         "audio/mpeg, mpegversion=(int)4, stream-format=(string){raw}"
-        CAPS_FRAGMENT_AUDIO_ENCODER,
+        CAPS_FRAGMENT_AUDIO_ENCODER, TRUE,
       is_mpeg4v, NULL, create_mpeg4venc_codec_data, NULL, NULL, NULL, NULL},
 
   /* video encoders */
   {GST_DROID_CODEC_ENCODER_VIDEO, "video/mpeg", "video/mp4v-es",
-        "video/mpeg, mpegversion=4, systemstream=false",
+        "video/mpeg, mpegversion=4, systemstream=false", TRUE,
       is_mpeg4v, NULL, create_mpeg4venc_codec_data, NULL, NULL, NULL, NULL},
 
   {GST_DROID_CODEC_ENCODER_VIDEO, "video/x-h264", "video/avc",
-        "video/x-h264, stream-format=avc,alignment=au",
+        "video/x-h264, stream-format=avc,alignment=au", TRUE,
         is_h264_enc, h264enc_complement, create_h264enc_codec_data,
       process_h264enc_data, NULL, NULL, NULL},
 };
@@ -206,13 +208,14 @@ gst_droid_codec_get_all_caps (GstDroidCodecType type)
       continue;
     }
 
+    /* If the codec is listed in the configuration file then we obey it.
+     * Otherwise we fallback to our hard-coded default */
     codec_listed = g_key_file_has_key (file, group, codecs[x].droid, NULL);
     codec_enabled = g_key_file_get_integer (file, group, codecs[x].droid, NULL);
-    if (codec_listed) {
-      if (!codec_enabled) {
-        GST_INFO ("%s is disabled", codecs[x].droid);
-        continue;
-      }
+    if ((codec_listed && !codec_enabled) || (!codec_listed
+            && !codecs[x].enabled)) {
+      GST_INFO ("%s is disabled", codecs[x].droid);
+      continue;
     }
 
     s = gst_structure_new_from_string (codecs[x].caps);
