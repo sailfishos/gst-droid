@@ -32,6 +32,7 @@ struct _GstDroidCamSrcParams
   GHashTable *params;
   gboolean is_dirty;
   GArray *min_fps_range, *max_fps_range;
+  gboolean has_separate_video_size_values;
   GMutex lock;
 };
 
