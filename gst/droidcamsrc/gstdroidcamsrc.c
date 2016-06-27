@@ -405,7 +405,11 @@ gst_droidcamsrc_fill_info (GstDroidCamSrc * src, GstDroidCamSrcCamInfo * target,
   int x;
 
   for (x = 0; x < MAX_CAMERAS; x++) {
-    droid_media_camera_get_info (&info, x);
+    if (droid_media_camera_get_info (&info, x) == false) {
+      GST_WARNING_OBJECT (src, "Cannot get camera info for %d (facing %d)", x,
+          facing);
+      continue;
+    }
 
     if (info.facing == facing) {
       target->num = x;
