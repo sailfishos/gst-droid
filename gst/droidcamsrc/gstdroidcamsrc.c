@@ -437,6 +437,8 @@ gst_droidcamsrc_get_hw (GstDroidCamSrc * src)
   GST_DEBUG_OBJECT (src, "get hw");
 
   num = droid_media_camera_get_number_of_cameras ();
+  GST_INFO_OBJECT (src, "Found %d cameras", num);
+
   if (num < 0) {
     GST_ERROR_OBJECT (src, "no camera hardware found");
     return FALSE;
