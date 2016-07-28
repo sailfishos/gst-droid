@@ -18,6 +18,7 @@ BuildRequires:  pkgconfig(gstreamer-plugins-bad-1.0)
 BuildRequires:  pkgconfig(gstreamer-tag-1.0)
 BuildRequires:  pkgconfig(nemo-gstreamer-interfaces-1.0)
 BuildRequires:  pkgconfig(libexif)
+BuildRequires:  automake
 BuildRequires:  libtool
 BuildRequires:  gettext
 BuildRequires:  droidmedia-devel
