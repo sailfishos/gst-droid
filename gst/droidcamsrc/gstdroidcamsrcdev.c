@@ -974,9 +974,16 @@ gst_droidcamsrc_dev_release_recording_frame (void *data,
 void
 gst_droidcamsrc_dev_update_params_locked (GstDroidCamSrcDev * dev)
 {
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
   gchar *params;
 
   params = droid_media_camera_get_parameters (dev->cam);
+
+  if (!params) {
+    GST_ELEMENT_ERROR (src, LIBRARY, INIT, (NULL),
+        ("Failed to read camera parameters"));
+    return;
+  }
 
   if (dev->params) {
     /* TODO: is this really needed? We might lose some unset params if we do that. */
