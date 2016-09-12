@@ -413,9 +413,12 @@ gst_droidvdec_frame_available (void *user)
   /* We get the timestamp in ns already */
   frame->pts = ts;
 
-  /* we have a ref so drop it */
-  gst_video_codec_frame_unref (frame);
-
+  /* we have a ref acquired by _get_oldest_frame()
+   * but we don't drop it because _finish_frame() assumes 2 refs.
+   * A ref that we obtained via _handle_frame() which we dropped already
+   * so we need to compensate it and the 2nd ref which is already owned by
+   * the base class GstVideoDecoder
+   */
   dec->downstream_flow_ret = gst_droidvdec_finish_frame (decoder, frame);
 
   GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
@@ -488,9 +491,12 @@ gst_droidvdec_data_available (void *data, DroidMediaCodecData * encoded)
   frame->pts = encoded->ts;
   frame->output_buffer = buff;
 
-  /* we have a ref so drop it */
-  gst_video_codec_frame_unref (frame);
-
+  /* we have a ref acquired by _get_oldest_frame()
+   * but we don't drop it because _finish_frame() assumes 2 refs.
+   * A ref that we obtained via _handle_frame() which we dropped already
+   * so we need to compensate it and the 2nd ref which is already owned by
+   * the base class GstVideoDecoder
+   */
   flow_ret = gst_droidvdec_finish_frame (decoder, frame);
 
 out:
@@ -1029,15 +1035,14 @@ gst_droidvdec_handle_frame (GstVideoDecoder * decoder,
   droid_media_codec_queue (dec->codec, &data, &cb);
   GST_VIDEO_DECODER_STREAM_LOCK (decoder);
   GST_LOG_OBJECT (dec, "acquired stream lock");
-  /* from now on decoder owns a frame reference so we cannot use the out label otherwise
-   * we will drop the needed reference
-   */
+
+  /* from now on decoder owns a frame reference */
 
   if (dec->downstream_flow_ret != GST_FLOW_OK) {
     GST_DEBUG_OBJECT (dec, "not handling frame in error state: %s",
         gst_flow_get_name (dec->downstream_flow_ret));
     ret = dec->downstream_flow_ret;
-    goto out;
+    goto unref;
   }
 
   g_mutex_lock (&dec->state_lock);
@@ -1045,11 +1050,18 @@ gst_droidvdec_handle_frame (GstVideoDecoder * decoder,
     GST_WARNING_OBJECT (dec, "got frame in eos state");
     g_mutex_unlock (&dec->state_lock);
     ret = GST_FLOW_EOS;
-    goto out;
+    goto unref;
   }
+
   g_mutex_unlock (&dec->state_lock);
 
   ret = GST_FLOW_OK;
+
+  goto unref;
+
+unref:
+  gst_video_codec_frame_unref (frame);
+  goto out;
 
 out:
   return ret;

@@ -68,7 +68,6 @@ GST_DEFINE_MINI_OBJECT_TYPE (GstDroidCodec, gst_droid_codec);
 typedef struct
 {
   gpointer data;
-  GstVideoCodecFrame *frame;
 } GstDroidCodecFrameReleaseData;
 
 struct _GstDroidCodecPrivate
@@ -316,7 +315,6 @@ gst_droid_codec_prepare_decoder_frame (GstDroidCodec * codec,
   release_data = g_slice_new (GstDroidCodecFrameReleaseData);
 
   release_data->data = data->data;
-  release_data->frame = gst_video_codec_frame_ref (frame);
 
   cb->unref = gst_droid_codec_release_input_frame;
   cb->data = release_data;
@@ -1073,7 +1071,6 @@ gst_droid_codec_release_input_frame (void *data)
 {
   GstDroidCodecFrameReleaseData *info = (GstDroidCodecFrameReleaseData *) data;
 
-  gst_video_codec_frame_unref (info->frame);
   g_free (info->data);
 
   g_slice_free (GstDroidCodecFrameReleaseData, info);
