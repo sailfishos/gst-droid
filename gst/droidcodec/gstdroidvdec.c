@@ -1059,12 +1059,12 @@ gst_droidvdec_handle_frame (GstVideoDecoder * decoder,
 
   goto unref;
 
+out:
+  return ret;
+
 unref:
   gst_video_codec_frame_unref (frame);
   goto out;
-
-out:
-  return ret;
 
 error:
   /* don't leak the frame */
