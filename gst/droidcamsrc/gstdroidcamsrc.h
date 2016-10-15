@@ -2,6 +2,7 @@
  * gst-droid
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2016 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -112,6 +113,7 @@ struct _GstDroidCamSrc
   gboolean face_detection;
   gboolean image_noise_reduction;
   gboolean fast_capture_enabled;
+  GstDroidCamSrcImageMode image_mode;
 
   GstDroidCamSrcPhotography * photo;
   gfloat max_zoom;

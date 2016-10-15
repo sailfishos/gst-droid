@@ -2,7 +2,7 @@
  * gst-droid
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
- * Copyright (C) 2015 Jolla LTD.
+ * Copyright (C) 2015-2016 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -108,6 +108,7 @@ static guint droidcamsrc_signals[LAST_SIGNAL];
 #define DEFAULT_SENSOR_ORIENTATION     0
 #define DEFAULT_FAST_CAPTURE           FALSE
 #define DEFAULT_FAST_CAPTURE_SUPPORTED FALSE
+#define DEFAULT_IMAGE_MODE             GST_DROIDCAMSRC_IMAGE_MODE_NORMAL
 
 static GstDroidCamSrcPad *
 gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
@@ -166,6 +167,7 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   src->video_torch = DEFAULT_VIDEO_TORCH;
   src->face_detection = DEFAULT_FACE_DETECTION;
   src->image_noise_reduction = DEFAULT_IMAGE_NOISE_REDUCTION;
+  src->image_mode = GST_DROIDCAMSRC_IMAGE_MODE_NORMAL;
   src->fast_capture_enabled = DEFAULT_FAST_CAPTURE;
   src->min_ev_compensation = DEFAULT_MIN_EV_COMPENSATION;
   src->max_ev_compensation = DEFAULT_MAX_EV_COMPENSATION;
@@ -203,6 +205,7 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
     GParamSpec * pspec)
 {
   GstDroidCamSrc *src = GST_DROIDCAMSRC (object);
+  gint supported_image_modes = DEFAULT_IMAGE_MODE;
 
   if (gst_droidcamsrc_photography_get_property (src, prop_id, value, pspec)) {
     return;
@@ -257,6 +260,20 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
     case PROP_SENSOR_MOUNT_ANGLE:
     case PROP_SENSOR_ORIENTATION:
       g_value_set_int (value, src->info[src->camera_device].orientation * 90);
+      break;
+
+    case PROP_IMAGE_MODE:
+      g_value_set_enum (value, src->image_mode);
+      break;
+
+    case PROP_SUPPORTED_IMAGE_MODES:
+      if (gst_droidcamsrc_quirks_get_quirk (src->quirks, "zsl"))
+        supported_image_modes |= GST_DROIDCAMSRC_IMAGE_MODE_ZSL;
+
+      if (gst_droidcamsrc_quirks_get_quirk (src->quirks, "hdr"))
+        supported_image_modes |= GST_DROIDCAMSRC_IMAGE_MODE_HDR;
+
+      g_value_set_flags (value, supported_image_modes);
       break;
 
     case PROP_FAST_CAPTURE:
@@ -356,6 +373,11 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
 
     case PROP_IMAGE_NOISE_REDUCTION:
       src->image_noise_reduction = g_value_get_boolean (value);
+      gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
+      break;
+
+    case PROP_IMAGE_MODE:
+      src->image_mode = g_value_get_enum (value);
       gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
       break;
 
@@ -978,6 +1000,18 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
       g_param_spec_pointer ("device-parameters", "Device parameters",
           "The GHash table of the GstDroidCamSrcParams struct currently used",
           G_PARAM_READABLE | G_PARAM_STATIC_STRINGS | G_PARAM_PRIVATE));
+
+  g_object_class_install_property (gobject_class, PROP_IMAGE_MODE,
+      g_param_spec_enum ("image-mode", "Image mode",
+          "Image mode (normal, zsl, hdr)",
+          GST_TYPE_DROIDCAMSRC_IMAGE_MODE,
+          DEFAULT_IMAGE_MODE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_SUPPORTED_IMAGE_MODES,
+      g_param_spec_flags ("supported-image-modes", "Supported image modes",
+          "Image modes supported by HAL",
+          GST_TYPE_DROIDCAMSRC_SUPPORTED_IMAGE_MODES,
+          DEFAULT_IMAGE_MODE, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_FAST_CAPTURE,
       g_param_spec_boolean ("fast-capture", "Fast Image Capture",
