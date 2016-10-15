@@ -2,6 +2,7 @@
  * gst-droid
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2016 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -34,6 +35,8 @@ typedef enum
   PROP_DEVICE_PARAMETERS,
   PROP_CAMERA_DEVICE,
   PROP_MODE,
+  PROP_IMAGE_MODE,
+  PROP_SUPPORTED_IMAGE_MODES,
   PROP_READY_FOR_CAPTURE,
   PROP_MAX_ZOOM,
   PROP_VIDEO_TORCH,
