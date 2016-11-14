@@ -85,6 +85,7 @@ static GstCaps *gst_droidcamsrc_pick_largest_resolution (GstDroidCamSrc * src,
     GstCaps * caps);
 static gchar *gst_droidcamsrc_find_picture_resolution (GstDroidCamSrc * src,
     const gchar * resolution);
+static gboolean gst_droidcamsrc_is_zsl_and_hdr_supported (GstDroidCamSrc * src);
 
 enum
 {
@@ -269,6 +270,9 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
 
       if (gst_droidcamsrc_quirks_get_quirk (src->quirks, "hdr"))
         supported_image_modes |= GST_DROIDCAMSRC_IMAGE_MODE_HDR;
+
+      if (gst_droidcamsrc_is_zsl_and_hdr_supported (src))
+        supported_image_modes |= GST_DROIDCAMSRC_IMAGE_MODE_ZSL_AND_HDR;
 
       g_value_set_flags (value, supported_image_modes);
       break;
@@ -566,6 +570,10 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 
       /* now that we have camera parameters, we can update min and max ev-compensation */
       gst_droidcamsrc_update_ev_compensation_bounds (src);
+
+      /* And we can also detect the supported image modes. In reality the only thing
+         we are unable to detect until this moment is _ZSL_AND_HDR */
+      g_object_notify (G_OBJECT (src), "supported-image-modes");
 
       /* Now add the needed orientation tag */
       gst_droidcamsrc_add_vfsrc_orientation_tag (src);
@@ -2231,4 +2239,40 @@ gst_droidcamsrc_is_hdr_enabled (GstDroidCamSrc * src)
 {
   return src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_HDR
       || src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_ZSL_AND_HDR;
+}
+
+
+static gboolean
+gst_droidcamsrc_is_zsl_and_hdr_supported (GstDroidCamSrc * src)
+{
+  /*
+   * There is no standard way to do our detection.
+   * We will just follow some heuristics here
+   */
+
+  gboolean ret = FALSE;
+  gchar *str = NULL;
+
+  GST_DEBUG_OBJECT (src, "is zsl and hdr supported");
+
+  g_rec_mutex_lock (&src->dev_lock);
+  if (!src->dev || !src->dev->params)
+    goto out;
+
+  str =
+      gst_droidcamsrc_params_get_string (src->dev->params, "zsl-hdr-supported");
+  if (!str)
+    goto out;
+
+  if (g_strcmp0 (src, "true") == 0)
+    goto out;
+
+out:
+  g_rec_mutex_unlock (&src->dev_lock);
+
+  if (str)
+    g_free (str);
+
+  GST_INFO_OBJECT (src, "zsl and hdr supported: %d", ret);
+  return ret;
 }
