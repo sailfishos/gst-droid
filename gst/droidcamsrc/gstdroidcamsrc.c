@@ -106,8 +106,6 @@ static guint droidcamsrc_signals[LAST_SIGNAL];
 #define DEFAULT_FACE_DETECTION         FALSE
 #define DEFAULT_IMAGE_NOISE_REDUCTION  TRUE
 #define DEFAULT_SENSOR_ORIENTATION     0
-#define DEFAULT_FAST_CAPTURE           FALSE
-#define DEFAULT_FAST_CAPTURE_SUPPORTED FALSE
 #define DEFAULT_IMAGE_MODE             GST_DROIDCAMSRC_IMAGE_MODE_NORMAL
 
 static GstDroidCamSrcPad *
@@ -168,7 +166,6 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   src->face_detection = DEFAULT_FACE_DETECTION;
   src->image_noise_reduction = DEFAULT_IMAGE_NOISE_REDUCTION;
   src->image_mode = GST_DROIDCAMSRC_IMAGE_MODE_NORMAL;
-  src->fast_capture_enabled = DEFAULT_FAST_CAPTURE;
   src->min_ev_compensation = DEFAULT_MIN_EV_COMPENSATION;
   src->max_ev_compensation = DEFAULT_MAX_EV_COMPENSATION;
   src->ev_step = 0.0f;
@@ -276,15 +273,6 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
       g_value_set_flags (value, supported_image_modes);
       break;
 
-    case PROP_FAST_CAPTURE:
-      g_value_set_boolean (value, src->fast_capture_enabled);
-      break;
-
-    case PROP_FAST_CAPTURE_SUPPORTED:
-      g_value_set_boolean (value, gst_droidcamsrc_quirks_get_quirk (src->quirks,
-              "fast-capture") != NULL);
-      break;
-
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -378,11 +366,6 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
 
     case PROP_IMAGE_MODE:
       src->image_mode = g_value_get_enum (value);
-      gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
-      break;
-
-    case PROP_FAST_CAPTURE:
-      src->fast_capture_enabled = g_value_get_boolean (value);
       gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
       break;
 
@@ -1012,17 +995,6 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
           "Image modes supported by HAL",
           GST_TYPE_DROIDCAMSRC_SUPPORTED_IMAGE_MODES,
           DEFAULT_IMAGE_MODE, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_FAST_CAPTURE,
-      g_param_spec_boolean ("fast-capture", "Fast Image Capture",
-          "Fast image capture mode enabled",
-          DEFAULT_FAST_CAPTURE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
-  g_object_class_install_property (gobject_class, PROP_FAST_CAPTURE_SUPPORTED,
-      g_param_spec_boolean ("fast-capture-supported",
-          "Fast Image Capture Supported", "Fast image capture mode supported",
-          DEFAULT_FAST_CAPTURE_SUPPORTED,
-          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   gst_droidcamsrc_photography_add_overrides (gobject_class);
 
@@ -2034,8 +2006,12 @@ gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
   gst_droidcamsrc_apply_quirk (src, "image-noise-reduction",
       src->image_noise_reduction);
 
-  /* fast capture quirk */
-  gst_droidcamsrc_apply_quirk (src, "fast-capture", src->fast_capture_enabled);
+  /* ZSL quirk */
+  gst_droidcamsrc_apply_quirk (src, "zsl",
+      gst_droidcamsrc_is_zsl_enabled (src));
+
+  /* HDR quirk */
+  /* TODO: */
 
   if (type == SET_AND_APPLY) {
     gst_droidcamsrc_apply_params (src);
@@ -2240,4 +2216,11 @@ out:
   }
 
   return ret;
+}
+
+gboolean
+gst_droidcamsrc_is_zsl_enabled (GstDroidCamSrc * src)
+{
+  return src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_ZSL
+      || src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_ZSL_AND_HDR;
 }
