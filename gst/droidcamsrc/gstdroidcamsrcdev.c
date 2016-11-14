@@ -2,7 +2,7 @@
  * gst-droid
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
- * Copyright (C) 2015 Jolla LTD.
+ * Copyright (C) 2015-2016 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -221,7 +221,7 @@ gst_droidcamsrc_dev_compressed_image_callback (void *user, DroidMediaData * mem)
   /* we need to start restart the preview
    * android demands this but GStreamer does not know about it.
    */
-  if (!src->fast_capture_enabled) {
+  if (!gst_droidcamsrc_is_zsl_enabled (src)) {
     g_rec_mutex_lock (dev->lock);
     dev->running = FALSE;
     g_rec_mutex_unlock (dev->lock);
