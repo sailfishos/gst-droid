@@ -2011,7 +2011,8 @@ gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
       gst_droidcamsrc_is_zsl_enabled (src));
 
   /* HDR quirk */
-  /* TODO: */
+  gst_droidcamsrc_apply_quirk (src, "hdr",
+      gst_droidcamsrc_is_hdr_enabled (src));
 
   if (type == SET_AND_APPLY) {
     gst_droidcamsrc_apply_params (src);
@@ -2222,5 +2223,12 @@ gboolean
 gst_droidcamsrc_is_zsl_enabled (GstDroidCamSrc * src)
 {
   return src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_ZSL
+      || src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_ZSL_AND_HDR;
+}
+
+gboolean
+gst_droidcamsrc_is_hdr_enabled (GstDroidCamSrc * src)
+{
+  return src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_HDR
       || src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_ZSL_AND_HDR;
 }
