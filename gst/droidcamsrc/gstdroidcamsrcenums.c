@@ -47,38 +47,17 @@ GType
 gst_droidcamsrc_image_mode_get_type (void)
 {
   static GType gst_droidcamsrc_image_mode_type = 0;
-  static GEnumValue gst_droidcamsrc_image_modes[] = {
+  static GFlagsValue gst_droidcamsrc_image_modes[] = {
     {GST_DROIDCAMSRC_IMAGE_MODE_NORMAL, "Normal image mode", "normal"},
     {GST_DROIDCAMSRC_IMAGE_MODE_ZSL, "ZSL image mode", "zsl"},
     {GST_DROIDCAMSRC_IMAGE_MODE_HDR, "HDR image mode", "hdr"},
-    {GST_DROIDCAMSRC_IMAGE_MODE_ZSL_AND_HDR, "HDR in ZSL mode", "zsl-hdr"},
     {0, NULL, NULL},
   };
 
   if (G_UNLIKELY (!gst_droidcamsrc_image_mode_type)) {
     gst_droidcamsrc_image_mode_type =
-        g_enum_register_static ("GstDroidCamSrcImageMode",
+        g_flags_register_static ("GstDroidCamSrcImageMode",
         gst_droidcamsrc_image_modes);
   }
   return gst_droidcamsrc_image_mode_type;
-}
-
-GType
-gst_droidcamsrc_supported_image_modes_get_type (void)
-{
-  static GType gst_droidcamsrc_supported_image_modes_type = 0;
-  static GFlagsValue gst_droidcamsrc_supported_image_modes[] = {
-    {GST_DROIDCAMSRC_IMAGE_MODE_NORMAL, "Normal image mode", "normal"},
-    {GST_DROIDCAMSRC_IMAGE_MODE_ZSL, "ZSL image mode", "zsl"},
-    {GST_DROIDCAMSRC_IMAGE_MODE_HDR, "HDR image mode", "hdr"},
-    {GST_DROIDCAMSRC_IMAGE_MODE_ZSL_AND_HDR, "HDR in ZSL mode", "zsl-hdr"},
-    {0, NULL, NULL},
-  };
-
-  if (G_UNLIKELY (!gst_droidcamsrc_supported_image_modes_type)) {
-    gst_droidcamsrc_supported_image_modes_type =
-        g_flags_register_static ("GstDroidCamSrcSupportedImageModes",
-        gst_droidcamsrc_supported_image_modes);
-  }
-  return gst_droidcamsrc_supported_image_modes_type;
 }

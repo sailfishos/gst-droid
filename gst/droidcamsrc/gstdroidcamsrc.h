@@ -144,8 +144,6 @@ void gst_droidcamsrc_timestamp (GstDroidCamSrc * src, GstBuffer * buffer);
 gboolean gst_droidcamsrc_apply_params (GstDroidCamSrc * src);
 void gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src, GstDroidCamSrcApplyType type);
 void gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src);
-gboolean gst_droidcamsrc_is_zsl_enabled (GstDroidCamSrc * src);
-gboolean gst_droidcamsrc_is_hdr_enabled (GstDroidCamSrc * src);
 
 G_END_DECLS
 
