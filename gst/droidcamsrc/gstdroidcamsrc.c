@@ -203,7 +203,8 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
     GParamSpec * pspec)
 {
   GstDroidCamSrc *src = GST_DROIDCAMSRC (object);
-  gint supported_image_modes = DEFAULT_IMAGE_MODE;
+  GArray *supported_image_modes = NULL;
+  int mode = DEFAULT_IMAGE_MODE;
 
   if (gst_droidcamsrc_photography_get_property (src, prop_id, value, pspec)) {
     return;
@@ -261,20 +262,30 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
       break;
 
     case PROP_IMAGE_MODE:
-      g_value_set_enum (value, src->image_mode);
+      g_value_set_flags (value, src->image_mode);
       break;
 
     case PROP_SUPPORTED_IMAGE_MODES:
-      if (gst_droidcamsrc_quirks_get_quirk (src->quirks, "zsl"))
-        supported_image_modes |= GST_DROIDCAMSRC_IMAGE_MODE_ZSL;
+      supported_image_modes = g_array_new (FALSE, FALSE, sizeof (gint));
+      g_array_append_val (supported_image_modes, mode);
 
-      if (gst_droidcamsrc_quirks_get_quirk (src->quirks, "hdr"))
-        supported_image_modes |= GST_DROIDCAMSRC_IMAGE_MODE_HDR;
+      if (gst_droidcamsrc_quirks_get_quirk (src->quirks, "zsl")) {
+        mode = GST_DROIDCAMSRC_IMAGE_MODE_ZSL;
+        g_array_append_val (supported_image_modes, mode);
+      }
 
-      if (gst_droidcamsrc_is_zsl_and_hdr_supported (src))
-        supported_image_modes |= GST_DROIDCAMSRC_IMAGE_MODE_ZSL_AND_HDR;
+      if (gst_droidcamsrc_quirks_get_quirk (src->quirks, "hdr")) {
+        mode = GST_DROIDCAMSRC_IMAGE_MODE_HDR;
+        g_array_append_val (supported_image_modes, mode);
+      }
 
-      g_value_set_flags (value, supported_image_modes);
+      if (gst_droidcamsrc_is_zsl_and_hdr_supported (src)) {
+        mode = GST_DROIDCAMSRC_IMAGE_MODE_ZSL;
+        mode |= GST_DROIDCAMSRC_IMAGE_MODE_HDR;
+        g_array_append_val (supported_image_modes, mode);
+      }
+
+      g_value_set_pointer (value, supported_image_modes);
       break;
 
     default:
@@ -369,7 +380,7 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
       break;
 
     case PROP_IMAGE_MODE:
-      src->image_mode = g_value_get_enum (value);
+      src->image_mode = g_value_get_flags (value);
       gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
       break;
 
@@ -993,16 +1004,15 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
           G_PARAM_READABLE | G_PARAM_STATIC_STRINGS | G_PARAM_PRIVATE));
 
   g_object_class_install_property (gobject_class, PROP_IMAGE_MODE,
-      g_param_spec_enum ("image-mode", "Image mode",
+      g_param_spec_flags ("image-mode", "Image mode",
           "Image mode (normal, zsl, hdr)",
           GST_TYPE_DROIDCAMSRC_IMAGE_MODE,
           DEFAULT_IMAGE_MODE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SUPPORTED_IMAGE_MODES,
-      g_param_spec_flags ("supported-image-modes", "Supported image modes",
+      g_param_spec_pointer ("supported-image-modes", "Supported image modes",
           "Image modes supported by HAL",
-          GST_TYPE_DROIDCAMSRC_SUPPORTED_IMAGE_MODES,
-          DEFAULT_IMAGE_MODE, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   gst_droidcamsrc_photography_add_overrides (gobject_class);
 
@@ -2016,11 +2026,11 @@ gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
 
   /* ZSL quirk */
   gst_droidcamsrc_apply_quirk (src, "zsl",
-      gst_droidcamsrc_is_zsl_enabled (src));
+      (src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_ZSL));
 
   /* HDR quirk */
   gst_droidcamsrc_apply_quirk (src, "hdr",
-      gst_droidcamsrc_is_hdr_enabled (src));
+      (src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_HDR));
 
   if (type == SET_AND_APPLY) {
     gst_droidcamsrc_apply_params (src);
@@ -2227,21 +2237,6 @@ out:
   return ret;
 }
 
-gboolean
-gst_droidcamsrc_is_zsl_enabled (GstDroidCamSrc * src)
-{
-  return src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_ZSL
-      || src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_ZSL_AND_HDR;
-}
-
-gboolean
-gst_droidcamsrc_is_hdr_enabled (GstDroidCamSrc * src)
-{
-  return src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_HDR
-      || src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_ZSL_AND_HDR;
-}
-
-
 static gboolean
 gst_droidcamsrc_is_zsl_and_hdr_supported (GstDroidCamSrc * src)
 {
@@ -2251,7 +2246,7 @@ gst_droidcamsrc_is_zsl_and_hdr_supported (GstDroidCamSrc * src)
    */
 
   gboolean ret = FALSE;
-  gchar *str = NULL;
+  const gchar *str = NULL;
 
   GST_DEBUG_OBJECT (src, "is zsl and hdr supported");
 
@@ -2264,14 +2259,14 @@ gst_droidcamsrc_is_zsl_and_hdr_supported (GstDroidCamSrc * src)
   if (!str)
     goto out;
 
-  if (g_strcmp0 (src, "true") == 0)
+  if (g_strcmp0 (str, "true") == 0)
     goto out;
 
 out:
   g_rec_mutex_unlock (&src->dev_lock);
 
   if (str)
-    g_free (str);
+    g_free ((gpointer) str);
 
   GST_INFO_OBJECT (src, "zsl and hdr supported: %d", ret);
   return ret;

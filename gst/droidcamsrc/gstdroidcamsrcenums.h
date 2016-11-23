@@ -28,7 +28,6 @@ G_BEGIN_DECLS
 
 #define GST_TYPE_DROIDCAMSRC_CAMERA_DEVICE (gst_droidcamsrc_camera_device_get_type())
 #define GST_TYPE_DROIDCAMSRC_IMAGE_MODE (gst_droidcamsrc_image_mode_get_type())
-#define GST_TYPE_DROIDCAMSRC_SUPPORTED_IMAGE_MODES (gst_droidcamsrc_supported_image_modes_get_type())
 
 typedef enum {
   GST_DROIDCAMSRC_CAMERA_DEVICE_PRIMARY = 0,
@@ -38,10 +37,9 @@ typedef enum {
 GType gst_droidcamsrc_camera_device_get_type (void);
 
 typedef enum {
-  GST_DROIDCAMSRC_IMAGE_MODE_NORMAL = 0x1,
-  GST_DROIDCAMSRC_IMAGE_MODE_ZSL = 0x2,
-  GST_DROIDCAMSRC_IMAGE_MODE_HDR = 0x4,
-  GST_DROIDCAMSRC_IMAGE_MODE_ZSL_AND_HDR = 0x8,
+  GST_DROIDCAMSRC_IMAGE_MODE_NORMAL = 0x0,
+  GST_DROIDCAMSRC_IMAGE_MODE_ZSL = 0x1,
+  GST_DROIDCAMSRC_IMAGE_MODE_HDR = 0x2,
 } GstDroidCamSrcImageMode;
 
 GType gst_droidcamsrc_image_mode_get_type (void);
