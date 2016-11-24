@@ -218,8 +218,7 @@ gst_droidcamsrc_dev_compressed_image_callback (void *user, DroidMediaData * mem)
   g_cond_signal (&dev->imgsrc->cond);
   g_mutex_unlock (&dev->imgsrc->lock);
 
-  /* we need to start restart the preview
-   * Note that we do not need to do anything in ZSL mode.
+  /* we need to restart the preview but only if we are not in ZSL mode.
    * android demands this but GStreamer does not know about it.
    */
   if (!(src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_ZSL)) {
