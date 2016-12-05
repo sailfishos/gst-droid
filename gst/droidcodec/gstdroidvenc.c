@@ -2,7 +2,7 @@
  * gst-droid
  *
  * Copyright (C) 2014-2015 Mohammed Sameer <msameer@foolab.org>
- * Copyright (C) 2015 Jolla LTD.
+ * Copyright (C) 2015-2016 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -26,6 +26,7 @@
 #include "gstdroidvenc.h"
 #include "gst/droid/gstwrappedmemory.h"
 #include "gst/droid/gstdroidquery.h"
+#include "gst/droid/gstdroidfpsdumper.h"
 #include "plugin.h"
 #include <string.h>
 
@@ -191,6 +192,8 @@ gst_droidvenc_create_codec (GstDroidVEnc * enc)
     enc->codec = NULL;
     return FALSE;
   }
+
+  gst_droid_fps_dumper_reset (enc->dumper);
 
   return TRUE;
 }
@@ -386,6 +389,8 @@ gst_droidvenc_finalize (GObject * object)
 
   g_mutex_clear (&enc->eos_lock);
   g_cond_clear (&enc->eos_cond);
+
+  gst_droid_fps_dumper_destroy (enc->dumper);
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
@@ -599,6 +604,8 @@ gst_droidvenc_handle_frame (GstVideoEncoder * encoder,
   cb.unref = gst_droidvenc_release_input_frame;
   cb.data = release_data;
 
+  gst_droid_fps_dumper_new_frame (enc->dumper);
+
   /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
    * cannot write the input buffer. We end up waiting for the write operation
    * which does not happen because stagefright needs us to provide
@@ -668,6 +675,7 @@ gst_droidvenc_init (GstDroidVEnc * enc)
   enc->downstream_flow_ret = GST_FLOW_OK;
   g_mutex_init (&enc->eos_lock);
   g_cond_init (&enc->eos_cond);
+  enc->dumper = gst_droid_fps_dumper_new ("venc");
 }
 
 static GstCaps *

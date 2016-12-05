@@ -2,6 +2,7 @@
  * gst-droid
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2016 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -40,6 +41,7 @@ G_BEGIN_DECLS
 
 typedef struct _GstDroidVEnc GstDroidVEnc;
 typedef struct _GstDroidVEncClass GstDroidVEncClass;
+typedef struct _GstDroidFpsDumper GstDroidFpsDumper;
 
 struct _GstDroidVEnc
 {
@@ -59,6 +61,8 @@ struct _GstDroidVEnc
   /* protected by decoder stream lock */
   GstFlowReturn downstream_flow_ret;
   gboolean dirty;
+
+  GstDroidFpsDumper *dumper;
 };
 
 struct _GstDroidVEncClass
