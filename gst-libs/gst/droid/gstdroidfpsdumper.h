@@ -41,7 +41,7 @@ void gst_droid_fps_dumper_destroy (GstDroidFpsDumper *dumper);
 
 void gst_droid_fps_dumper_reset (GstDroidFpsDumper *dumper);
 
-void gst_droid_fps_new_frame (GstDroidFpsDumper *dumper);
+void gst_droid_fps_dumper_new_frame (GstDroidFpsDumper *dumper);
 
 G_END_DECLS
 

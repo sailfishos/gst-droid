@@ -52,7 +52,7 @@ gst_droid_fps_dumper_reset (GstDroidFpsDumper * dumper)
 }
 
 void
-gst_droid_fps_new_frame (GstDroidFpsDumper * dumper)
+gst_droid_fps_dumper_new_frame (GstDroidFpsDumper * dumper)
 {
   GstClockTime ts;
 
