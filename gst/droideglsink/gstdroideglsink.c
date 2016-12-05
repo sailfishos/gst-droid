@@ -2,7 +2,7 @@
  * gst-droid
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
- * Copyright (C) 2015 Jolla LTD.
+ * Copyright (C) 2016 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -27,6 +27,7 @@
 #include <gst/video/video.h>
 #include <gst/interfaces/nemovideotexture.h>
 #include "gst/droid/gstdroidmediabuffer.h"
+#include "gst/droid/gstdroidfpsdumper.h"
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_eglsink_debug);
 #define GST_CAT_DEFAULT gst_droid_eglsink_debug
@@ -177,6 +178,8 @@ gst_droideglsink_start (GstBaseSink * bsink)
 
   sink->allocator = gst_droid_media_buffer_allocator_new ();
 
+  gst_droid_fps_dumper_reset (sink->dumper);
+
   return TRUE;
 }
 
@@ -253,6 +256,8 @@ gst_droideglsink_show_frame (GstVideoSink * vsink, GstBuffer * buf)
   gst_buffer_replace (&sink->last_buffer, buf);
 
   g_mutex_unlock (&sink->lock);
+
+  gst_droid_fps_dumper_new_frame (sink->dumper);
 
   nemo_gst_video_texture_frame_ready (NEMO_GST_VIDEO_TEXTURE (sink), 0);
 
@@ -343,6 +348,8 @@ gst_droideglsink_finalize (GObject * object)
 
   g_mutex_clear (&sink->lock);
 
+  gst_droid_fps_dumper_destroy (sink->dumper);
+
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
 
@@ -364,6 +371,7 @@ gst_droideglsink_init (GstDroidEglSink * sink)
   sink->eglDestroyImageKHR = NULL;
   sink->eglClientWaitSyncKHR = NULL;
   sink->eglDestroySyncKHR = NULL;
+  sink->dumper = gst_droid_fps_dumper_new ("sink");
 }
 
 static void

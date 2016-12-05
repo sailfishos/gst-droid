@@ -2,7 +2,7 @@
  * gst-droid
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
- * Copyright (C) 2015 Jolla LTD.
+ * Copyright (C) 2016 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -42,6 +42,7 @@ G_BEGIN_DECLS
 
 typedef struct _GstDroidEglSink GstDroidEglSink;
 typedef struct _GstDroidEglSinkClass GstDroidEglSinkClass;
+typedef struct _GstDroidFpsDumper GstDroidFpsDumper;
 
 struct _GstDroidEglSink
 {
@@ -63,6 +64,8 @@ struct _GstDroidEglSink
   PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageKHR;
   PFNEGLCLIENTWAITSYNCKHRPROC eglClientWaitSyncKHR;
   PFNEGLDESTROYSYNCKHRPROC eglDestroySyncKHR;
+
+  GstDroidFpsDumper *dumper;
 };
 
 struct _GstDroidEglSinkClass
