@@ -32,6 +32,7 @@
 #include "gst/droid/gstdroidquery.h"
 #include "gstdroidcamsrcphotography.h"
 #include "droidmediacamera.h"
+#include "gst/droid/gstdroidfpsdumper.h"
 #ifndef GST_USE_UNSTABLE_API
 #define GST_USE_UNSTABLE_API
 #endif /* GST_USE_UNSTABLE_API */
@@ -135,6 +136,8 @@ gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
   pad->pushed_buffers = 0;
   pad->adjust_segment = FALSE;
   pad->pending_events = NULL;
+  pad->dumper = gst_droid_fps_dumper_new (name);
+
   gst_segment_init (&pad->segment, GST_FORMAT_TIME);
 
   gst_element_add_pad (GST_ELEMENT (src), pad->pad);
@@ -146,6 +149,7 @@ static void
 gst_droidcamsrc_destroy_pad (GstDroidCamSrcPad * pad)
 {
   /* we don't destroy the pad itself */
+  gst_droid_fps_dumper_destroy (pad->dumper);
   g_mutex_clear (&pad->lock);
   g_cond_clear (&pad->cond);
   g_queue_free (pad->queue);
@@ -1148,6 +1152,8 @@ out:
     g_list_free (events);
   }
 
+  gst_droid_fps_dumper_new_frame (data->dumper);
+
   /* finally we can push our buffer */
   GST_LOG_OBJECT (pad, "pushing buffer %p", buffer);
   ret = gst_pad_push (data->pad, buffer);
@@ -1199,6 +1205,9 @@ gst_droidcamsrc_pad_activate_mode (GstPad * pad, GstObject * parent,
       GST_ERROR_OBJECT (src, "failed to start pad task");
       return FALSE;
     }
+
+    gst_droid_fps_dumper_reset (data->dumper);
+
   } else {
     gboolean ret = FALSE;
 

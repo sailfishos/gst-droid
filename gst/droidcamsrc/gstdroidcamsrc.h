@@ -58,6 +58,7 @@ typedef struct _GstDroidCamSrcClass GstDroidCamSrcClass;
 typedef struct _GstDroidCamSrcCamInfo GstDroidCamSrcCamInfo;
 typedef struct _GstDroidCamSrcPad GstDroidCamSrcPad;
 typedef struct _GstDroidCamSrcPhotography GstDroidCamSrcPhotography;
+typedef struct _GstDroidFpsDumper GstDroidFpsDumper;
 typedef enum _GstDroidCamSrcApplyType GstDroidCamSrcApplyType;
 
 typedef gboolean (* GstDroidCamSrcNegotiateCallback)(GstDroidCamSrcPad * pad);
@@ -84,6 +85,7 @@ struct _GstDroidCamSrcPad
   GstSegment segment;
   GstDroidCamSrcNegotiateCallback negotiate;
   GList *pending_events;
+  GstDroidFpsDumper *dumper;
 };
 
 struct _GstDroidCamSrc
