@@ -30,6 +30,7 @@
 #include "gst/droid/gstdroidmediabuffer.h"
 #include "gst/droid/gstwrappedmemory.h"
 #include "gst/droid/gstdroidquery.h"
+#include "gst/droid/gstdroidcodec.h"
 #include "gstdroidcamsrcphotography.h"
 #include "droidmediacamera.h"
 #ifndef GST_USE_UNSTABLE_API
@@ -59,12 +60,14 @@ GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_IMAGE_PAD_NAME,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS ("image/jpeg"));
 
+#if 0
 static GstStaticPadTemplate vid_src_template_factory =
 GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME,
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
         (GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA, "{YV12}")));
+#endif
 
 static gboolean gst_droidcamsrc_pad_activate_mode (GstPad * pad,
     GstObject * parent, GstPadMode mode, gboolean active);
@@ -86,6 +89,7 @@ static GstCaps *gst_droidcamsrc_pick_largest_resolution (GstDroidCamSrc * src,
 static gchar *gst_droidcamsrc_find_picture_resolution (GstDroidCamSrc * src,
     const gchar * resolution);
 static gboolean gst_droidcamsrc_is_zsl_and_hdr_supported (GstDroidCamSrc * src);
+static GstCaps *gst_droidcamsrc_get_video_caps_locked (GstDroidCamSrc * src);
 
 enum
 {
@@ -110,12 +114,13 @@ static guint droidcamsrc_signals[LAST_SIGNAL];
 #define DEFAULT_IMAGE_MODE             GST_DROIDCAMSRC_IMAGE_MODE_NORMAL
 
 static GstDroidCamSrcPad *
-gst_droidcamsrc_create_pad (GstDroidCamSrc * src, GstStaticPadTemplate * tpl,
+gst_droidcamsrc_create_pad (GstDroidCamSrc * src,
     const gchar * name, gboolean capture_pad)
 {
   GstDroidCamSrcPad *pad = g_slice_new0 (GstDroidCamSrcPad);
-
-  pad->pad = gst_pad_new_from_static_template (tpl, name);
+  GstPadTemplate *tpl =
+      gst_element_class_get_pad_template (GST_ELEMENT_GET_CLASS (src), name);
+  pad->pad = gst_pad_new_from_template (tpl, name);
 
   /* TODO: I don't think this is needed */
   gst_pad_use_fixed_caps (pad->pad);
@@ -178,15 +183,15 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   gst_droidcamsrc_photography_init (src, DEFAULT_CAMERA_DEVICE);
 
   src->vfsrc = gst_droidcamsrc_create_pad (src,
-      &vf_src_template_factory, GST_BASE_CAMERA_SRC_VIEWFINDER_PAD_NAME, FALSE);
+      GST_BASE_CAMERA_SRC_VIEWFINDER_PAD_NAME, FALSE);
   src->vfsrc->negotiate = gst_droidcamsrc_vfsrc_negotiate;
 
   src->imgsrc = gst_droidcamsrc_create_pad (src,
-      &img_src_template_factory, GST_BASE_CAMERA_SRC_IMAGE_PAD_NAME, TRUE);
+      GST_BASE_CAMERA_SRC_IMAGE_PAD_NAME, TRUE);
   src->imgsrc->negotiate = gst_droidcamsrc_imgsrc_negotiate;
 
   src->vidsrc = gst_droidcamsrc_create_pad (src,
-      &vid_src_template_factory, GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME, TRUE);
+      GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME, TRUE);
   src->vidsrc->adjust_segment = TRUE;
   src->vidsrc->negotiate = gst_droidcamsrc_vidsrc_negotiate;
 
@@ -907,6 +912,8 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
 {
   GObjectClass *gobject_class;
   GstElementClass *gstelement_class;
+  GstCaps *caps;
+  GstPadTemplate *tpl;
 
   gobject_class = (GObjectClass *) klass;
   gstelement_class = (GstElementClass *) klass;
@@ -921,8 +928,18 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
   gst_element_class_add_pad_template (gstelement_class,
       gst_static_pad_template_get (&img_src_template_factory));
 
-  gst_element_class_add_pad_template (gstelement_class,
-      gst_static_pad_template_get (&vid_src_template_factory));
+  /* encoded caps */
+  caps = gst_droid_codec_get_all_caps (GST_DROID_CODEC_ENCODER_VIDEO);
+
+  /* add raw caps */
+  caps =
+      gst_caps_merge (caps,
+      gst_caps_from_string (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
+          (GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA, "{YV12}")));
+  tpl =
+      gst_pad_template_new (GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME, GST_PAD_SRC,
+      GST_PAD_ALWAYS, caps);
+  gst_element_class_add_pad_template (gstelement_class, tpl);
 
   gobject_class->set_property = gst_droidcamsrc_set_property;
   gobject_class->get_property = gst_droidcamsrc_get_property;
@@ -1393,7 +1410,7 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
         } else if (data == src->imgsrc) {
           caps = gst_droidcamsrc_params_get_image_caps (src->dev->params);
         } else if (data == src->vidsrc) {
-          caps = gst_droidcamsrc_params_get_video_caps (src->dev->params);
+          caps = gst_droidcamsrc_get_video_caps_locked (src);
         }
       } else {
         caps = gst_pad_get_pad_template_caps (data->pad);
@@ -1633,7 +1650,7 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
 
   GST_DEBUG_OBJECT (src, "vidsrc negotiate");
 
-  our_caps = gst_droidcamsrc_params_get_video_caps (src->dev->params);
+  our_caps = gst_droidcamsrc_get_video_caps_locked (src);
   GST_DEBUG_OBJECT (src, "our caps %" GST_PTR_FORMAT, our_caps);
 
   if (!our_caps || gst_caps_is_empty (our_caps)) {
@@ -2270,4 +2287,59 @@ out:
 
   GST_INFO_OBJECT (src, "zsl and hdr supported: %d", ret);
   return ret;
+}
+
+static GstCaps *
+gst_droidcamsrc_get_video_caps_locked (GstDroidCamSrc * src)
+{
+  struct Data
+  {
+    GstCaps *result;
+    GstStructure *encoded;
+  };
+
+  gboolean __map (GstCapsFeatures * features,
+      GstStructure * structure, struct Data *data)
+  {
+
+    /* Given structure from template caps, we need to transform Data::encoded */
+    int i;
+    GstStructure *s = gst_structure_copy (data->encoded);
+    for (i = 0; i < gst_structure_n_fields (structure); i++) {
+      const gchar *field = gst_structure_nth_field_name (structure, i);
+      /* skip format field */
+      if (g_strcmp0 (field, "format") != 0) {
+        gst_structure_set_value (s, field, gst_structure_get_value (structure,
+                field));
+      }
+    }
+
+    data->result = gst_caps_merge_structure (data->result, s);
+
+    return TRUE;
+  }
+
+  GstCaps *tpl = gst_droidcamsrc_params_get_video_caps (src->dev->params);
+  GstCaps *caps = gst_caps_new_empty ();
+  GstCaps *encoded =
+      gst_droid_codec_get_all_caps (GST_DROID_CODEC_ENCODER_VIDEO);
+  int x;
+
+  struct Data data;
+  data.result = caps;
+
+  for (x = 0; x < gst_caps_get_size (encoded); x++) {
+    data.encoded = gst_caps_get_structure (encoded, x);
+    gst_caps_foreach (tpl, __map, &data);
+  }
+
+  caps = gst_caps_merge (caps, tpl);
+
+  caps = gst_caps_simplify (caps);
+
+  gst_caps_unref (encoded);
+
+  GST_DEBUG_OBJECT (src, "video caps %" GST_PTR_FORMAT, caps);
+
+  return caps;
 }
