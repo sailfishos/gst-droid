@@ -25,7 +25,7 @@
 #include <gst/gst.h>
 #include <gst/audio/gstaudiodecoder.h>
 #include <gst/base/gstadapter.h>
-#include "gstdroidcodec.h"
+#include "gst/droid/gstdroidcodec.h"
 
 G_BEGIN_DECLS
 

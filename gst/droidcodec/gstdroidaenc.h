@@ -23,7 +23,7 @@
 
 #include <gst/gst.h>
 #include <gst/audio/gstaudioencoder.h>
-#include "gstdroidcodec.h"
+#include "gst/droid/gstdroidcodec.h"
 
 G_BEGIN_DECLS
 
