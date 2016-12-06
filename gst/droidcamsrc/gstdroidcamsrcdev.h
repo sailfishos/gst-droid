@@ -2,7 +2,7 @@
  * gst-droid
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
- * Copyright (C) 2015 Jolla LTD.
+ * Copyright (C) 2015-2016 Jolla LTD.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -87,6 +87,8 @@ gboolean gst_droidcamsrc_dev_restart (GstDroidCamSrcDev * dev);
 void gst_droidcamsrc_dev_send_command (GstDroidCamSrcDev * dev, gint cmd, gint arg1, gint arg2);
 
 gboolean gst_droidcamsrc_dev_is_running (GstDroidCamSrcDev * dev);
+
+void gst_droidcamsrc_dev_queue_video_buffer (GstDroidCamSrcDev * dev, GstBuffer * buffer);
 
 G_END_DECLS
 
