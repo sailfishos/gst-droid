@@ -34,6 +34,7 @@ typedef struct _GstDroidCamSrcImageCaptureState GstDroidCamSrcImageCaptureState;
 typedef struct _GstDroidCamSrcVideoCaptureState GstDroidCamSrcVideoCaptureState;
 typedef struct _GstDroidCamSrcCamInfo GstDroidCamSrcCamInfo;
 typedef struct _GstDroidCamSrcPad GstDroidCamSrcPad;
+typedef struct _GstDroidCamSrcRecorder GstDroidCamSrcRecorder;
 
 struct _GstDroidCamSrcDev
 {
@@ -53,6 +54,9 @@ struct _GstDroidCamSrcDev
   GstDroidCamSrcVideoCaptureState *vid;
   GstBufferPool *pool;
   DroidMediaCameraConstants c;
+
+  gboolean use_recorder;
+  GstDroidCamSrcRecorder *recorder;
 };
 
 GstDroidCamSrcDev *gst_droidcamsrc_dev_new (GstDroidCamSrcPad *vfsrc,

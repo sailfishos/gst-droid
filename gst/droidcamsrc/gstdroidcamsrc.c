@@ -32,6 +32,7 @@
 #include "gst/droid/gstdroidquery.h"
 #include "gst/droid/gstdroidcodec.h"
 #include "gstdroidcamsrcphotography.h"
+#include "gstdroidcamsrcrecorder.h"
 #include "droidmediacamera.h"
 #ifndef GST_USE_UNSTABLE_API
 #define GST_USE_UNSTABLE_API
@@ -1543,6 +1544,7 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
 
   g_rec_mutex_lock (&src->dev_lock);
   src->dev->use_raw_data = info.finfo->format == GST_VIDEO_FORMAT_NV21;
+  gst_droidcamsrc_recorder_update_vf (src->dev->recorder, &info);
   g_rec_mutex_unlock (&src->dev_lock);
 
   ret = TRUE;
@@ -1710,6 +1712,16 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
   }
 
   ret = TRUE;
+
+  if (info.finfo->format == GST_VIDEO_FORMAT_ENCODED) {
+    GST_INFO_OBJECT (src, "using external recorder");
+    src->dev->use_recorder = TRUE;
+  } else {
+    GST_INFO_OBJECT (src, "using raw recorder");
+    src->dev->use_recorder = FALSE;
+  }
+
+  gst_droidcamsrc_recorder_update_vid (src->dev->recorder, &info, our_caps);
 
 out:
   if (peer) {
