@@ -35,7 +35,7 @@ gst_droidcamsrc_recorder_create (GstDroidCamSrcPad * vidsrc)
 
   recorder->vidsrc = vidsrc;
   recorder->md.color_format = -1;       // TODO:
-  recorder->md.bitrate = 192000;        // TODO:
+  recorder->md.bitrate = 12000000;      // TODO:
   recorder->md.meta_data = true;        // TODO:
   recorder->md.parent.flags = DROID_MEDIA_CODEC_HW_ONLY;
 
