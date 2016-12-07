@@ -1146,7 +1146,8 @@ gst_droidcamsrc_dev_start_video_recording_recorder_locked (GstDroidCamSrcDev *
 {
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
-  if (!gst_droidcamsrc_recorder_init (dev->recorder, dev->cam)) {
+  if (!gst_droidcamsrc_recorder_init (dev->recorder, dev->cam,
+          src->target_bitrate)) {
     GST_ELEMENT_ERROR (src, LIBRARY, FAILED,
         ("error initializing video recorder"), (NULL));
     return FALSE;

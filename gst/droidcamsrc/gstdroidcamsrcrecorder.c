@@ -25,6 +25,8 @@
 #include "gstdroidcamsrc.h"
 #include <gst/droid/gstdroidcodec.h>
 
+#define GST_DROIDCAMSRC_RECORDER_TARGET_BITRATE_DEFAULT 192000
+
 static void gst_droidcamsrc_recorder_data_available (void *data,
     DroidMediaCodecData * encoded);
 
@@ -34,7 +36,7 @@ gst_droidcamsrc_recorder_create (GstDroidCamSrcPad * vidsrc)
   GstDroidCamSrcRecorder *recorder = g_new0 (GstDroidCamSrcRecorder, 1);
 
   recorder->vidsrc = vidsrc;
-  recorder->md.bitrate = 12000000;      // TODO:
+  recorder->md.bitrate = GST_DROIDCAMSRC_RECORDER_TARGET_BITRATE_DEFAULT;
   recorder->md.meta_data = true;
   recorder->md.parent.flags = DROID_MEDIA_CODEC_HW_ONLY;
 
@@ -53,7 +55,7 @@ gst_droidcamsrc_recorder_destroy (GstDroidCamSrcRecorder * recorder)
 
 gboolean
 gst_droidcamsrc_recorder_init (GstDroidCamSrcRecorder * recorder,
-    DroidMediaCamera * cam)
+    DroidMediaCamera * cam, gint32 target_bitrate)
 {
   if (!recorder->codec) {
     return FALSE;
@@ -62,6 +64,8 @@ gst_droidcamsrc_recorder_init (GstDroidCamSrcRecorder * recorder,
   if (recorder->recorder) {
     droid_media_recorder_destroy (recorder->recorder);
   }
+
+  recorder->md.bitrate = target_bitrate;
 
   /* set the color format */
   recorder->md.color_format = droid_media_camera_get_video_color_format (cam);

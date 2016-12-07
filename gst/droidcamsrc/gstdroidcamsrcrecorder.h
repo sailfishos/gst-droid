@@ -44,7 +44,7 @@ struct _GstDroidCamSrcRecorder
 GstDroidCamSrcRecorder *gst_droidcamsrc_recorder_create (GstDroidCamSrcPad *vidsrc);
 void gst_droidcamsrc_recorder_destroy (GstDroidCamSrcRecorder *recorder);
 
-gboolean gst_droidcamsrc_recorder_init (GstDroidCamSrcRecorder *recorder, DroidMediaCamera *cam);
+gboolean gst_droidcamsrc_recorder_init (GstDroidCamSrcRecorder *recorder, DroidMediaCamera *cam, gint32 target_bitrate);
 
 void gst_droidcamsrc_recorder_update_vid (GstDroidCamSrcRecorder *recorder, GstVideoInfo *info, GstCaps *caps);
 

@@ -113,6 +113,7 @@ static guint droidcamsrc_signals[LAST_SIGNAL];
 #define DEFAULT_IMAGE_NOISE_REDUCTION  TRUE
 #define DEFAULT_SENSOR_ORIENTATION     0
 #define DEFAULT_IMAGE_MODE             GST_DROIDCAMSRC_IMAGE_MODE_NORMAL
+#define DEFAULT_TARGET_BITRATE         12000000
 
 static GstDroidCamSrcPad *
 gst_droidcamsrc_create_pad (GstDroidCamSrc * src,
@@ -180,6 +181,7 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   src->height = 0;
   src->fps_n = 0;
   src->fps_d = 1;
+  src->target_bitrate = DEFAULT_TARGET_BITRATE;
 
   gst_droidcamsrc_photography_init (src, DEFAULT_CAMERA_DEVICE);
 
@@ -294,6 +296,10 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
       g_value_set_pointer (value, supported_image_modes);
       break;
 
+    case PROP_TARGET_BITRATE:
+      g_value_set_int (value, src->target_bitrate);
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -388,6 +394,10 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
     case PROP_IMAGE_MODE:
       src->image_mode = g_value_get_flags (value);
       gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
+      break;
+
+    case PROP_TARGET_BITRATE:
+      src->target_bitrate = g_value_get_int (value);
       break;
 
     default:
@@ -1031,6 +1041,11 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
       g_param_spec_pointer ("supported-image-modes", "Supported image modes",
           "Image modes supported by HAL",
           G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_TARGET_BITRATE,
+      g_param_spec_int ("target-bitrate", "Target Bitrate",
+          "Target bitrate", 0, G_MAXINT,
+          DEFAULT_TARGET_BITRATE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   gst_droidcamsrc_photography_add_overrides (gobject_class);
 
