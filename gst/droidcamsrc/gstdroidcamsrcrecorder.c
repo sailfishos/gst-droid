@@ -34,9 +34,8 @@ gst_droidcamsrc_recorder_create (GstDroidCamSrcPad * vidsrc)
   GstDroidCamSrcRecorder *recorder = g_new0 (GstDroidCamSrcRecorder, 1);
 
   recorder->vidsrc = vidsrc;
-  recorder->md.color_format = -1;       // TODO:
   recorder->md.bitrate = 12000000;      // TODO:
-  recorder->md.meta_data = true;        // TODO:
+  recorder->md.meta_data = true;
   recorder->md.parent.flags = DROID_MEDIA_CODEC_HW_ONLY;
 
   return recorder;
@@ -63,6 +62,9 @@ gst_droidcamsrc_recorder_init (GstDroidCamSrcRecorder * recorder,
   if (recorder->recorder) {
     droid_media_recorder_destroy (recorder->recorder);
   }
+
+  /* set the color format */
+  recorder->md.color_format = droid_media_camera_get_video_color_format (cam);
 
   recorder->recorder = droid_media_recorder_create (cam, &recorder->md);
 
