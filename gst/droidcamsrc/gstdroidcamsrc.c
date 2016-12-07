@@ -1544,7 +1544,6 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
 
   g_rec_mutex_lock (&src->dev_lock);
   src->dev->use_raw_data = info.finfo->format == GST_VIDEO_FORMAT_NV21;
-  gst_droidcamsrc_recorder_update_vf (src->dev->recorder, &info);
   g_rec_mutex_unlock (&src->dev_lock);
 
   ret = TRUE;

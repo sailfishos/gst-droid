@@ -64,9 +64,7 @@ gst_droidcamsrc_recorder_init (GstDroidCamSrcRecorder * recorder,
     droid_media_recorder_destroy (recorder->recorder);
   }
 
-  recorder->recorder =
-      droid_media_recorder_create (cam, &recorder->md, recorder->width,
-      recorder->height, recorder->fps);
+  recorder->recorder = droid_media_recorder_create (cam, &recorder->md);
 
   if (!recorder->recorder) {
     return FALSE;
@@ -95,15 +93,6 @@ gst_droidcamsrc_recorder_update_vid (GstDroidCamSrcRecorder * recorder,
   if (recorder->codec) {
     recorder->md.parent.type = gst_droid_codec_get_droid_type (recorder->codec);
   }
-}
-
-void
-gst_droidcamsrc_recorder_update_vf (GstDroidCamSrcRecorder * recorder,
-    GstVideoInfo * info)
-{
-  recorder->width = info->width;
-  recorder->height = info->height;
-  recorder->fps = info->fps_n / info->fps_d;
 }
 
 gboolean

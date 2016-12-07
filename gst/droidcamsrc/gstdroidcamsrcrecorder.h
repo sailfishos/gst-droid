@@ -39,11 +39,6 @@ struct _GstDroidCamSrcRecorder
   GstDroidCodec *codec;
   DroidMediaRecorder *recorder;
   DroidMediaCodecEncoderMetaData md;
-
-  /* These are camera viewfinder parameters not video parameters */
-  gint width;
-  gint height;
-  gint fps;
 };
 
 GstDroidCamSrcRecorder *gst_droidcamsrc_recorder_create (GstDroidCamSrcPad *vidsrc);
@@ -52,7 +47,6 @@ void gst_droidcamsrc_recorder_destroy (GstDroidCamSrcRecorder *recorder);
 gboolean gst_droidcamsrc_recorder_init (GstDroidCamSrcRecorder *recorder, DroidMediaCamera *cam);
 
 void gst_droidcamsrc_recorder_update_vid (GstDroidCamSrcRecorder *recorder, GstVideoInfo *info, GstCaps *caps);
-void gst_droidcamsrc_recorder_update_vf (GstDroidCamSrcRecorder *recorder, GstVideoInfo *info);
 
 gboolean gst_droidcamsrc_recorder_start (GstDroidCamSrcRecorder *recorder);
 void gst_droidcamsrc_recorder_stop (GstDroidCamSrcRecorder *recorder);
