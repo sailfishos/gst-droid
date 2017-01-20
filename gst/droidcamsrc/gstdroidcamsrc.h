@@ -120,6 +120,8 @@ struct _GstDroidCamSrc
   gfloat max_ev_compensation;
   gfloat ev_step;
 
+  gint32 target_bitrate;
+
   /* protected with OBJECT_LOCK */
   gint width;
   gint height;

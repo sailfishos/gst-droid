@@ -24,7 +24,6 @@
 #endif
 
 #include "gstdroidcodec.h"
-#include "plugin.h"
 #include <glib.h>
 #include <gst/base/gstbytewriter.h>
 #ifndef GST_USE_UNSTABLE_API

@@ -24,7 +24,7 @@
 
 #include <gst/gst.h>
 #include <gst/video/gstvideodecoder.h>
-#include "gstdroidcodec.h"
+#include "gst/droid/gstdroidcodec.h"
 #include "droidmediaconvert.h"
 
 G_BEGIN_DECLS

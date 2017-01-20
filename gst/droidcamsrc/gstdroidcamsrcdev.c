@@ -26,6 +26,7 @@
 #include "gstdroidcamsrcdev.h"
 #include <stdlib.h>
 #include "gstdroidcamsrc.h"
+#include "gstdroidcamsrcrecorder.h"
 #include "gst/droid/gstdroidmediabuffer.h"
 #include "gst/droid/gstwrappedmemory.h"
 #include "gst/droid/gstdroidbufferpool.h"
@@ -73,6 +74,13 @@ void gst_droidcamsrc_dev_update_params_locked (GstDroidCamSrcDev * dev);
 static void
 gst_droidcamsrc_dev_prepare_buffer (GstDroidCamSrcDev * dev, GstBuffer * buffer,
     DroidMediaRect rect, int width, int height, GstVideoFormat format);
+static gboolean
+gst_droidcamsrc_dev_start_video_recording_recorder_locked (GstDroidCamSrcDev *
+    dev);
+static gboolean
+gst_droidcamsrc_dev_start_video_recording_raw_locked (GstDroidCamSrcDev * dev);
+static void gst_droidcamsrc_dev_queue_video_buffer_locked (GstDroidCamSrcDev *
+    dev, GstBuffer * buffer);
 
 static void
 gst_droidcamsrc_dev_shutter_callback (void *user)
@@ -309,7 +317,6 @@ gst_droidcamsrc_dev_video_frame_callback (void *user,
   GstBuffer *buffer;
   GstMemory *mem;
   GstDroidCamSrcDevVideoData *mem_data;
-  gboolean drop_buffer;
 
   GST_DEBUG_OBJECT (src, "dev video frame callback");
 
@@ -335,26 +342,12 @@ gst_droidcamsrc_dev_video_frame_callback (void *user,
       (GFunc) gst_droidcamsrc_dev_release_recording_frame, mem_data);
   gst_buffer_insert_memory (buffer, 0, mem);
 
-  GST_BUFFER_OFFSET (buffer) = dev->vid->video_frames;
-  GST_BUFFER_OFFSET_END (buffer) = ++dev->vid->video_frames;
   gst_droidcamsrc_timestamp (src, buffer);
 
-  g_rec_mutex_lock (dev->lock);
-  ++dev->vid->queued_frames;
-  g_rec_mutex_unlock (dev->lock);
+  gst_droidcamsrc_dev_queue_video_buffer_locked (dev, buffer);
 
-  drop_buffer = !dev->vid->running;
-
-  if (drop_buffer) {
-    GST_INFO_OBJECT (src,
-        "dropping buffer because video recording is not running");
-    gst_buffer_unref (buffer);
-  } else {
-    g_mutex_lock (&dev->vidsrc->lock);
-    g_queue_push_tail (dev->vidsrc->queue, buffer);
-    g_cond_signal (&dev->vidsrc->cond);
-    g_mutex_unlock (&dev->vidsrc->lock);
-  }
+  g_mutex_unlock (&dev->vid->lock);
+  return;
 
 unlock_and_out:
   /* in case stop_video_recording() is waiting for us */
@@ -543,6 +536,9 @@ gst_droidcamsrc_dev_new (GstDroidCamSrcPad * vfsrc,
 
   dev->pool = gst_droid_buffer_pool_new ();
 
+  dev->use_recorder = FALSE;
+  dev->recorder = gst_droidcamsrc_recorder_create (vidsrc);
+
   droid_media_camera_constants_init (&dev->c);
 
   return dev;
@@ -623,6 +619,8 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
   g_cond_clear (&dev->vid->cond);
 
   gst_object_unref (dev->pool);
+
+  gst_droidcamsrc_recorder_destroy (dev->recorder);
 
   g_slice_free (GstDroidCamSrcImageCaptureState, dev->img);
   g_slice_free (GstDroidCamSrcVideoCaptureState, dev->vid);
@@ -873,18 +871,14 @@ gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
   dev->vid->video_frames = 0;
   dev->vid->queued_frames = 0;
 
-  /* TODO: get that from caps */
-  if (!droid_media_camera_store_meta_data_in_buffers (dev->cam, true)) {
-    GST_ELEMENT_ERROR (src, LIBRARY, SETTINGS,
-        ("error storing meta data in buffers for video recording"), (NULL));
-    goto out;
+  if (dev->use_recorder) {
+    ret = gst_droidcamsrc_dev_start_video_recording_recorder_locked (dev);
+  } else {
+    ret = gst_droidcamsrc_dev_start_video_recording_raw_locked (dev);
   }
 
-  if (!droid_media_camera_start_recording (dev->cam)) {
-    GST_ELEMENT_ERROR (src, LIBRARY, FAILED, ("error starting video recording"),
-        (NULL));
+  if (!ret)
     goto out;
-  }
 
   ret = TRUE;
 
@@ -931,21 +925,28 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
     GST_ERROR ("failed to push EOS event");
   }
 
-  g_rec_mutex_lock (dev->lock);
-
-  GST_INFO ("waiting for queued frames %i", dev->vid->queued_frames);
-
-  while (dev->vid->queued_frames > 0) {
-    GST_INFO ("waiting for queued frames to reach 0 from %i",
-        dev->vid->queued_frames);
-    g_rec_mutex_unlock (dev->lock);
-    usleep (VIDEO_RECORDING_STOP_TIMEOUT);
+  if (!dev->use_recorder) {
     g_rec_mutex_lock (dev->lock);
+
+    GST_INFO ("waiting for queued frames %i", dev->vid->queued_frames);
+
+    while (dev->vid->queued_frames > 0) {
+      GST_INFO ("waiting for queued frames to reach 0 from %i",
+          dev->vid->queued_frames);
+      g_rec_mutex_unlock (dev->lock);
+      usleep (VIDEO_RECORDING_STOP_TIMEOUT);
+      g_rec_mutex_lock (dev->lock);
+    }
+
+    /* TODO: move this unlock() call after we stop recording? */
+    g_rec_mutex_unlock (dev->lock);
   }
 
-  g_rec_mutex_unlock (dev->lock);
-
-  droid_media_camera_stop_recording (dev->cam);
+  if (dev->use_recorder) {
+    gst_droidcamsrc_recorder_stop (dev->recorder);
+  } else {
+    droid_media_camera_stop_recording (dev->cam);
+  }
 
   gst_buffer_pool_set_flushing (dev->pool, FALSE);
 
@@ -1137,4 +1138,87 @@ gst_droidcamsrc_dev_prepare_buffer (GstDroidCamSrcDev * dev, GstBuffer * buffer,
 
   GST_LOG_OBJECT (src, "preview info: w=%d, h=%d, crop: x=%d, y=%d, w=%d, h=%d",
       width, height, crop->x, crop->y, crop->width, crop->height);
+}
+
+static gboolean
+gst_droidcamsrc_dev_start_video_recording_recorder_locked (GstDroidCamSrcDev *
+    dev)
+{
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+
+  if (!gst_droidcamsrc_recorder_init (dev->recorder, dev->cam,
+          src->target_bitrate)) {
+    GST_ELEMENT_ERROR (src, LIBRARY, FAILED,
+        ("error initializing video recorder"), (NULL));
+    return FALSE;
+  }
+
+  if (!gst_droidcamsrc_recorder_start (dev->recorder)) {
+    GST_ELEMENT_ERROR (src, LIBRARY, FAILED, ("error starting video recorder"),
+        (NULL));
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+static gboolean
+gst_droidcamsrc_dev_start_video_recording_raw_locked (GstDroidCamSrcDev * dev)
+{
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+
+  /* TODO: get that from caps */
+  if (!droid_media_camera_store_meta_data_in_buffers (dev->cam, true)) {
+    GST_ELEMENT_ERROR (src, LIBRARY, SETTINGS,
+        ("error storing meta data in buffers for video recording"), (NULL));
+    return FALSE;
+  }
+
+  if (!droid_media_camera_start_recording (dev->cam)) {
+    GST_ELEMENT_ERROR (src, LIBRARY, FAILED, ("error starting video recording"),
+        (NULL));
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+void
+gst_droidcamsrc_dev_queue_video_buffer (GstDroidCamSrcDev * dev,
+    GstBuffer * buffer)
+{
+  g_mutex_lock (&dev->vid->lock);
+  gst_droidcamsrc_dev_queue_video_buffer_locked (dev, buffer);
+  g_mutex_unlock (&dev->vid->lock);
+}
+
+static void
+gst_droidcamsrc_dev_queue_video_buffer_locked (GstDroidCamSrcDev * dev,
+    GstBuffer * buffer)
+{
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+  gboolean drop_buffer;
+
+  GST_BUFFER_OFFSET (buffer) = dev->vid->video_frames;
+  GST_BUFFER_OFFSET_END (buffer) = ++dev->vid->video_frames;
+
+  g_rec_mutex_lock (dev->lock);
+  ++dev->vid->queued_frames;
+  g_rec_mutex_unlock (dev->lock);
+
+  drop_buffer = !dev->vid->running;
+
+  if (drop_buffer) {
+    GST_INFO_OBJECT (src,
+        "dropping buffer because video recording is not running");
+    gst_buffer_unref (buffer);
+  } else {
+    g_mutex_lock (&dev->vidsrc->lock);
+    g_queue_push_tail (dev->vidsrc->queue, buffer);
+    g_cond_signal (&dev->vidsrc->cond);
+    g_mutex_unlock (&dev->vidsrc->lock);
+  }
+
+  /* in case stop_video_recording() is waiting for us */
+  g_cond_signal (&dev->vid->cond);
 }
