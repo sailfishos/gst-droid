@@ -195,6 +195,8 @@ gst_droidcamsrc_params_reload_locked (GstDroidCamSrcParams * params,
   gst_droidcamsrc_params_fill_fps_range_arrays_locked (params);
 
   params->is_dirty = FALSE;
+  params->has_separate_video_size_values =
+      g_hash_table_lookup (params->params, "video-size-values") != NULL;
 }
 
 GstDroidCamSrcParams *
@@ -389,8 +391,14 @@ gst_droidcamsrc_params_get_video_caps (GstDroidCamSrcParams * params)
   GstCaps *caps;
 
   g_mutex_lock (&params->lock);
-  caps = gst_droidcamsrc_params_get_caps_locked (params, "video-size-values",
+
+  gchar *key =
+      params->has_separate_video_size_values ? "video-size-values" :
+      "preview-size-values";
+
+  caps = gst_droidcamsrc_params_get_caps_locked (params, key,
       "video/x-raw", GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA, "YV12");
+
   g_mutex_unlock (&params->lock);
 
   return caps;

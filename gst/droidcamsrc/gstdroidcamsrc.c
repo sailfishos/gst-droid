@@ -1712,7 +1712,10 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
   }
 
   vid = g_strdup_printf ("%ix%i", info.width, info.height);
-  gst_droidcamsrc_params_set_string (src->dev->params, "video-size", vid);
+  gchar *key =
+      src->dev->
+      params->has_separate_video_size_values ? "video-size" : "preview-size";
+  gst_droidcamsrc_params_set_string (src->dev->params, key, vid);
 
   /* Now we need to find a picture size that is equal to our video size.
    * Some devices need to have a picture size otherwise the video mode viewfinder
