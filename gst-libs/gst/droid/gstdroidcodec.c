@@ -129,7 +129,7 @@ static GstDroidCodecInfo codecs[] = {
       NULL, NULL, NULL, NULL, NULL, NULL},
 
   {GST_DROID_CODEC_DECODER_VIDEO, "video/x-vp8", "video/x-vnd.on2.vp8",
-        "video/x-vp8", FALSE, NULL, NULL, NULL, NULL,
+        "video/x-vp8", TRUE, NULL, NULL, NULL, NULL,
       create_vp8vdec_codec_data_from_codec_data, NULL, NULL},
 
   /* audio encoders */
