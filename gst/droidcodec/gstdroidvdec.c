@@ -215,6 +215,39 @@ gst_droidvdec_buffers_released (G_GNUC_UNUSED void *user)
   GST_FIXME ("Not sure what to do here really");
 }
 
+static void
+gst_droidvec_copy_plane (guint8 * out, gint stride_out, guint8 * in,
+    gint stride_in, gint width, gint height)
+{
+  int i;
+  for (i = 0; i < height; i++) {
+    orc_memcpy (out, in, width);
+    out += stride_out;
+    in += stride_in;
+  }
+}
+
+static void
+gst_droidvec_copy_packed_planes (guint8 * out0, guint8 * out1, gint stride_out,
+    guint8 * in, gint stride_in, gint width, gint height)
+{
+  int x, y;
+  for (y = 0; y < height; y++) {
+    guint8 *row = in;
+    for (x = 0; x < width; x++) {
+      out0[x] = row[0];
+      out1[x] = row[1];
+      row += 2;
+    }
+
+    out0 += stride_out;
+    out1 += stride_out;
+    in += stride_in;
+  }
+}
+
+#define ALIGN_SIZE(size, to) (((size) + to  - 1) & ~(to - 1))
+
 static gboolean
 gst_droidvdec_convert_buffer (GstDroidVDec * dec,
     GstBuffer * out, DroidMediaData * in, GstVideoInfo * info)
@@ -222,8 +255,7 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
   gsize height = info->height;
   gsize width = info->width;
   gsize size;
-  gboolean use_external_buffer;
-  guint8 *data = NULL;
+  gboolean use_droid_convert;
   gboolean ret;
   GstMapInfo map_info;
 
@@ -240,7 +272,7 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
   }
 
   size = width * height * 3 / 2;
-  use_external_buffer = gst_buffer_get_size (out) != size;
+  use_droid_convert = dec->convert && gst_buffer_get_size (out) == size;
   map_info.data = NULL;
 
   if (!gst_buffer_map (out, &map_info, GST_MAP_WRITE)) {
@@ -249,61 +281,35 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
     goto out;
   }
 
-  if (use_external_buffer) {
-    GST_DEBUG_OBJECT (dec, "using an external buffer for I420 conversion.");
-    data = g_malloc (size);
+  if (use_droid_convert) {
+    if (droid_media_convert_to_i420 (dec->convert, in, map_info.data) != true) {
+      GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, (NULL),
+          ("failed to convert frame"));
+
+      ret = FALSE;
+      goto out;
+    }
   } else {
-    data = map_info.data;
-  }
+    /* copy to the output buffer swapping the u and v planes and cropping if necessary */
+    /* this assumes a NV12 format with 128 byte alignment */
+    gint stride = ALIGN_SIZE (width, 128);
+    gint slice_height = ALIGN_SIZE (height, 32);
+    gint top = ALIGN_SIZE (dec->crop_rect.top, 2);
+    gint left = ALIGN_SIZE (dec->crop_rect.left, 2);
 
-  if (droid_media_convert_to_i420 (dec->convert, in, data) != true) {
-    GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, (NULL),
-        ("failed to convert frame"));
+    guint8 *y = in->data + (top * stride) + left;
+    guint8 *uv = in->data + (stride * slice_height) + (top * stride / 2) + left;
 
-    ret = FALSE;
-    goto out;
-  }
-
-  if (use_external_buffer) {
-    /* fix up the buffer */
-    /* Code is based on gst-colorconv qcom backend */
-
-    gint stride = GST_VIDEO_INFO_COMP_STRIDE (info, 0);
-    gint strideUV = GST_VIDEO_INFO_COMP_STRIDE (info, 1);
-    guint8 *p = data;
-    guint8 *dst = map_info.data;
-    int i;
-    int x;
-
-    /* Y */
-    for (i = 0; i < info->height; i++) {
-      orc_memcpy (dst, p, info->width);
-      dst += stride;
-      p += width;
-    }
-
-    /* NOP if height == info->height */
-    p += (height - info->height) * width;
-    /* U and V */
-    for (x = 0; x < 2; x++) {
-      for (i = 0; i < info->height / 2; i++) {
-        orc_memcpy (dst, p, info->width / 2);
-        dst += strideUV;
-        p += width / 2;
-      }
-
-      /* NOP if height == info->height */
-      p += (height - info->height) / 2 * width / 2;
-    }
+    gst_droidvec_copy_plane (map_info.data + info->offset[0], info->stride[0],
+        y, stride, info->width, info->height);
+    gst_droidvec_copy_packed_planes (map_info.data + info->offset[1],
+        map_info.data + info->offset[2], info->stride[1], uv, stride,
+        info->width / 2, info->height / 2);
   }
 
   ret = TRUE;
 
 out:
-  if (use_external_buffer && data) {
-    g_free (data);
-  }
-
   if (map_info.data) {
     gst_buffer_unmap (out, &map_info);
   }
@@ -653,14 +659,11 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
       dec->convert = droid_media_convert_create ();
     }
 
-    if (!dec->convert) {
-      GST_ELEMENT_ERROR (dec, LIBRARY, INIT, (NULL),
-          ("Failed to create I420 converter"));
-      goto error;
+    if (dec->convert) {
+      droid_media_convert_set_crop_rect (dec->convert, rect, md.width,
+          md.height);
+      GST_INFO_OBJECT (dec, "using I420 conversion for output buffers");
     }
-
-    droid_media_convert_set_crop_rect (dec->convert, rect, md.width, md.height);
-    GST_INFO_OBJECT (dec, "using I420 conversion for output buffers");
   }
 
   if (!gst_video_decoder_negotiate (decoder)) {
@@ -1018,9 +1021,8 @@ gst_droidvdec_handle_frame (GstVideoDecoder * decoder,
    * which breaks timestamping.
    */
   data.ts =
-      GST_CLOCK_TIME_IS_VALID (frame->
-      pts) ? GST_TIME_AS_USECONDS (frame->pts) : GST_TIME_AS_USECONDS (frame->
-      dts);
+      GST_CLOCK_TIME_IS_VALID (frame->pts) ? GST_TIME_AS_USECONDS (frame->
+      pts) : GST_TIME_AS_USECONDS (frame->dts);
   data.sync = GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame) ? true : false;
 
   /* This can deadlock if droidmedia/stagefright input buffer queue is full thus we
