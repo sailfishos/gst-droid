@@ -30,9 +30,7 @@
 #include "gst/droid/gstdroidmediabuffer.h"
 #include "gst/droid/gstwrappedmemory.h"
 #include "gst/droid/gstdroidquery.h"
-#include "gst/droid/gstdroidcodec.h"
 #include "gstdroidcamsrcphotography.h"
-#include "gstdroidcamsrcrecorder.h"
 #include "droidmediacamera.h"
 #ifndef GST_USE_UNSTABLE_API
 #define GST_USE_UNSTABLE_API
@@ -939,14 +937,11 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
   gst_element_class_add_pad_template (gstelement_class,
       gst_static_pad_template_get (&img_src_template_factory));
 
-  /* encoded caps */
-  caps = gst_droid_codec_get_all_caps (GST_DROID_CODEC_ENCODER_VIDEO);
-
   /* add raw caps */
   caps =
-      gst_caps_merge (caps,
       gst_caps_from_string (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
-          (GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA, "{YV12}")));
+      (GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA, "{YV12}"));
+
   tpl =
       gst_pad_template_new (GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME, GST_PAD_SRC,
       GST_PAD_ALWAYS, caps);
@@ -1730,16 +1725,6 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
 
   ret = TRUE;
 
-  if (info.finfo->format == GST_VIDEO_FORMAT_ENCODED) {
-    GST_INFO_OBJECT (src, "using external recorder");
-    src->dev->use_recorder = TRUE;
-  } else {
-    GST_INFO_OBJECT (src, "using raw recorder");
-    src->dev->use_recorder = FALSE;
-  }
-
-  gst_droidcamsrc_recorder_update_vid (src->dev->recorder, &info, our_caps);
-
 out:
   if (peer) {
     gst_caps_unref (peer);
@@ -2350,23 +2335,14 @@ gst_droidcamsrc_get_video_caps_locked (GstDroidCamSrc * src)
 
   GstCaps *tpl = gst_droidcamsrc_params_get_video_caps (src->dev->params);
   GstCaps *caps = gst_caps_new_empty ();
-  GstCaps *encoded =
-      gst_droid_codec_get_all_caps (GST_DROID_CODEC_ENCODER_VIDEO);
   int x;
 
   struct Data data;
   data.result = caps;
 
-  for (x = 0; x < gst_caps_get_size (encoded); x++) {
-    data.encoded = gst_caps_get_structure (encoded, x);
-    gst_caps_foreach (tpl, __map, &data);
-  }
-
   caps = gst_caps_merge (caps, tpl);
 
   caps = gst_caps_simplify (caps);
-
-  gst_caps_unref (encoded);
 
   GST_DEBUG_OBJECT (src, "video caps %" GST_PTR_FORMAT, caps);
 

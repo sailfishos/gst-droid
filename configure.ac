@@ -174,7 +174,6 @@ AC_CONFIG_FILES([Makefile
 		gst-libs/gst/droid/Makefile
 		gst/Makefile
 		gst/droideglsink/Makefile
-		gst/droidcodec/Makefile
 		gst/droidcamsrc/Makefile
 		tools/Makefile])
 AC_OUTPUT
