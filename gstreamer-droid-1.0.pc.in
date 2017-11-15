@@ -1,0 +1,11 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@/gstreamer-1.0
+
+Name: GstDroid library
+Description: GstDroid library
+Requires: gstreamer-1.0 gstreamer-base-1.0 android-headers
+Version: @VERSION@
+Libs: -L${libdir} -lgstdroid-1.0
+Cflags: -I${includedir}

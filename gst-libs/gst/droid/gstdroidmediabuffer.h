@@ -23,7 +23,7 @@
 
 #include <gst/gst.h>
 #include <gst/video/video.h>
-#include "droidmedia.h"
+#include <droidmedia/droidmedia.h>
 
 G_BEGIN_DECLS
 

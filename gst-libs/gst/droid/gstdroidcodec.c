@@ -31,7 +31,7 @@
 #endif /* GST_USE_UNSTABLE_API */
 #include <gst/codecparsers/gsth264parser.h>
 
-GST_DEBUG_CATEGORY_EXTERN (gst_droid_codec_debug);
+GST_DEBUG_CATEGORY (gst_droid_codec_debug);
 #define GST_CAT_DEFAULT gst_droid_codec_debug
 
 static GstBuffer *create_mpeg4venc_codec_data (DroidMediaData * data);
