@@ -69,6 +69,7 @@ rm -rf $RPM_BUILD_ROOT%{_sysconfdir}/gst-droid
 %defattr(-,root,root,-)
 %{_includedir}/gstreamer-%{majorminor}/gst/
 %{_libdir}/*.so
+%{_libdir}/pkgconfig/gstreamer-droid-1.0.pc
 
 %files tools
 %defattr(-,root,root,-)

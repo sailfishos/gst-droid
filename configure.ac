@@ -167,6 +167,7 @@ AC_DEFINE_UNQUOTED(GST_API_VERSION, "$GST_API_VERSION",
    [GStreamer API Version])
 
 AC_CONFIG_FILES([Makefile
+        gstreamer-droid-1.0.pc
 		common/Makefile
 		common/m4/Makefile
 		gst-libs/Makefile
