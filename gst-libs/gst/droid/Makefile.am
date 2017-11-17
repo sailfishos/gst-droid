@@ -16,12 +16,10 @@ libgstdroid_@GST_API_VERSION@_la_SOURCES = \
 	gstdroidmediabuffer.c \
 	gstdroidbufferpool.c \
 	gstdroidquery.c \
-	gstdroidcodec.c \
 	/usr/share/droidmedia/hybris.c
 
 libgstdroid_@GST_API_VERSION@_la_include_HEADERS = \
 	gstwrappedmemory.h \
 	gstdroidmediabuffer.h \
 	gstdroidbufferpool.h \
-	gstdroidquery.h \
-	gstdroidcodec.h
+	gstdroidquery.h 
