@@ -1615,9 +1615,7 @@ gst_droidcamsrc_imgsrc_negotiate (GstDroidCamSrcPad * data)
 
   our_caps = gst_caps_make_writable (our_caps);
   our_caps = gst_droidcamsrc_pick_largest_resolution (src, our_caps);
-
-  /* imgsrc frame rate is not really important so we will just set it to 30 */
-  gst_caps_set_simple (our_caps, "framerate", G_TYPE_INT, 30, NULL);
+  gst_droidcamsrc_params_choose_image_framerate (src->dev->params, our_caps);
 
   if (!gst_pad_set_caps (data->pad, our_caps)) {
     GST_ERROR_OBJECT (src, "failed to set caps");
