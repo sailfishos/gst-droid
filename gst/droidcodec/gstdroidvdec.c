@@ -256,6 +256,8 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
   gsize width = info->width;
   gsize size;
   gboolean use_droid_convert;
+  gboolean use_external_buffer;
+  guint8 *data = NULL;
   gboolean ret;
   GstMapInfo map_info;
 
@@ -272,7 +274,8 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
   }
 
   size = width * height * 3 / 2;
-  use_droid_convert = dec->convert && gst_buffer_get_size (out) == size;
+  use_droid_convert = dec->convert;
+  use_external_buffer = use_droid_convert && gst_buffer_get_size (out) != size;
   map_info.data = NULL;
 
   if (!gst_buffer_map (out, &map_info, GST_MAP_WRITE)) {
@@ -282,12 +285,52 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
   }
 
   if (use_droid_convert) {
-    if (droid_media_convert_to_i420 (dec->convert, in, map_info.data) != true) {
+    if (use_external_buffer) {
+      GST_DEBUG_OBJECT (dec, "using an external buffer for I420 conversion.");
+      data = g_malloc (size);
+    } else {
+      data = map_info.data;
+    }
+
+    if (droid_media_convert_to_i420 (dec->convert, in, data) != true) {
       GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, (NULL),
           ("failed to convert frame"));
 
       ret = FALSE;
       goto out;
+    }
+
+    if (use_external_buffer) {
+      /* fix up the buffer */
+      /* Code is based on gst-colorconv qcom backend */
+
+      gint stride = GST_VIDEO_INFO_COMP_STRIDE (info, 0);
+      gint strideUV = GST_VIDEO_INFO_COMP_STRIDE (info, 1);
+      guint8 *p = data;
+      guint8 *dst = map_info.data;
+      int i;
+      int x;
+
+      /* Y */
+      for (i = 0; i < info->height; i++) {
+        orc_memcpy (dst, p, info->width);
+        dst += stride;
+        p += width;
+      }
+
+      /* NOP if height == info->height */
+      p += (height - info->height) * width;
+      /* U and V */
+      for (x = 0; x < 2; x++) {
+        for (i = 0; i < info->height / 2; i++) {
+          orc_memcpy (dst, p, info->width / 2);
+          dst += strideUV;
+          p += width / 2;
+        }
+
+        /* NOP if height == info->height */
+        p += (height - info->height) / 2 * width / 2;
+      }
     }
   } else {
     /* copy to the output buffer swapping the u and v planes and cropping if necessary */
@@ -310,6 +353,10 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
   ret = TRUE;
 
 out:
+  if (use_external_buffer && data) {
+    g_free (data);
+  }
+
   if (map_info.data) {
     gst_buffer_unmap (out, &map_info);
   }
