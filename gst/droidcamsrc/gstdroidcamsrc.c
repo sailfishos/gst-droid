@@ -481,8 +481,7 @@ gst_droidcamsrc_get_hw (GstDroidCamSrc * src)
   }
 
   if (num > MAX_CAMERAS) {
-    GST_ERROR_OBJECT (src, "cannot support %d cameras", num);
-    return FALSE;
+    GST_WARNING_OBJECT (src, "cannot support %d cameras", num);
   }
 
   src->info[0].num = src->info[1].num = -1;
