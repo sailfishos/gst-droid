@@ -27,6 +27,7 @@
 #include "gst/droid/gstdroidmediabuffer.h"
 #include "gst/droid/gstdroidbufferpool.h"
 #include "plugin.h"
+#include "droidmediaconstants.h"
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <string.h>             /* memset() */
@@ -265,7 +266,7 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
 
   if (dec->codec_type->quirks & USE_CODEC_SUPPLIED_WIDTH_VALUE) {
     width = dec->codec_reported_width;
-    GST_INFO_OBJECT (dec, "using codec supplied width %d", height);
+    GST_INFO_OBJECT (dec, "using codec supplied width %d", width);
   }
 
   if (dec->codec_type->quirks & USE_CODEC_SUPPLIED_HEIGHT_VALUE) {
@@ -333,21 +334,55 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
       }
     }
   } else {
-    /* copy to the output buffer swapping the u and v planes and cropping if necessary */
-    /* this assumes a NV12 format with 128 byte alignment */
-    gint stride = ALIGN_SIZE (width, 128);
-    gint slice_height = ALIGN_SIZE (height, 32);
-    gint top = ALIGN_SIZE (dec->crop_rect.top, 2);
-    gint left = ALIGN_SIZE (dec->crop_rect.left, 2);
+    DroidMediaColourFormatConstants c;
+    droid_media_colour_format_constants_init (&c);
+    if (dec->hal_format == c.OMX_COLOR_FormatYUV420Planar) {
+      /* Buffer is already I420, so we can copy it straight over */
+      /* though we need to handle the cropping */
 
-    guint8 *y = in->data + (top * stride) + left;
-    guint8 *uv = in->data + (stride * slice_height) + (top * stride / 2) + left;
+      GST_DEBUG_OBJECT (dec, "Copying I420 buffer");
+      gint top = dec->crop_rect.top;
+      gint left = dec->crop_rect.left;
+      gint crop_width = dec->crop_rect.right - left;
+      gint crop_height = dec->crop_rect.bottom - top;
 
-    gst_droidvec_copy_plane (map_info.data + info->offset[0], info->stride[0],
-        y, stride, info->width, info->height);
-    gst_droidvec_copy_packed_planes (map_info.data + info->offset[1],
-        map_info.data + info->offset[2], info->stride[1], uv, stride,
-        info->width / 2, info->height / 2);
+      guint8 *y = in->data + (top * width) + left;
+      guint8 *u = in->data + (width * height) + (top * width / 2) + (left / 2);
+      guint8 *v =
+          in->data + (width * height) + (width * height / 4) +
+          (top * width / 2) + (left / 2);
+
+      gst_droidvec_copy_plane (map_info.data + info->offset[0],
+          info->stride[0], y, width, crop_width, crop_height);
+      gst_droidvec_copy_plane (map_info.data + info->offset[1],
+          info->stride[1], u, width / 2, crop_width / 2, crop_height / 2);
+      gst_droidvec_copy_plane (map_info.data + info->offset[2],
+          info->stride[2], v, width / 2, crop_width / 2, crop_height / 2);
+
+    } else if (dec->hal_format == c.QOMX_COLOR_FormatYUV420PackedSemiPlanar32m) {
+      /* copy to the output buffer swapping the u and v planes and cropping if necessary */
+      /* NV12 format with 128 byte alignment */
+      GST_DEBUG_OBJECT (dec, "Converting from qcom NV12 semi planar");
+      gint stride = ALIGN_SIZE (width, 128);
+      gint slice_height = ALIGN_SIZE (height, 32);
+      gint top = ALIGN_SIZE (dec->crop_rect.top, 2);
+      gint left = ALIGN_SIZE (dec->crop_rect.left, 2);
+
+      guint8 *y = in->data + (top * stride) + left;
+      guint8 *uv =
+          in->data + (stride * slice_height) + (top * stride / 2) + left;
+
+      gst_droidvec_copy_plane (map_info.data + info->offset[0],
+          info->stride[0], y, stride, info->width, info->height);
+      gst_droidvec_copy_packed_planes (map_info.data + info->offset[1],
+          map_info.data + info->offset[2], info->stride[1], uv, stride,
+          info->width / 2, info->height / 2);
+    } else {
+      GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, (NULL),
+          ("Unknown codec colour format: %d", dec->hal_format));
+      ret = FALSE;
+      goto out;
+    }
   }
 
   ret = TRUE;
@@ -674,11 +709,13 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
   droid_media_codec_get_output_info (dec->codec, &md, &rect);
 
   GST_INFO_OBJECT (dec,
-      "codec reported state: width: %d, height: %d, crop: %d,%d %d,%d",
-      md.width, md.height, rect.left, rect.top, rect.right, rect.bottom);
+      "codec reported state: colour: %d, width: %d, height: %d, crop: %d,%d %d,%d",
+      md.hal_format, md.width, md.height, rect.left, rect.top, rect.right,
+      rect.bottom);
 
   dec->codec_reported_height = md.height;
   dec->codec_reported_width = md.width;
+  dec->hal_format = md.hal_format;
 
   if (dec->format == GST_VIDEO_FORMAT_I420) {
     width = rect.right - rect.left;
@@ -709,7 +746,7 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
     if (dec->convert) {
       droid_media_convert_set_crop_rect (dec->convert, rect, md.width,
           md.height);
-      GST_INFO_OBJECT (dec, "using I420 conversion for output buffers");
+      GST_INFO_OBJECT (dec, "using colour conversion for output buffers");
     }
   }
 
