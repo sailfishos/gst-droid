@@ -123,6 +123,7 @@ struct Node
       ADD_ENTRY (GST_PHOTOGRAPHY_COLOR_TONE_MODE_AQUA, "aqua"),
       {NULL, -1}
     }},
+  // Qualcomm ISO values (e.g. ISO100) and Intel (iso-100)
   {"iso-values", "iso-speed", {
       ADD_ENTRY (0, "auto"),
       ADD_ENTRY (0, "iso-auto"),
@@ -138,6 +139,16 @@ struct Node
       ADD_ENTRY (3200, "ISO3200"),
       {NULL, -1}
     }},
+  // Mediatek ISO values
+  {"iso-speed-values", "iso-speed", {
+      ADD_ENTRY (0, "auto"),
+      ADD_ENTRY (100, "100"),
+      ADD_ENTRY (200, "200"),
+      ADD_ENTRY (400, "400"),
+      ADD_ENTRY (800, "800"),
+      ADD_ENTRY (1600, "1600"),
+      {NULL, -1}
+  }},
   {"antibanding-values", "flicker-mode", {
       ADD_ENTRY (GST_PHOTOGRAPHY_FLICKER_REDUCTION_OFF, "off"),
       ADD_ENTRY (GST_PHOTOGRAPHY_FLICKER_REDUCTION_50HZ, "50hz"),

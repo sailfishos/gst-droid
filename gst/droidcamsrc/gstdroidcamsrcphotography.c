@@ -76,6 +76,7 @@ struct _GstDroidCamSrcPhotography
   GList *scene;
   GList *wb;
   GList *iso;
+  gchar *iso_key;
   GList *flicker;
 };
 
@@ -1040,12 +1041,25 @@ gst_droidcamsrc_set_iso_speed (GstDroidCamSrc * src, guint iso_speed)
     GST_WARNING_OBJECT (src, "setting iso to %d is not supported", iso_speed);
     return FALSE;
   }
-
+  // find iso param key if not set
+  if (src->photo->iso_key == NULL) {
+    if (src->dev == NULL || src->dev->params == NULL) {
+      GST_WARNING_OBJECT (src, "Params are NULL! Cannot find iso param key.");
+      return FALSE;
+    }
+    if (gst_droidcamsrc_has_param (src->dev->params, "iso")) {
+      src->photo->iso_key = "iso";
+    } else if (gst_droidcamsrc_has_param (src->dev->params, "iso-speed")) {
+      src->photo->iso_key = "iso-speed";
+    } else {
+      GST_WARNING_OBJECT (src, "ISO setting param key not found. Cannot set");
+      return FALSE;
+    }
+  }
   GST_OBJECT_LOCK (src);
   src->photo->settings.iso_speed = iso_speed;
   GST_OBJECT_UNLOCK (src);
-
-  return gst_droidcamsrc_set_and_apply (src, "iso", value);
+  return gst_droidcamsrc_set_and_apply (src, src->photo->iso_key, value);
 }
 
 static gboolean
@@ -1406,8 +1420,23 @@ gst_droidcamsrc_photography_set_iso_to_droid (GstDroidCamSrc * src)
         src->photo->settings.iso_speed);
     return;
   }
-
-  gst_droidcamsrc_params_set_string (src->dev->params, "iso", value);
+  // find iso param key if not set
+  if (src->photo->iso_key == NULL) {
+    if (src->dev == NULL || src->dev->params == NULL) {
+      GST_WARNING_OBJECT (src, "Params are NULL! Cannot find iso param key.");
+      return FALSE;
+    }
+    if (gst_droidcamsrc_has_param (src->dev->params, "iso")) {
+      src->photo->iso_key = "iso";
+    } else if (gst_droidcamsrc_has_param (src->dev->params, "iso-speed")) {
+      src->photo->iso_key = "iso-speed";
+    } else {
+      GST_WARNING_OBJECT (src, "ISO setting param key not found. Cannot set");
+      return FALSE;
+    }
+  }
+  gst_droidcamsrc_params_set_string (src->dev->params, src->photo->iso_key,
+      value);
 }
 
 static void
