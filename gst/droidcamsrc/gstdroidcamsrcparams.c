@@ -51,6 +51,12 @@ out:
   g_strfreev (parts);
 }
 
+gboolean
+gst_droidcamsrc_has_param (GstDroidCamSrcParams * params, const char *key)
+{
+  return g_hash_table_contains (params->params, key);
+}
+
 static int
 gst_droidcamsrc_params_get_int_locked (GstDroidCamSrcParams * params,
     const char *key)
