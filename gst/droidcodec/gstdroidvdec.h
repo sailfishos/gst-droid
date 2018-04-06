@@ -81,6 +81,7 @@ struct _GstDroidVDec
   GstVideoCodecState *in_state;
   GstVideoCodecState *out_state;
   DroidMediaConvert *convert;
+  gint32 hal_format;
 };
 
 struct _GstDroidVDecClass

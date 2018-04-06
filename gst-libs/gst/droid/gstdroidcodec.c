@@ -1104,6 +1104,7 @@ gst_droid_codec_type_fill_quirks (GstDroidCodec * codec)
     goto out;
   }
 
+  codec->quirks = 0;
   for (x = 0; x < quirks_length; x++) {
     if (!g_strcmp0 (quirks_string[x], USE_CODEC_SUPPLIED_HEIGHT_NAME)) {
       codec->quirks |= USE_CODEC_SUPPLIED_HEIGHT_VALUE;
