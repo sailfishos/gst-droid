@@ -115,6 +115,14 @@ gst_droidaenc_create_codec (GstDroidAEnc * enc)
   md.max_input_size = info.bpf * enc->rate;
   enc->codec = droid_media_codec_create_encoder (&md);
 
+  // Reset timestamp clock
+  GstClock *clock = GST_ELEMENT_CLOCK (enc);
+  if (clock) {
+    gst_object_ref (clock);
+    GST_ELEMENT_CAST (enc)->base_time = gst_clock_get_time (clock);
+    gst_object_unref (clock);
+  }
+
   if (!enc->codec) {
     GST_ELEMENT_ERROR (enc, LIBRARY, SETTINGS, NULL,
         ("Failed to create encoder"));
@@ -507,8 +515,23 @@ gst_droidaenc_handle_frame (GstAudioEncoder * encoder, GstBuffer * buffer)
   data.data.size = info.size;
   data.data.data = g_malloc (info.size);
   data.sync = false;
-  data.ts = GST_TIME_AS_USECONDS (buffer->pts);
 
+/* Check if the buffer has a valid timestamp, and if not then set it from the
+ * encoder's clock, as some versions of libstagefright throw away frames if
+ * it doesn't increase
+ */
+  GstClockTime ts = GST_BUFFER_TIMESTAMP (buffer);
+  if (!GST_CLOCK_TIME_IS_VALID (ts)) {
+    GST_DEBUG_OBJECT (enc, "Replacing invalid timestamp: %" GST_TIME_FORMAT,
+        GST_TIME_ARGS (ts));
+    GstClock *clock = gst_element_get_clock (enc);
+    if (clock) {
+      ts = gst_clock_get_time (clock) - GST_ELEMENT_CAST (enc)->base_time;
+      GST_DEBUG_OBJECT (enc, "New timestamp: %" GST_TIME_FORMAT,
+          GST_TIME_ARGS (ts));
+    }
+  }
+  data.ts = GST_TIME_AS_USECONDS (ts);
   memcpy (data.data.data, info.data, info.size);
 
   gst_buffer_unmap (buffer, &info);
