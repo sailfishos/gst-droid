@@ -85,6 +85,10 @@ void
 gst_droidcamsrc_recorder_update_vid (GstDroidCamSrcRecorder * recorder,
     GstVideoInfo * info, GstCaps * caps)
 {
+  if (recorder->codec) {
+    gst_droid_codec_unref (recorder->codec);
+  }
+
   recorder->codec =
       gst_droid_codec_new_from_caps (caps, GST_DROID_CODEC_ENCODER_VIDEO);
   recorder->md.parent.width = info->width;
