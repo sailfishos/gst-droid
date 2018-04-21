@@ -807,6 +807,8 @@ gst_droidcamsrc_photography_load (GKeyFile * file, const gchar * property)
     }
   }
 
+  g_strfreev(keys);
+
   return list;
 }
 
