@@ -34,7 +34,7 @@
 GST_DEBUG_CATEGORY (gst_droid_codec_debug);
 #define GST_CAT_DEFAULT gst_droid_codec_debug
 
-static GstBuffer *create_mpeg4venc_codec_data (DroidMediaData * data);
+static GstBuffer *create_enc_codec_data (DroidMediaData * data);
 static GstBuffer *create_h264enc_codec_data (DroidMediaData * data);
 static gboolean create_mpeg4vdec_codec_data_from_codec_data (GstDroidCodec *
     codec, GstBuffer * data, DroidMediaData * out);
@@ -151,17 +151,21 @@ static GstDroidCodecInfo codecs[] = {
   {GST_DROID_CODEC_ENCODER_AUDIO, "audio/mpeg", "audio/mp4a-latm",
         "audio/mpeg, mpegversion=(int)4, stream-format=(string){raw}"
         CAPS_FRAGMENT_AUDIO_ENCODER, TRUE,
-      is_mpeg4v, NULL, create_mpeg4venc_codec_data, NULL, NULL, NULL, NULL},
+      is_mpeg4v, NULL, create_enc_codec_data, NULL, NULL, NULL, NULL},
 
   /* video encoders */
   {GST_DROID_CODEC_ENCODER_VIDEO, "video/mpeg", "video/mp4v-es",
         "video/mpeg, mpegversion=4, systemstream=false", TRUE,
-      is_mpeg4v, NULL, create_mpeg4venc_codec_data, NULL, NULL, NULL, NULL},
+      is_mpeg4v, NULL, create_enc_codec_data, NULL, NULL, NULL, NULL},
 
   {GST_DROID_CODEC_ENCODER_VIDEO, "video/x-h264", "video/avc",
         "video/x-h264, stream-format=avc,alignment=au", TRUE,
         is_h264_enc, h264enc_complement, create_h264enc_codec_data,
       process_h264enc_data, NULL, NULL, NULL},
+
+  {GST_DROID_CODEC_ENCODER_VIDEO, "video/x-vp8", "video/x-vnd.on2.vp8",
+        "video/x-vp8", TRUE, NULL, NULL, create_enc_codec_data, NULL,
+      NULL, NULL, NULL},
 };
 
 GstDroidCodec *
@@ -423,7 +427,7 @@ gst_droid_codec_get_samples_per_frane (GstCaps * caps)
 }
 
 static GstBuffer *
-create_mpeg4venc_codec_data (DroidMediaData * data)
+create_enc_codec_data (DroidMediaData * data)
 {
   GstBuffer *codec_data = gst_buffer_new_allocate (NULL, data->size, NULL);
 
