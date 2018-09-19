@@ -183,7 +183,7 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   src->fps_d = 1;
   src->target_bitrate = DEFAULT_TARGET_BITRATE;
 
-  gst_droidcamsrc_photography_init (src, DEFAULT_CAMERA_DEVICE);
+  gst_droidcamsrc_photography_init (src);
 
   src->vfsrc = gst_droidcamsrc_create_pad (src,
       GST_BASE_CAMERA_SRC_VIEWFINDER_PAD_NAME, FALSE);
@@ -325,8 +325,8 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
       } else {
         src->camera_device = g_value_get_enum (value);
         GST_INFO_OBJECT (src, "camera device set to %d", src->camera_device);
-        /* load our configuration file */
-        gst_droidcamsrc_photography_init (src, src->camera_device);
+        /* initialize empty photo properties */
+        gst_droidcamsrc_photography_init (src);
       }
       g_rec_mutex_unlock (&src->dev_lock);
       break;
@@ -596,6 +596,9 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 
       /* now that we have camera parameters, we can update min and max ev-compensation */
       gst_droidcamsrc_update_ev_compensation_bounds (src);
+
+      /* and the photography parameters */
+      gst_droidcamsrc_photography_update_params (src);
 
       /* And we can also detect the supported image modes. In reality the only thing
          we are unable to detect until this moment is _ZSL_AND_HDR */

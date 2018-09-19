@@ -75,7 +75,8 @@ typedef enum
 
 void gst_droidcamsrc_photography_register (gpointer g_iface,  gpointer iface_data);
 void gst_droidcamsrc_photography_add_overrides (GObjectClass * klass);
-void gst_droidcamsrc_photography_init (GstDroidCamSrc * src, gint dev);
+void gst_droidcamsrc_photography_init (GstDroidCamSrc * src);
+void gst_droidcamsrc_photography_update_params (GstDroidCamSrc * src);
 void gst_droidcamsrc_photography_destroy (GstDroidCamSrc * src);
 gboolean gst_droidcamsrc_photography_get_property (GstDroidCamSrc * src, guint prop_id,
 						   GValue * value, GParamSpec * pspec);

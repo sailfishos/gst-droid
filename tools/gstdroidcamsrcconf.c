@@ -127,6 +127,7 @@ struct Node
   {"iso-values", "iso-speed", {
       ADD_ENTRY (0, "auto"),
       ADD_ENTRY (0, "iso-auto"),
+      ADD_ENTRY (1, "ISO_HJR"),
       ADD_ENTRY (100, "ISO100"),
       ADD_ENTRY (100, "iso-100"),
       ADD_ENTRY (200, "ISO200"),
@@ -137,6 +138,8 @@ struct Node
       ADD_ENTRY (800, "iso-800"),
       ADD_ENTRY (1600, "ISO1600"),
       ADD_ENTRY (3200, "ISO3200"),
+      ADD_ENTRY (6400, "ISO6400"),
+      ADD_ENTRY (12800, "ISO12800"),
       {NULL, -1}
     }},
   // Mediatek ISO values
@@ -147,6 +150,9 @@ struct Node
       ADD_ENTRY (400, "400"),
       ADD_ENTRY (800, "800"),
       ADD_ENTRY (1600, "1600"),
+      ADD_ENTRY (3200, "3200"),
+      ADD_ENTRY (6400, "6400"),
+      ADD_ENTRY (12800, "12800"),
       {NULL, -1}
   }},
   {"antibanding-values", "flicker-mode", {
