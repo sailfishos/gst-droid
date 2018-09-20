@@ -377,6 +377,25 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
       gst_droidvec_copy_packed_planes (map_info.data + info->offset[1],
           map_info.data + info->offset[2], info->stride[1], uv, stride,
           info->width / 2, info->height / 2);
+
+    } else if (dec->hal_format == c.OMX_COLOR_FormatYUV420SemiPlanar) {
+      GST_DEBUG_OBJECT (dec,
+          "Converting from OMX_COLOR_FormatYUV420SemiPlanar");
+      gint stride = width;
+      gint slice_height = ALIGN_SIZE (height, 16);
+      gint top = dec->crop_rect.top;
+      gint left = dec->crop_rect.left;
+
+      guint8 *y = in->data + (top * stride) + left;
+      guint8 *uv =
+          in->data + (stride * slice_height) + (top * stride / 2) + left;
+
+      gst_droidvec_copy_plane (map_info.data + info->offset[0],
+          info->stride[0], y, stride, info->width, info->height);
+      gst_droidvec_copy_packed_planes (map_info.data + info->offset[1],
+          map_info.data + info->offset[2], info->stride[1], uv, stride,
+          info->width / 2, info->height / 2);
+
     } else {
       GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, (NULL),
           ("Unknown codec colour format: %d", dec->hal_format));
