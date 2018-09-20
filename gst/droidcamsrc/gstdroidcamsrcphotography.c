@@ -1259,11 +1259,31 @@ gst_droidcamsrc_set_scene_mode (GstDroidCamSrc
   SET_ENUM (src->photo->scene, scene_mode, "scene-mode", scene_mode);
 }
 
+static void
+gst_droidcamsrc_set_extra_flash_params (GstDroidCamSrc * src)
+{
+  // Enable chroma-flash if available, but only when the flash is enabled
+  const GstDroidCamSrcQuirk *quirk =
+      gst_droidcamsrc_quirks_get_quirk (src->quirks, "chroma-flash");
+  if (quirk) {
+    if (src->photo->settings.flash_mode == GST_PHOTOGRAPHY_FLASH_MODE_OFF) {
+      GST_INFO_OBJECT (src, "Disabling chroma flash");
+      gst_droidcamsrc_quirks_apply_quirk (src->quirks, src,
+          src->dev->info->direction, src->mode, quirk, FALSE);
+    } else {
+      GST_INFO_OBJECT (src, "Enabling chroma flash");
+      gst_droidcamsrc_quirks_apply_quirk (src->quirks, src,
+          src->dev->info->direction, src->mode, quirk, TRUE);
+    }
+  }
+}
+
 static gboolean
 gst_droidcamsrc_set_flash_mode (GstDroidCamSrc
     * src, GstPhotographyFlashMode flash_mode)
 {
   SET_ENUM (src->photo->flash, flash_mode, "flash-mode", flash_mode);
+  gst_droidcamsrc_set_extra_flash_params (src);
 }
 
 static gboolean
@@ -1565,6 +1585,8 @@ gst_droidcamsrc_photography_set_flash_to_droid (GstDroidCamSrc * src)
 
   GST_INFO_OBJECT (src, "setting flash-mode to %s", value);
   gst_droidcamsrc_params_set_string (src->dev->params, "flash-mode", value);
+
+  gst_droidcamsrc_set_extra_flash_params (src);
 }
 
 static void
