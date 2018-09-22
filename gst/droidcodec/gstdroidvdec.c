@@ -279,6 +279,11 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
   use_external_buffer = use_droid_convert && gst_buffer_get_size (out) != size;
   map_info.data = NULL;
 
+  if (dec->codec_type->quirks & DONT_USE_DROID_CONVERT_VALUE) {
+    use_droid_convert = false;
+    GST_INFO_OBJECT (dec, "not using droid convert binary");
+  }
+
   if (!gst_buffer_map (out, &map_info, GST_MAP_WRITE)) {
     GST_ERROR_OBJECT (dec, "failed to map buffer");
     ret = FALSE;
