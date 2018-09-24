@@ -87,6 +87,7 @@ void gst_droidcamsrc_photography_apply (GstDroidCamSrc * src,
 					GstDroidCamSrcApplyType type);
 void gst_droidcamsrc_photography_set_focus_to_droid (GstDroidCamSrc * src);
 void gst_droidcamsrc_photography_set_flash_to_droid (GstDroidCamSrc * src);
+void gst_droidcamsrc_photography_set_scene_mode_to_droid (GstDroidCamSrc * src);
 
 G_END_DECLS
 

@@ -143,11 +143,12 @@ struct DataEntry WhiteBalanceValues[] = {
 };
 
 struct DataEntry SceneValues[] = {
+  {GST_PHOTOGRAPHY_SCENE_MODE_MANUAL, "auto"},
   {GST_PHOTOGRAPHY_SCENE_MODE_PORTRAIT, "portrait"},
   {GST_PHOTOGRAPHY_SCENE_MODE_LANDSCAPE, "landscape"},
   {GST_PHOTOGRAPHY_SCENE_MODE_SPORT, "sports"},
   {GST_PHOTOGRAPHY_SCENE_MODE_NIGHT, "night"},
-  {GST_PHOTOGRAPHY_SCENE_MODE_AUTO, "auto"},
+  {GST_PHOTOGRAPHY_SCENE_MODE_AUTO, "asd"},
   {GST_PHOTOGRAPHY_SCENE_MODE_ACTION, "action"},
   {GST_PHOTOGRAPHY_SCENE_MODE_NIGHT_PORTRAIT, "night-portrait"},
   {GST_PHOTOGRAPHY_SCENE_MODE_THEATRE, "theatre"},
@@ -916,10 +917,9 @@ gst_droidcamsrc_photography_apply (GstDroidCamSrc * src,
   gst_droidcamsrc_photography_set_iso_to_droid (src);
   gst_droidcamsrc_photography_set_zoom_to_droid (src);
   gst_droidcamsrc_photography_set_ev_compensation_to_droid (src);
+  gst_droidcamsrc_photography_set_scene_mode_to_droid (src);
 
   APPLY_SETTING (src->photo->wb, src->photo->settings.wb_mode, "whitebalance");
-  APPLY_SETTING (src->photo->scene, src->photo->settings.scene_mode,
-      "scene-mode");
   APPLY_SETTING (src->photo->color_tone, src->photo->settings.tone_mode,
       "effect");
   APPLY_SETTING (src->photo->flicker, src->photo->settings.flicker_mode,
@@ -1250,6 +1250,25 @@ gst_droidcamsrc_set_color_tone_mode (GstDroidCamSrc *
   SET_ENUM (src->photo->color_tone, tone_mode, "effect", tone_mode);
 }
 
+static void
+gst_droidcamsrc_set_extra_scene_mode_params (GstDroidCamSrc * src)
+{
+  // In AUTO scene mode, enable scene detect if available
+  const GstDroidCamSrcQuirk *quirk =
+      gst_droidcamsrc_quirks_get_quirk (src->quirks, "scene-detect");
+  if (quirk) {
+    if (src->photo->settings.scene_mode == GST_PHOTOGRAPHY_SCENE_MODE_AUTO) {
+      GST_INFO_OBJECT (src, "Enabling scene detection");
+      gst_droidcamsrc_quirks_apply_quirk (src->quirks, src,
+          src->dev->info->direction, src->mode, quirk, TRUE);
+    } else {
+      GST_INFO_OBJECT (src, "Disabling scene detection");
+      gst_droidcamsrc_quirks_apply_quirk (src->quirks, src,
+          src->dev->info->direction, src->mode, quirk, FALSE);
+    }
+  }
+}
+
 static gboolean
 gst_droidcamsrc_set_scene_mode (GstDroidCamSrc
     * src, GstPhotographySceneMode scene_mode)
@@ -1257,6 +1276,7 @@ gst_droidcamsrc_set_scene_mode (GstDroidCamSrc
   // TODO: an idea would be switching focus mode to macro here if we are in closeup scene
   // and switch it back to whatever it was when we are in normal mode.
   SET_ENUM (src->photo->scene, scene_mode, "scene-mode", scene_mode);
+  gst_droidcamsrc_set_extra_scene_mode_params (src);
 }
 
 static void
@@ -1662,4 +1682,35 @@ gst_droidcamsrc_photography_set_ev_compensation_to_droid (GstDroidCamSrc * src)
       value);
 
   g_free (value);
+}
+
+void
+gst_droidcamsrc_photography_set_scene_mode_to_droid (GstDroidCamSrc * src)
+{
+  int x;
+  int len = g_list_length (src->photo->scene);
+  gchar *value = NULL;
+
+  if (!src->dev || !src->dev->params) {
+    return;
+  }
+
+  for (x = 0; x < len; x++) {
+    struct DataEntry *entry =
+        (struct DataEntry *) g_list_nth_data (src->photo->scene, x);
+    if (src->photo->settings.scene_mode == entry->key) {
+      value = entry->value;
+      break;
+    }
+  }
+
+  if (!value) {
+    GST_WARNING_OBJECT (src, "setting scene mode to %d is not supported",
+        src->photo->settings.scene_mode);
+    return;
+  }
+
+  gst_droidcamsrc_params_set_string (src->dev->params, "scene-mode", value);
+
+  gst_droidcamsrc_set_extra_scene_mode_params (src);
 }
