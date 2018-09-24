@@ -35,6 +35,9 @@ G_BEGIN_DECLS
 #define USE_CODEC_SUPPLIED_WIDTH_NAME    "use-codec-supplied-width"
 #define USE_CODEC_SUPPLIED_WIDTH_VALUE   0x2
 
+#define DONT_USE_DROID_CONVERT_NAME    "dont-use-droid-convert"
+#define DONT_USE_DROID_CONVERT_VALUE   0x4
+
 typedef struct _GstDroidCodec GstDroidCodec;
 typedef struct _GstDroidCodecInfo GstDroidCodecInfo;
 typedef struct _GstDroidCodecPrivate GstDroidCodecPrivate;
