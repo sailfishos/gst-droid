@@ -112,6 +112,7 @@ struct _GstDroidCamSrc
   gboolean video_torch;
   gboolean face_detection;
   gboolean image_noise_reduction;
+  gboolean video_noise_reduction;
   GstDroidCamSrcImageMode image_mode;
 
   GstDroidCamSrcPhotography * photo;

@@ -111,6 +111,7 @@ static guint droidcamsrc_signals[LAST_SIGNAL];
 #define DEFAULT_MAX_EV_COMPENSATION    2.5f
 #define DEFAULT_FACE_DETECTION         FALSE
 #define DEFAULT_IMAGE_NOISE_REDUCTION  TRUE
+#define DEFAULT_VIDEO_NOISE_REDUCTION  TRUE
 #define DEFAULT_SENSOR_ORIENTATION     0
 #define DEFAULT_IMAGE_MODE             GST_DROIDCAMSRC_IMAGE_MODE_NORMAL
 #define DEFAULT_TARGET_BITRATE         12000000
@@ -173,6 +174,7 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   src->video_torch = DEFAULT_VIDEO_TORCH;
   src->face_detection = DEFAULT_FACE_DETECTION;
   src->image_noise_reduction = DEFAULT_IMAGE_NOISE_REDUCTION;
+  src->video_noise_reduction = DEFAULT_VIDEO_NOISE_REDUCTION;
   src->image_mode = GST_DROIDCAMSRC_IMAGE_MODE_NORMAL;
   src->min_ev_compensation = DEFAULT_MIN_EV_COMPENSATION;
   src->max_ev_compensation = DEFAULT_MAX_EV_COMPENSATION;
@@ -262,6 +264,10 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
 
     case PROP_IMAGE_NOISE_REDUCTION:
       g_value_set_boolean (value, src->image_noise_reduction);
+      break;
+
+    case PROP_VIDEO_NOISE_REDUCTION:
+      g_value_set_boolean (value, src->video_noise_reduction);
       break;
 
     case PROP_SENSOR_MOUNT_ANGLE:
@@ -388,6 +394,11 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
 
     case PROP_IMAGE_NOISE_REDUCTION:
       src->image_noise_reduction = g_value_get_boolean (value);
+      gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
+      break;
+
+    case PROP_VIDEO_NOISE_REDUCTION:
+      src->video_noise_reduction = g_value_get_boolean (value);
       gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
       break;
 
@@ -1014,6 +1025,12 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
       g_param_spec_boolean ("image-noise-reduction", "Image noise reduction",
           "Vendor specific image noise reduction",
           DEFAULT_IMAGE_NOISE_REDUCTION,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_VIDEO_NOISE_REDUCTION,
+      g_param_spec_boolean ("video-noise-reduction", "Video noise reduction",
+          "Vendor specific video noise reduction",
+          DEFAULT_VIDEO_NOISE_REDUCTION,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SENSOR_ORIENTATION,
@@ -2068,9 +2085,11 @@ gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
     gst_droidcamsrc_dev_enable_face_detection (src->dev, TRUE);
   }
 
-  /* image noise reduction */
+  /* noise reduction */
   gst_droidcamsrc_apply_quirk (src, "image-noise-reduction",
       src->image_noise_reduction);
+  gst_droidcamsrc_apply_quirk (src, "video-noise-reduction",
+      src->video_noise_reduction);
 
   /* ZSL quirk */
   gst_droidcamsrc_apply_quirk (src, "zsl",
