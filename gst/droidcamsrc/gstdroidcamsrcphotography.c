@@ -86,8 +86,108 @@ struct DataEntry
   gchar *value;
 };
 
-static GList *gst_droidcamsrc_photography_load (GKeyFile * file,
-    const gchar * property);
+struct DataEntry FlashValues[] = {
+  {GST_PHOTOGRAPHY_FLASH_MODE_AUTO, "auto"},
+  {GST_PHOTOGRAPHY_FLASH_MODE_OFF, "off"},
+  {GST_PHOTOGRAPHY_FLASH_MODE_ON, "on"},
+  {GST_PHOTOGRAPHY_FLASH_MODE_RED_EYE, "red-eye"}
+};
+
+struct DataEntry FocusValues[] = {
+  {GST_PHOTOGRAPHY_FOCUS_MODE_AUTO, "auto"},
+  {GST_PHOTOGRAPHY_FOCUS_MODE_MACRO, "macro"},
+  {GST_PHOTOGRAPHY_FOCUS_MODE_INFINITY, "infinity"},
+  {GST_PHOTOGRAPHY_FOCUS_MODE_HYPERFOCAL, "fixed"},
+  {GST_PHOTOGRAPHY_FOCUS_MODE_EXTENDED, "edof"},
+  {GST_PHOTOGRAPHY_FOCUS_MODE_CONTINUOUS_NORMAL, "continuous"},
+  {GST_PHOTOGRAPHY_FOCUS_MODE_CONTINUOUS_EXTENDED, "continuous"},
+  {GST_PHOTOGRAPHY_FOCUS_MODE_MANUAL, "manual"}
+};
+
+struct DataEntry ISOValues[] = {
+  {0, "auto"},
+  {0, "iso-auto"},
+  {1, "ISO_HJR"},
+  {100, "ISO100"},
+  {100, "iso-100"},
+  {100, "100"},
+  {200, "ISO200"},
+  {200, "iso-200"},
+  {200, "200"},
+  {400, "ISO400"},
+  {400, "iso-400"},
+  {400, "400"},
+  {800, "ISO800"},
+  {800, "iso-800"},
+  {800, "800"},
+  {1600, "ISO1600"},
+  {1600, "1600"},
+  {3200, "ISO3200"},
+  {3200, "3200"},
+  {6400, "ISO6400"},
+  {6400, "6400"},
+  {12800, "ISO12800"},
+  {12800, "12800"}
+};
+
+struct DataEntry WhiteBalanceValues[] = {
+  {GST_PHOTOGRAPHY_WB_MODE_AUTO, "auto"},
+  {GST_PHOTOGRAPHY_WB_MODE_DAYLIGHT, "daylight"},
+  {GST_PHOTOGRAPHY_WB_MODE_CLOUDY, "cloudy-daylight"},
+  {GST_PHOTOGRAPHY_WB_MODE_SUNSET, "twilight"},
+  {GST_PHOTOGRAPHY_WB_MODE_TUNGSTEN, "incandescent"},
+  {GST_PHOTOGRAPHY_WB_MODE_FLUORESCENT, "fluorescent"},
+  {GST_PHOTOGRAPHY_WB_MODE_MANUAL, "manual"},
+  {GST_PHOTOGRAPHY_WB_MODE_WARM_FLUORESCENT, "warm-fluorescent"},
+  {GST_PHOTOGRAPHY_WB_MODE_SHADE, "shade"}
+};
+
+struct DataEntry SceneValues[] = {
+  {GST_PHOTOGRAPHY_SCENE_MODE_PORTRAIT, "portrait"},
+  {GST_PHOTOGRAPHY_SCENE_MODE_LANDSCAPE, "landscape"},
+  {GST_PHOTOGRAPHY_SCENE_MODE_SPORT, "sports"},
+  {GST_PHOTOGRAPHY_SCENE_MODE_NIGHT, "night"},
+  {GST_PHOTOGRAPHY_SCENE_MODE_AUTO, "auto"},
+  {GST_PHOTOGRAPHY_SCENE_MODE_ACTION, "action"},
+  {GST_PHOTOGRAPHY_SCENE_MODE_NIGHT_PORTRAIT, "night-portrait"},
+  {GST_PHOTOGRAPHY_SCENE_MODE_THEATRE, "theatre"},
+  {GST_PHOTOGRAPHY_SCENE_MODE_BEACH, "beach"},
+  {GST_PHOTOGRAPHY_SCENE_MODE_SNOW, "snow"},
+  {GST_PHOTOGRAPHY_SCENE_MODE_SUNSET, "sunset"},
+  {GST_PHOTOGRAPHY_SCENE_MODE_STEADY_PHOTO, "steadyphoto"},
+  {GST_PHOTOGRAPHY_SCENE_MODE_FIREWORKS, "fireworks"},
+  {GST_PHOTOGRAPHY_SCENE_MODE_PARTY, "party"},
+  {GST_PHOTOGRAPHY_SCENE_MODE_CANDLELIGHT, "candlelight"},
+  {GST_PHOTOGRAPHY_SCENE_MODE_BARCODE, "barcode"}
+};
+
+struct DataEntry ColourToneValues[] = {
+  {GST_PHOTOGRAPHY_COLOR_TONE_MODE_NORMAL, "none"},
+  {GST_PHOTOGRAPHY_COLOR_TONE_MODE_SEPIA, "sepia"},
+  {GST_PHOTOGRAPHY_COLOR_TONE_MODE_NEGATIVE, "negative"},
+  {GST_PHOTOGRAPHY_COLOR_TONE_MODE_GRAYSCALE, "mono"},
+  {GST_PHOTOGRAPHY_COLOR_TONE_MODE_VIVID, "vivid"},
+  {GST_PHOTOGRAPHY_COLOR_TONE_MODE_SOLARIZE, "solarize"},
+  {GST_PHOTOGRAPHY_COLOR_TONE_MODE_SKY_BLUE, "still-sky-blue"},
+  {GST_PHOTOGRAPHY_COLOR_TONE_MODE_GRASS_GREEN, "still-grass-green"},
+  {GST_PHOTOGRAPHY_COLOR_TONE_MODE_SKIN_WHITEN, "still-skin-whiten-medium"},
+  {GST_PHOTOGRAPHY_COLOR_TONE_MODE_POSTERIZE, "posterize"},
+  {GST_PHOTOGRAPHY_COLOR_TONE_MODE_WHITEBOARD, "whiteboard"},
+  {GST_PHOTOGRAPHY_COLOR_TONE_MODE_BLACKBOARD, "blackboard"},
+  {GST_PHOTOGRAPHY_COLOR_TONE_MODE_AQUA, "aqua"},
+};
+
+struct DataEntry FlickerValues[] = {
+  {GST_PHOTOGRAPHY_FLICKER_REDUCTION_OFF, "off"},
+  {GST_PHOTOGRAPHY_FLICKER_REDUCTION_50HZ, "50hz"},
+  {GST_PHOTOGRAPHY_FLICKER_REDUCTION_60HZ, "60hz"},
+  {GST_PHOTOGRAPHY_FLICKER_REDUCTION_AUTO, "auto"}
+};
+
+static GList *gst_droidcamsrc_photography_append_list (GList * list,
+    const int key, const gchar * value);
+static GList *gst_droidcamsrc_photography_create_list (const gchar * params,
+    struct DataEntry entries[], gsize len);
 
 #define PHOTO_IFACE_FUNC(name, tset, tget)					\
   static gboolean gst_droidcamsrc_get_##name (GstDroidCamSrc * src, tget val); \
@@ -125,6 +225,14 @@ static GList *gst_droidcamsrc_photography_load (GKeyFile * file,
 #define SET_ENUM(table,val,droid,memb)					\
   int x;								\
   int len = g_list_length (table);					\
+  if (len == 0) {							\
+    GST_WARNING_OBJECT (src, "params for %s not yet available. not applying value %d yet", droid, val); \
+    GST_OBJECT_LOCK (src);						\
+    src->photo->settings.memb = val;					\
+    GST_OBJECT_UNLOCK (src);						\
+    return FALSE;							\
+  }									\
+									\
   const gchar *value = NULL;						\
   for (x = 0; x < len; x++) {						\
     struct DataEntry *entry = (struct DataEntry *) g_list_nth_data (table, x); \
@@ -600,15 +708,9 @@ sort_desc (gconstpointer a, gconstpointer b)
 }
 
 void
-gst_droidcamsrc_photography_init (GstDroidCamSrc * src, gint dev)
+gst_droidcamsrc_photography_init (GstDroidCamSrc * src)
 {
   int x;
-  GKeyFile *file = g_key_file_new ();
-  gchar *file_path =
-      g_strdup_printf ("/%s/gst-droid/gstdroidcamsrc-%d.conf", SYSCONFDIR, dev);
-  GError *err = NULL;
-
-  GST_INFO_OBJECT (src, "using configuration file %s", file_path);
 
   if (!src->photo) {
     src->photo = g_slice_new0 (GstDroidCamSrcPhotography);
@@ -637,59 +739,87 @@ gst_droidcamsrc_photography_init (GstDroidCamSrc * src, gint dev)
       src->photo->settings.white_point[x] = 0;
     }
   }
+}
 
-  if (!g_key_file_load_from_file (file, file_path, G_KEY_FILE_NONE, &err)) {
-    GST_WARNING ("failed to load configuration file %s: %s", file_path,
-        err->message);
-  }
+void
+gst_droidcamsrc_photography_update_params (GstDroidCamSrc * src)
+{
+  /* Set photography parameters from Android HAL */
 
-  if (err) {
-    g_error_free (err);
-    err = NULL;
-  }
-
-  /* load settings */
+  /* Flash */
   if (src->photo->flash) {
     g_list_free_full (src->photo->flash, (GDestroyNotify) free_data_entry);
   }
-  src->photo->flash = gst_droidcamsrc_photography_load (file, "flash-mode");
+  src->photo->flash =
+      gst_droidcamsrc_photography_create_list (gst_droidcamsrc_params_get_string
+      (src->dev->params, "flash-mode-values"), FlashValues,
+      G_N_ELEMENTS (FlashValues));
 
+  /* Colour tone / Effects */
   if (src->photo->color_tone) {
     g_list_free_full (src->photo->color_tone, (GDestroyNotify) free_data_entry);
   }
   src->photo->color_tone =
-      gst_droidcamsrc_photography_load (file, "color-tone-mode");
+      gst_droidcamsrc_photography_create_list (gst_droidcamsrc_params_get_string
+      (src->dev->params, "effect-values"), ColourToneValues,
+      G_N_ELEMENTS (ColourToneValues));
 
+  /* Focus */
   if (src->photo->focus) {
     g_list_free_full (src->photo->focus, (GDestroyNotify) free_data_entry);
   }
-  src->photo->focus = gst_droidcamsrc_photography_load (file, "focus-mode");
+  src->photo->focus =
+      gst_droidcamsrc_photography_create_list (gst_droidcamsrc_params_get_string
+      (src->dev->params, "focus-mode-values"), FocusValues,
+      G_N_ELEMENTS (FocusValues));
 
+  /* Scene Mode */
   if (src->photo->scene) {
     g_list_free_full (src->photo->scene, (GDestroyNotify) free_data_entry);
   }
-  src->photo->scene = gst_droidcamsrc_photography_load (file, "scene-mode");
+  src->photo->scene =
+      gst_droidcamsrc_photography_create_list (gst_droidcamsrc_params_get_string
+      (src->dev->params, "scene-mode-values"), SceneValues,
+      G_N_ELEMENTS (SceneValues));
 
+  /* White Balance */
   if (src->photo->wb) {
     g_list_free_full (src->photo->wb, (GDestroyNotify) free_data_entry);
   }
   src->photo->wb =
-      gst_droidcamsrc_photography_load (file, "white-balance-mode");
+      gst_droidcamsrc_photography_create_list (gst_droidcamsrc_params_get_string
+      (src->dev->params, "whitebalance-values"), WhiteBalanceValues,
+      G_N_ELEMENTS (WhiteBalanceValues));
 
+  /* ISO speed */
   if (src->photo->iso) {
     g_list_free_full (src->photo->iso, (GDestroyNotify) free_data_entry);
   }
-  src->photo->iso = gst_droidcamsrc_photography_load (file, "iso-speed");
+  if (gst_droidcamsrc_has_param (src->dev->params, "iso-values")) {
+    src->photo->iso =
+        gst_droidcamsrc_photography_create_list
+        (gst_droidcamsrc_params_get_string (src->dev->params, "iso-values"),
+        ISOValues, G_N_ELEMENTS (ISOValues));
+    src->photo->iso_key = "iso";
+  } else if (gst_droidcamsrc_has_param (src->dev->params, "iso-speed-values")) {
+    src->photo->iso =
+        gst_droidcamsrc_photography_create_list
+        (gst_droidcamsrc_params_get_string (src->dev->params,
+            "iso-speed-values"), ISOValues, G_N_ELEMENTS (ISOValues));
+    src->photo->iso_key = "iso-speed";
+  }
+  // This list should be sorted
   src->photo->iso = g_list_sort (src->photo->iso, sort_desc);
 
+  /* Flicker / Anti-banding */
   if (src->photo->flicker) {
     g_list_free_full (src->photo->flicker, (GDestroyNotify) free_data_entry);
   }
-  src->photo->flicker = gst_droidcamsrc_photography_load (file, "flicker-mode");
+  src->photo->flicker =
+      gst_droidcamsrc_photography_create_list (gst_droidcamsrc_params_get_string
+      (src->dev->params, "antibanding-values"), FlickerValues,
+      G_N_ELEMENTS (FlickerValues));
 
-  /* free our stuff */
-  g_free (file_path);
-  g_key_file_unref (file);
 }
 
 void
@@ -773,43 +903,44 @@ gst_droidcamsrc_photography_apply (GstDroidCamSrc * src,
 }
 
 static GList *
-gst_droidcamsrc_photography_load (GKeyFile * file, const gchar * property)
+gst_droidcamsrc_photography_append_list (GList * list, const int key,
+    const gchar * value)
 {
-  gchar **keys;
+  struct DataEntry *entry = g_slice_new (struct DataEntry);
+  entry->key = key;
+  entry->value = g_strdup (value);
+  return g_list_append (list, entry);
+}
+
+static GList *
+gst_droidcamsrc_photography_create_list (const gchar * params,
+    struct DataEntry entries[], gsize len)
+{
   int x;
-  GError *err = NULL;
-  gsize len = 0;
   GList *list = NULL;
-
-  keys = g_key_file_get_keys (file, property, &len, &err);
-
-  if (err) {
-    GST_WARNING ("failed to load %s: %s", property, err->message);
-    g_error_free (err);
-    err = NULL;
+  if (params == NULL) {
+    GST_WARNING ("No params supplied. Returning empty list");
+    return list;
   }
-
-  for (x = 0; x < len; x++) {
-    gchar *value = g_key_file_get_value (file, property, keys[x], &err);
-
-    if (err) {
-      GST_WARNING ("failed to load %s (%s): %s", property, keys[x],
-          err->message);
-      g_error_free (err);
-      err = NULL;
-    }
-
-    if (value) {
-      int key = atoi (keys[x]);
-      struct DataEntry *entry = g_slice_new (struct DataEntry);
-      entry->key = key;
-      entry->value = value;
-      list = g_list_append (list, entry);
+  // Split the params
+  gchar **p = g_strsplit (params, ",", -1);
+  for (x = 0; x < len; x++) {   // look for each entry, so they can each occur only once
+    gchar **tmp = p;
+    while (*tmp) {
+      // Special handling for continuous focus - we have to choose -picture or -video depending on mode
+      if (!g_strcmp0 (*tmp, entries[x].value)
+          || (!g_strcmp0 (entries[x].value, "continuous")
+              && (!g_strcmp0 (*tmp, "continuous-picture")
+                  || !g_strcmp0 (*tmp, "continuous-video")))) {
+        list =
+            gst_droidcamsrc_photography_append_list (list, entries[x].key,
+            entries[x].value);
+        break;
+      }
+      ++tmp;
     }
   }
-
-  g_strfreev(keys);
-
+  g_strfreev (p);
   return list;
 }
 
@@ -1030,6 +1161,15 @@ gst_droidcamsrc_set_iso_speed (GstDroidCamSrc * src, guint iso_speed)
   int len = g_list_length (src->photo->iso);
   gchar *value = NULL;
 
+  if (len == 0 || src->photo->iso_key == NULL) {
+    GST_DEBUG_OBJECT (src,
+        "params not yet fetched. not applying iso speed yet");
+    GST_OBJECT_LOCK (src);
+    src->photo->settings.iso_speed = iso_speed;
+    GST_OBJECT_UNLOCK (src);
+    return FALSE;
+  }
+
   for (x = 0; x < len; x++) {
     struct DataEntry *entry =
         (struct DataEntry *) g_list_nth_data (src->photo->iso, x);
@@ -1043,21 +1183,7 @@ gst_droidcamsrc_set_iso_speed (GstDroidCamSrc * src, guint iso_speed)
     GST_WARNING_OBJECT (src, "setting iso to %d is not supported", iso_speed);
     return FALSE;
   }
-  // find iso param key if not set
-  if (src->photo->iso_key == NULL) {
-    if (src->dev == NULL || src->dev->params == NULL) {
-      GST_WARNING_OBJECT (src, "Params are NULL! Cannot find iso param key.");
-      return FALSE;
-    }
-    if (gst_droidcamsrc_has_param (src->dev->params, "iso")) {
-      src->photo->iso_key = "iso";
-    } else if (gst_droidcamsrc_has_param (src->dev->params, "iso-speed")) {
-      src->photo->iso_key = "iso-speed";
-    } else {
-      GST_WARNING_OBJECT (src, "ISO setting param key not found. Cannot set");
-      return FALSE;
-    }
-  }
+
   GST_OBJECT_LOCK (src);
   src->photo->settings.iso_speed = iso_speed;
   GST_OBJECT_UNLOCK (src);
@@ -1156,6 +1282,16 @@ gst_droidcamsrc_set_focus_mode (GstDroidCamSrc
 {
   int x;
   int len = g_list_length (src->photo->focus);
+
+  if (len == 0) {
+    GST_DEBUG_OBJECT (src,
+        "params not yet fetched. not applying focus mode yet");
+    GST_OBJECT_LOCK (src);
+    src->photo->settings.focus_mode = focus_mode;
+    GST_OBJECT_UNLOCK (src);
+    return FALSE;
+  }
+
   const gchar *value = NULL;
   for (x = 0; x < len; x++) {
     struct DataEntry *entry =
@@ -1408,6 +1544,10 @@ gst_droidcamsrc_photography_set_iso_to_droid (GstDroidCamSrc * src)
   int len = g_list_length (src->photo->iso);
   gchar *value = NULL;
 
+  if (!src->dev || !src->dev->params) {
+    return;
+  }
+
   for (x = 0; x < len; x++) {
     struct DataEntry *entry =
         (struct DataEntry *) g_list_nth_data (src->photo->iso, x);
@@ -1422,21 +1562,7 @@ gst_droidcamsrc_photography_set_iso_to_droid (GstDroidCamSrc * src)
         src->photo->settings.iso_speed);
     return;
   }
-  // find iso param key if not set
-  if (src->photo->iso_key == NULL) {
-    if (src->dev == NULL || src->dev->params == NULL) {
-      GST_WARNING_OBJECT (src, "Params are NULL! Cannot find iso param key.");
-      return FALSE;
-    }
-    if (gst_droidcamsrc_has_param (src->dev->params, "iso")) {
-      src->photo->iso_key = "iso";
-    } else if (gst_droidcamsrc_has_param (src->dev->params, "iso-speed")) {
-      src->photo->iso_key = "iso-speed";
-    } else {
-      GST_WARNING_OBJECT (src, "ISO setting param key not found. Cannot set");
-      return FALSE;
-    }
-  }
+
   gst_droidcamsrc_params_set_string (src->dev->params, src->photo->iso_key,
       value);
 }
