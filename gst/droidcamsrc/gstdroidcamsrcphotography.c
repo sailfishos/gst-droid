@@ -607,6 +607,28 @@ gst_droidcamsrc_photography_get_property (GstDroidCamSrc * src, guint prop_id,
     {
       /* not supported */
     }
+
+      return TRUE;
+
+    case PROP_SUPPORTED_EXPOSURE_MODES:
+    {
+      int len = g_list_length (src->photo->scene);
+      if (len == 0) {
+        GST_WARNING_OBJECT (src, "params for scene not yet available.");
+        return TRUE;
+      }
+
+      struct DataEntry *entry;
+
+      GList *l;
+      gchar *modes = "";
+      for (l = src->photo->scene; l != NULL; l = l->next) {
+        entry = l->data;
+        modes = g_strconcat (modes, ",", entry->value, NULL);
+      }
+
+      g_value_set_string (value, modes);
+    }
       return TRUE;
   }
 
