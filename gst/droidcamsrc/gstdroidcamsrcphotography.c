@@ -147,7 +147,8 @@ struct DataEntry SceneValues[] = {
   {GST_PHOTOGRAPHY_SCENE_MODE_LANDSCAPE, "landscape"},
   {GST_PHOTOGRAPHY_SCENE_MODE_SPORT, "sports"},
   {GST_PHOTOGRAPHY_SCENE_MODE_NIGHT, "night"},
-  {GST_PHOTOGRAPHY_SCENE_MODE_AUTO, "auto"},
+  {GST_PHOTOGRAPHY_SCENE_MODE_MANUAL, "auto"},
+  {GST_PHOTOGRAPHY_SCENE_MODE_AUTO, "asd"},
   {GST_PHOTOGRAPHY_SCENE_MODE_ACTION, "action"},
   {GST_PHOTOGRAPHY_SCENE_MODE_NIGHT_PORTRAIT, "night-portrait"},
   {GST_PHOTOGRAPHY_SCENE_MODE_THEATRE, "theatre"},
@@ -324,6 +325,31 @@ gst_droidcamsrc_photography_prepare_for_capture (GstPhotography * photo,
 {
   return gst_droidcamsrc_prepare_for_capture (GST_DROIDCAMSRC (photo), func,
       capture_caps, user_data);
+}
+
+GVariant *
+gst_droid_camsrc_glist_to_array (GList * list)
+{
+  int len = g_list_length (list);
+
+  if (len == 0) {
+    return 0;
+  }
+
+  GVariant *modes;
+  GVariantBuilder *builder;
+  builder = g_variant_builder_new (G_VARIANT_TYPE ("ai"));
+
+  struct DataEntry *entry;
+  GList *l;
+  for (l = list; l != NULL; l = l->next) {
+    entry = l->data;
+    g_variant_builder_add (builder, "i", entry->key);
+  }
+
+  modes = g_variant_new ("ai", builder);
+  g_variant_builder_unref (builder);
+  return modes;
 }
 
 static void
@@ -609,24 +635,49 @@ gst_droidcamsrc_photography_get_property (GstDroidCamSrc * src, guint prop_id,
 
       return TRUE;
 
-    case PROP_SUPPORTED_EXPOSURE_MODES:
+    case PROP_SUPPORTED_WB_MODES:
     {
-      int len = g_list_length (src->photo->scene);
-      if (len == 0) {
-        GST_WARNING_OBJECT (src, "params for scene not yet available.");
-        return TRUE;
-      }
+      GVariant *wb_modes = gst_droid_camsrc_glist_to_array (src->photo->wb);
+      g_value_set_variant (value, wb_modes);
+    }
+      return TRUE;
 
-      struct DataEntry *entry;
+    case PROP_SUPPORTED_COLOR_TONES:
+    {
+      GVariant *effects =
+          gst_droid_camsrc_glist_to_array (src->photo->color_tone);
+      g_value_set_variant (value, effects);
+    }
+      return TRUE;
 
-      GList *l;
-      gchar *modes = "";
-      for (l = src->photo->scene; l != NULL; l = l->next) {
-        entry = l->data;
-        modes = g_strconcat (modes, ",", entry->value, NULL);
-      }
+    case PROP_SUPPORTED_SCENE_MODES:
+    {
+      GVariant *exposure_modes =
+          gst_droid_camsrc_glist_to_array (src->photo->scene);
+      g_value_set_variant (value, exposure_modes);
+    }
+      return TRUE;
 
-      g_value_set_string (value, modes);
+    case PROP_SUPPORTED_FLASH_MODES:
+    {
+      GVariant *flash_modes =
+          gst_droid_camsrc_glist_to_array (src->photo->flash);
+      g_value_set_variant (value, flash_modes);
+    }
+      return TRUE;
+
+    case PROP_SUPPORTED_FOCUS_MODES:
+    {
+      GVariant *focus_modes =
+          gst_droid_camsrc_glist_to_array (src->photo->focus);
+      g_value_set_variant (value, focus_modes);
+    }
+      return TRUE;
+
+    case PROP_SUPPORTED_ISO_SPEEDS:
+    {
+      GVariant *iso_modes = gst_droid_camsrc_glist_to_array (src->photo->iso);
+      g_value_set_variant (value, iso_modes);
     }
       return TRUE;
   }
@@ -745,7 +796,7 @@ gst_droidcamsrc_photography_init (GstDroidCamSrc * src)
     src->photo = g_slice_new0 (GstDroidCamSrcPhotography);
     src->photo->settings.wb_mode = GST_PHOTOGRAPHY_WB_MODE_AUTO;
     src->photo->settings.tone_mode = GST_PHOTOGRAPHY_COLOR_TONE_MODE_NORMAL;
-    src->photo->settings.scene_mode = GST_PHOTOGRAPHY_SCENE_MODE_AUTO;
+    src->photo->settings.scene_mode = GST_PHOTOGRAPHY_SCENE_MODE_MANUAL;
     src->photo->settings.flash_mode = GST_PHOTOGRAPHY_FLASH_MODE_AUTO;
     src->photo->settings.ev_compensation = 0.0;
     src->photo->settings.iso_speed = 0;
