@@ -52,7 +52,6 @@ static gboolean process_aacdec_data (GstDroidCodec * codec, GstBuffer * buffer,
     DroidMediaData * out);
 static gboolean is_mpeg4v (GstDroidCodec * codec, const GstStructure * s);
 static gboolean is_mpega (GstDroidCodec * codec, const GstStructure * s);
-static gboolean is_mp3 (GstDroidCodec * codec, const GstStructure * s);
 static gboolean is_h264_dec (GstDroidCodec * codec, const GstStructure * s);
 static gboolean is_h264_enc (GstDroidCodec * codec, const GstStructure * s);
 static void h264enc_complement (GstCaps * caps);
@@ -108,10 +107,6 @@ static GstDroidCodecInfo codecs[] = {
         TRUE,
         is_mpega, NULL, NULL, NULL, create_aacdec_codec_data_from_codec_data,
       create_aacdec_codec_data_from_frame_data, process_aacdec_data},
-
-  {GST_DROID_CODEC_DECODER_AUDIO, "audio/mpeg", "audio/mpeg",
-        "audio/mpeg, mpegversion=(int)1, layer=[1, 3]", TRUE,
-      is_mp3, NULL, NULL, NULL, NULL, NULL, NULL},
 
   /* video decoders */
   {GST_DROID_CODEC_DECODER_VIDEO, "video/mpeg", "video/mp4v-es",
@@ -583,15 +578,6 @@ is_mpega (GstDroidCodec * codec, const GstStructure * s)
   }
 
   return FALSE;
-}
-
-static gboolean
-is_mp3 (GstDroidCodec * codec G_GNUC_UNUSED, const GstStructure * s)
-{
-  gint val, layer;
-
-  return gst_structure_get_int (s, "mpegversion", &val) && val == 1 &&
-      gst_structure_get_int (s, "layer", &layer) && (layer == 1 || layer == 3);
 }
 
 static gboolean
