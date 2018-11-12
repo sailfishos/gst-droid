@@ -29,6 +29,8 @@ G_BEGIN_DECLS
 
 #define GST_ALLOCATOR_DROID_MEDIA_BUFFER                    "droidmediabuffer"
 #define GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER          "memory:DroidMediaBuffer"
+#define GST_DROID_MEDIA_BUFFER_MEMORY_VIDEO_FORMATS "{ NV12_64Z32, YV12, NV16, " \
+    "NV12, YUY2, RGBA, RGBx, RGB, RGB16, BGRA, ENCODED }"
 
 GstAllocator * gst_droid_media_buffer_allocator_new (void);
 GstMemory    * gst_droid_media_buffer_allocator_alloc (GstAllocator * allocator,

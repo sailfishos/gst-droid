@@ -44,6 +44,10 @@ typedef struct _GstDroidVDec GstDroidVDec;
 typedef struct _GstDroidVDecClass GstDroidVDecClass;
 typedef enum _GstDroidVDecState GstDroidVDecState;
 
+typedef gboolean (*GstDroidVideoConvertToI420) (GstDroidVDec * dec,
+    GstMapInfo * out, DroidMediaData * in, GstVideoInfo * info, gsize width,
+    gsize height);
+
 enum _GstDroidVDecState
 {
   GST_DROID_VDEC_STATE_OK,
@@ -73,14 +77,19 @@ struct _GstDroidVDec
   gboolean dirty;
   DroidMediaRect crop_rect;
   gboolean running;
+  gboolean use_hardware_buffers;
   GstVideoFormat format;
 
   gsize codec_reported_height;
   gsize codec_reported_width;
+  gsize bytes_per_pixel;
+  gsize v_align;
+  gsize h_align;
 
   GstVideoCodecState *in_state;
   GstVideoCodecState *out_state;
   DroidMediaConvert *convert;
+  GstDroidVideoConvertToI420 convert_to_i420;
   gint32 hal_format;
 };
 
