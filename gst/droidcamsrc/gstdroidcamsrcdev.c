@@ -73,7 +73,7 @@ static void gst_droidcamsrc_dev_release_recording_frame (void *data,
 void gst_droidcamsrc_dev_update_params_locked (GstDroidCamSrcDev * dev);
 static void
 gst_droidcamsrc_dev_prepare_buffer (GstDroidCamSrcDev * dev, GstBuffer * buffer,
-    DroidMediaRect rect, int width, int height, GstVideoFormat format);
+    DroidMediaRect rect, GstVideoInfo * video_info);
 static gboolean
 gst_droidcamsrc_dev_start_video_recording_recorder_locked (GstDroidCamSrcDev *
     dev);
@@ -273,6 +273,7 @@ gst_droidcamsrc_dev_preview_frame_callback (void *user,
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
   GstDroidCamSrcPad *pad = dev->vfsrc;
+  GstVideoInfo video_info;
   GstBuffer *buffer;
   gsize width, height;
   DroidMediaRect rect;
@@ -298,8 +299,9 @@ gst_droidcamsrc_dev_preview_frame_callback (void *user,
   rect = src->crop_rect;
   GST_OBJECT_UNLOCK (src);
 
-  gst_droidcamsrc_dev_prepare_buffer (dev, buffer, rect, width, height,
-      GST_VIDEO_FORMAT_NV21);
+  gst_video_info_set_format (&video_info, GST_VIDEO_FORMAT_NV21, width, height);
+
+  gst_droidcamsrc_dev_prepare_buffer (dev, buffer, rect, &video_info);
 
   g_mutex_lock (&pad->lock);
   g_queue_push_tail (pad->queue, buffer);
@@ -433,7 +435,6 @@ gst_droidcamsrc_dev_frame_available (void *user)
   DroidMediaBuffer *buffer;
   GstMemory *mem;
   DroidMediaRect rect;
-  guint width, height;
   GstBuffer *buff;
   DroidMediaBufferCallbacks cb;
   GstFlowReturn flow_ret;
@@ -482,11 +483,9 @@ gst_droidcamsrc_dev_frame_available (void *user)
   gst_droidcamsrc_timestamp (src, buff);
 
   rect = droid_media_buffer_get_crop_rect (buffer);
-  width = droid_media_buffer_get_width (buffer);
-  height = droid_media_buffer_get_height (buffer);
 
-  gst_droidcamsrc_dev_prepare_buffer (dev, buff, rect, width, height,
-      GST_VIDEO_FORMAT_YV12);
+  gst_droidcamsrc_dev_prepare_buffer (dev, buff, rect,
+      gst_droid_media_buffer_get_video_info (mem));
 
   g_mutex_lock (&pad->lock);
   g_queue_push_tail (pad->queue, buff);
@@ -541,6 +540,8 @@ gst_droidcamsrc_dev_new (GstDroidCamSrcPad * vfsrc,
 
   droid_media_camera_constants_init (&dev->c);
 
+  dev->viewfinder_format = GST_VIDEO_FORMAT_UNKNOWN;
+
   return dev;
 }
 
@@ -548,6 +549,10 @@ gboolean
 gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
 {
   GstDroidCamSrc *src;
+  DroidMediaColourFormatConstants constants;
+  int hal_format;
+
+  droid_media_colour_format_constants_init (&constants);
 
   g_rec_mutex_lock (dev->lock);
 
@@ -557,6 +562,22 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
 
   dev->info = info;
   dev->cam = droid_media_camera_connect (dev->info->num);
+
+  hal_format = droid_media_camera_get_video_color_format (dev->cam);
+
+  if (hal_format == constants.OMX_COLOR_FormatYUV420Planar) {
+    dev->viewfinder_format = GST_VIDEO_FORMAT_I420;
+  } else if (hal_format == constants.OMX_COLOR_FormatYUV422SemiPlanar) {
+    dev->viewfinder_format = GST_VIDEO_FORMAT_NV16;
+  } else if (hal_format == constants.OMX_COLOR_FormatYUV420SemiPlanar) {
+    dev->viewfinder_format = GST_VIDEO_FORMAT_NV21;
+  } else if (hal_format == constants.OMX_COLOR_FormatYCbYCr) {
+    dev->viewfinder_format = GST_VIDEO_FORMAT_YUY2;
+  } else if (hal_format == constants.OMX_COLOR_Format16bitRGB565) {
+    dev->viewfinder_format = GST_VIDEO_FORMAT_RGB16;
+  } else {
+    dev->viewfinder_format = GST_VIDEO_FORMAT_ENCODED;
+  }
 
   if (!dev->cam) {
     g_rec_mutex_unlock (dev->lock);
@@ -1115,7 +1136,7 @@ gst_droidcamsrc_dev_is_running (GstDroidCamSrcDev * dev)
 
 static void
 gst_droidcamsrc_dev_prepare_buffer (GstDroidCamSrcDev * dev, GstBuffer * buffer,
-    DroidMediaRect rect, int width, int height, GstVideoFormat format)
+    DroidMediaRect rect, GstVideoInfo * video_info)
 {
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
   GstVideoCropMeta *crop;
@@ -1133,11 +1154,13 @@ gst_droidcamsrc_dev_prepare_buffer (GstDroidCamSrcDev * dev, GstBuffer * buffer,
   gst_buffer_add_gst_buffer_orientation_meta (buffer,
       dev->info->orientation, dev->info->direction);
 
-  gst_buffer_add_video_meta (buffer, GST_VIDEO_FRAME_FLAG_NONE,
-      format, width, height);
+  gst_buffer_add_video_meta_full (buffer, GST_VIDEO_FRAME_FLAG_NONE,
+      video_info->finfo->format, video_info->width, video_info->height,
+      video_info->finfo->n_planes, video_info->offset, video_info->stride);
 
   GST_LOG_OBJECT (src, "preview info: w=%d, h=%d, crop: x=%d, y=%d, w=%d, h=%d",
-      width, height, crop->x, crop->y, crop->width, crop->height);
+      video_info->width, video_info->height, crop->x, crop->y, crop->width,
+      crop->height);
 }
 
 static gboolean

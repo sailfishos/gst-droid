@@ -54,6 +54,7 @@ struct _GstDroidCamSrcDev
   GstDroidCamSrcVideoCaptureState *vid;
   GstBufferPool *pool;
   DroidMediaCameraConstants c;
+  GstVideoFormat viewfinder_format;
 
   gboolean use_recorder;
   GstDroidCamSrcRecorder *recorder;

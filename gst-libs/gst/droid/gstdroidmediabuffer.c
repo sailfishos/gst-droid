@@ -147,7 +147,7 @@ gst_droid_media_buffer_initialize_format_map ()
 
     gst_droid_media_buffer_formats[7].hal_format =
         constants.HAL_PIXEL_FORMAT_YCrCb_420_SP;
-    gst_droid_media_buffer_formats[7].gst_format = GST_VIDEO_FORMAT_NV12;
+    gst_droid_media_buffer_formats[7].gst_format = GST_VIDEO_FORMAT_NV21;
     gst_droid_media_buffer_formats[7].bytes_per_pixel = 1;
     gst_droid_media_buffer_formats[7].h_align = 1;
     gst_droid_media_buffer_formats[7].v_align = 1;
@@ -246,9 +246,10 @@ gst_droid_media_buffer_allocator_alloc_from_buffer (GstAllocator * allocator,
     DroidMediaBuffer * buffer, int format_index, gsize width, gsize height,
     gsize stride)
 {
-  GstVideoInfo info;
   GstDroidMediaBufferMemory *mem = g_slice_new0 (GstDroidMediaBufferMemory);
-  gsize size;
+  GstFormat format;
+  gsize padded_width = width;
+  gsize padded_height = height;
 
   mem->buffer = buffer;
   mem->map_data = NULL;
@@ -256,24 +257,28 @@ gst_droid_media_buffer_allocator_alloc_from_buffer (GstAllocator * allocator,
   mem->map_count = 0;
 
   if (format_index == GST_DROID_MEDIA_BUFFER_FORMAT_COUNT) {
-    size = 0;
+    format = GST_VIDEO_FORMAT_ENCODED;
   } else {
+    format = gst_droid_media_buffer_formats[format_index].gst_format;
     if (gst_droid_media_buffer_formats[format_index].bytes_per_pixel != 0) {
-      width =
+      padded_width =
           ALIGN_SIZE (stride,
           gst_droid_media_buffer_formats[format_index].h_align) /
           gst_droid_media_buffer_formats[format_index].bytes_per_pixel;
-      height =
+      padded_height =
           ALIGN_SIZE (height,
           gst_droid_media_buffer_formats[format_index].v_align);
     }
-    gst_video_info_set_format (&info,
-        gst_droid_media_buffer_formats[format_index].gst_format, width, height);
-    size = info.size;
   }
 
+  gst_video_info_set_format (&mem->video_info, format, padded_width,
+      padded_height);
+  mem->video_info.width = width;
+  mem->video_info.height = height;
+
   gst_memory_init (GST_MEMORY_CAST (mem),
-      GST_MEMORY_FLAG_NO_SHARE, allocator, NULL, size, 0, 0, size);
+      GST_MEMORY_FLAG_NO_SHARE, allocator, NULL, mem->video_info.size, 0, 0,
+      mem->video_info.size);
 
   return mem;
 }
@@ -433,4 +438,15 @@ gst_droid_media_buffer_memory_unmap (GstMemory * mem)
     m->map_data = NULL;
     droid_media_buffer_unlock (m->buffer);
   }
+}
+
+GstVideoInfo *
+gst_droid_media_buffer_get_video_info (GstMemory * mem)
+{
+  if (!gst_is_droid_media_buffer_memory (mem)) {
+    GST_ERROR ("memory %p is not droidmediabuffer memory", mem);
+    return NULL;
+  }
+
+  return &((GstDroidMediaBufferMemory *) mem)->video_info;
 }
