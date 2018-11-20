@@ -375,7 +375,8 @@ gst_droidcamsrc_params_get_caps_locked (GstDroidCamSrcParams * params,
 }
 
 GstCaps *
-gst_droidcamsrc_params_get_viewfinder_caps (GstDroidCamSrcParams * params)
+gst_droidcamsrc_params_get_viewfinder_caps (GstDroidCamSrcParams * params,
+    GstVideoFormat format)
 {
   GstCaps *caps;
 
@@ -383,7 +384,8 @@ gst_droidcamsrc_params_get_viewfinder_caps (GstDroidCamSrcParams * params)
   caps =
       gst_caps_merge (gst_droidcamsrc_params_get_caps_locked (params,
           "preview-size-values", "video/x-raw",
-          GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER, "YV12"),
+          GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER,
+          gst_video_format_to_string (format)),
       gst_droidcamsrc_params_get_caps_locked (params, "preview-size-values",
           "video/x-raw", NULL, "NV21"));
   g_mutex_unlock (&params->lock);

@@ -45,12 +45,24 @@ G_DEFINE_TYPE (GstDroidVDec, gst_droidvdec, GST_TYPE_VIDEO_DECODER);
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_vdec_debug);
 #define GST_CAT_DEFAULT gst_droid_vdec_debug
 
+typedef struct
+{
+  int *hal_format;
+  GstVideoFormat gst_format;
+  GstDroidVideoConvertToI420 convert_to_i420;
+  gsize bytes_per_pixel;
+  gsize h_align;
+  gsize v_align;
+
+} GstDroidVideoFormatMap;
+
 static GstStaticPadTemplate gst_droidvdec_src_template_factory =
     GST_STATIC_PAD_TEMPLATE (GST_VIDEO_DECODER_SRC_NAME,
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
-        (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER, "{YV12}") ";"
+        (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER,
+            GST_DROID_MEDIA_BUFFER_MEMORY_VIDEO_FORMATS) ";"
         GST_VIDEO_CAPS_MAKE ("I420")));
 
 static gboolean gst_droidvdec_configure_state (GstVideoDecoder * decoder,
@@ -87,6 +99,179 @@ gst_droidvdec_loop (GstDroidVDec * dec)
 out:
   GST_INFO_OBJECT (dec, "pausing task");
   gst_pad_pause_task (GST_VIDEO_DECODER_SRC_PAD (GST_VIDEO_DECODER (dec)));
+}
+
+
+static void
+gst_droidvec_copy_plane (guint8 * out, gint stride_out, guint8 * in,
+    gint stride_in, gint width, gint height)
+{
+  int i;
+  for (i = 0; i < height; i++) {
+    orc_memcpy (out, in, width);
+    out += stride_out;
+    in += stride_in;
+  }
+}
+
+static void
+gst_droidvec_copy_packed_planes (guint8 * out0, guint8 * out1, gint stride_out,
+    guint8 * in, gint stride_in, gint width, gint height)
+{
+  int x, y;
+  for (y = 0; y < height; y++) {
+    guint8 *row = in;
+    for (x = 0; x < width; x++) {
+      out0[x] = row[0];
+      out1[x] = row[1];
+      row += 2;
+    }
+
+    out0 += stride_out;
+    out1 += stride_out;
+    in += stride_in;
+  }
+}
+
+#define ALIGN_SIZE(size, to) (((size) + to  - 1) & ~(to - 1))
+
+static gboolean
+gst_droidvdec_convert_native_to_i420 (GstDroidVDec * dec, GstMapInfo * out,
+    DroidMediaData * in, GstVideoInfo * info, gsize width, gsize height)
+{
+  gsize size = width * height * 3 / 2;
+  gboolean use_external_buffer = out->size != size;
+  guint8 *data = NULL;
+  gboolean ret = TRUE;
+
+  if (use_external_buffer) {
+    GST_DEBUG_OBJECT (dec, "using an external buffer for I420 conversion.");
+    data = g_malloc (size);
+  } else {
+    data = out->data;
+  }
+
+  if (droid_media_convert_to_i420 (dec->convert, in, data) != true) {
+    GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, (NULL),
+        ("failed to convert frame"));
+
+    ret = FALSE;
+  } else if (use_external_buffer) {
+    /* fix up the buffer */
+    /* Code is based on gst-colorconv qcom backend */
+
+    gint stride = GST_VIDEO_INFO_COMP_STRIDE (info, 0);
+    gint strideUV = GST_VIDEO_INFO_COMP_STRIDE (info, 1);
+    guint8 *p = data;
+    guint8 *dst = out->data;
+    int i;
+    int x;
+
+    /* Y */
+    for (i = 0; i < info->height; i++) {
+      orc_memcpy (dst, p, info->width);
+      dst += stride;
+      p += width;
+    }
+
+    /* NOP if height == info->height */
+    p += (height - info->height) * width;
+    /* U and V */
+    for (x = 0; x < 2; x++) {
+      for (i = 0; i < info->height / 2; i++) {
+        orc_memcpy (dst, p, info->width / 2);
+        dst += strideUV;
+        p += width / 2;
+      }
+
+      /* NOP if height == info->height */
+      p += (height - info->height) / 2 * width / 2;
+    }
+  }
+
+  if (use_external_buffer && data) {
+    g_free (data);
+  }
+
+  return ret;
+}
+
+static gboolean
+gst_droidvdec_convert_yuv420_planar_to_i420 (GstDroidVDec * dec,
+    GstMapInfo * out, DroidMediaData * in, GstVideoInfo * info, gsize width,
+    gsize height)
+{
+  /* Buffer is already I420, so we can copy it straight over */
+  /* though we need to handle the cropping */
+
+  GST_DEBUG_OBJECT (dec, "Copying I420 buffer");
+  gint top = dec->crop_rect.top;
+  gint left = dec->crop_rect.left;
+  gint crop_width = dec->crop_rect.right - left;
+  gint crop_height = dec->crop_rect.bottom - top;
+
+  guint8 *y = in->data + (top * width) + left;
+  guint8 *u = in->data + (width * height) + (top * width / 2) + (left / 2);
+  guint8 *v =
+      in->data + (width * height) + (width * height / 4) +
+      (top * width / 2) + (left / 2);
+
+  gst_droidvec_copy_plane (out->data + info->offset[0],
+      info->stride[0], y, width, crop_width, crop_height);
+  gst_droidvec_copy_plane (out->data + info->offset[1],
+      info->stride[1], u, width / 2, crop_width / 2, crop_height / 2);
+  gst_droidvec_copy_plane (out->data + info->offset[2],
+      info->stride[2], v, width / 2, crop_width / 2, crop_height / 2);
+
+  return TRUE;
+}
+
+static gboolean
+gst_droidvdec_convert_yuv420_semi_planar_to_i420 (GstDroidVDec * dec,
+    GstMapInfo * out, DroidMediaData * in, GstVideoInfo * info, gsize width,
+    gsize height)
+{
+  GST_DEBUG_OBJECT (dec, "Converting from OMX_COLOR_FormatYUV420SemiPlanar");
+  gint stride = width;
+  gint slice_height = ALIGN_SIZE (height, 16);
+  gint top = dec->crop_rect.top;
+  gint left = dec->crop_rect.left;
+
+  guint8 *y = in->data + (top * stride) + left;
+  guint8 *uv = in->data + (stride * slice_height) + (top * stride / 2) + left;
+
+  gst_droidvec_copy_plane (out->data + info->offset[0],
+      info->stride[0], y, stride, info->width, info->height);
+  gst_droidvec_copy_packed_planes (out->data + info->offset[1],
+      out->data + info->offset[2], info->stride[1], uv, stride,
+      info->width / 2, info->height / 2);
+
+  return TRUE;
+}
+
+static gboolean
+gst_droidvdec_convert_yuv420_packed_semi_planar_to_i420 (GstDroidVDec * dec,
+    GstMapInfo * out, DroidMediaData * in, GstVideoInfo * info, gsize width,
+    gsize height)
+{
+  /* copy to the output buffer swapping the u and v planes and cropping if necessary */
+  /* NV12 format with 128 byte alignment */
+  GST_DEBUG_OBJECT (dec, "Converting from qcom NV12 semi planar");
+  gint stride = ALIGN_SIZE (width, 128);
+  gint slice_height = ALIGN_SIZE (height, 32);
+  gint top = ALIGN_SIZE (dec->crop_rect.top, 2);
+  gint left = ALIGN_SIZE (dec->crop_rect.left, 2);
+
+  guint8 *y = in->data + (top * stride) + left;
+  guint8 *uv = in->data + (stride * slice_height) + (top * stride / 2) + left;
+
+  gst_droidvec_copy_plane (out->data + info->offset[0],
+      info->stride[0], y, stride, info->width, info->height);
+  gst_droidvec_copy_packed_planes (out->data + info->offset[1],
+      out->data + info->offset[2], info->stride[1], uv, stride,
+      info->width / 2, info->height / 2);
+
+  return TRUE;
 }
 
 static gboolean
@@ -133,7 +318,7 @@ gst_droidvdec_create_codec (GstDroidVDec * dec, GstBuffer * input)
       DROID_MEDIA_CODEC_HW_ONLY | DROID_MEDIA_CODEC_USE_EXTERNAL_LOOP;
   md.codec_data.size = 0;
 
-  if (dec->format == GST_VIDEO_FORMAT_I420) {
+  if (!dec->use_hardware_buffers) {
     md.parent.flags |= DROID_MEDIA_CODEC_NO_MEDIA_BUFFER;
   }
 
@@ -216,49 +401,12 @@ gst_droidvdec_buffers_released (G_GNUC_UNUSED void *user)
   GST_FIXME ("Not sure what to do here really");
 }
 
-static void
-gst_droidvec_copy_plane (guint8 * out, gint stride_out, guint8 * in,
-    gint stride_in, gint width, gint height)
-{
-  int i;
-  for (i = 0; i < height; i++) {
-    orc_memcpy (out, in, width);
-    out += stride_out;
-    in += stride_in;
-  }
-}
-
-static void
-gst_droidvec_copy_packed_planes (guint8 * out0, guint8 * out1, gint stride_out,
-    guint8 * in, gint stride_in, gint width, gint height)
-{
-  int x, y;
-  for (y = 0; y < height; y++) {
-    guint8 *row = in;
-    for (x = 0; x < width; x++) {
-      out0[x] = row[0];
-      out1[x] = row[1];
-      row += 2;
-    }
-
-    out0 += stride_out;
-    out1 += stride_out;
-    in += stride_in;
-  }
-}
-
-#define ALIGN_SIZE(size, to) (((size) + to  - 1) & ~(to - 1))
-
 static gboolean
 gst_droidvdec_convert_buffer (GstDroidVDec * dec,
     GstBuffer * out, DroidMediaData * in, GstVideoInfo * info)
 {
   gsize height = info->height;
   gsize width = info->width;
-  gsize size;
-  gboolean use_droid_convert;
-  gboolean use_external_buffer;
-  guint8 *data = NULL;
   gboolean ret;
   GstMapInfo map_info;
 
@@ -274,149 +422,15 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
     GST_INFO_OBJECT (dec, "using codec supplied height %d", height);
   }
 
-  size = width * height * 3 / 2;
-  use_droid_convert = dec->convert;
-  use_external_buffer = use_droid_convert && gst_buffer_get_size (out) != size;
-  map_info.data = NULL;
-
-  if (dec->codec_type->quirks & DONT_USE_DROID_CONVERT_VALUE) {
-    use_droid_convert = false;
-    GST_INFO_OBJECT (dec, "not using droid convert binary");
-  }
-
-  if (!gst_buffer_map (out, &map_info, GST_MAP_WRITE)) {
+  if (!dec->convert_to_i420) {
+    GST_ERROR_OBJECT (dec, "no i420 conversion function");
+    ret = FALSE;
+  } else if (!gst_buffer_map (out, &map_info, GST_MAP_WRITE)) {
     GST_ERROR_OBJECT (dec, "failed to map buffer");
     ret = FALSE;
-    goto out;
-  }
-
-  if (use_droid_convert) {
-    if (use_external_buffer) {
-      GST_DEBUG_OBJECT (dec, "using an external buffer for I420 conversion.");
-      data = g_malloc (size);
-    } else {
-      data = map_info.data;
-    }
-
-    if (droid_media_convert_to_i420 (dec->convert, in, data) != true) {
-      GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, (NULL),
-          ("failed to convert frame"));
-
-      ret = FALSE;
-      goto out;
-    }
-
-    if (use_external_buffer) {
-      /* fix up the buffer */
-      /* Code is based on gst-colorconv qcom backend */
-
-      gint stride = GST_VIDEO_INFO_COMP_STRIDE (info, 0);
-      gint strideUV = GST_VIDEO_INFO_COMP_STRIDE (info, 1);
-      guint8 *p = data;
-      guint8 *dst = map_info.data;
-      int i;
-      int x;
-
-      /* Y */
-      for (i = 0; i < info->height; i++) {
-        orc_memcpy (dst, p, info->width);
-        dst += stride;
-        p += width;
-      }
-
-      /* NOP if height == info->height */
-      p += (height - info->height) * width;
-      /* U and V */
-      for (x = 0; x < 2; x++) {
-        for (i = 0; i < info->height / 2; i++) {
-          orc_memcpy (dst, p, info->width / 2);
-          dst += strideUV;
-          p += width / 2;
-        }
-
-        /* NOP if height == info->height */
-        p += (height - info->height) / 2 * width / 2;
-      }
-    }
   } else {
-    DroidMediaColourFormatConstants c;
-    droid_media_colour_format_constants_init (&c);
-    if (dec->hal_format == c.OMX_COLOR_FormatYUV420Planar) {
-      /* Buffer is already I420, so we can copy it straight over */
-      /* though we need to handle the cropping */
+    ret = dec->convert_to_i420 (dec, &map_info, in, info, width, height);
 
-      GST_DEBUG_OBJECT (dec, "Copying I420 buffer");
-      gint top = dec->crop_rect.top;
-      gint left = dec->crop_rect.left;
-      gint crop_width = dec->crop_rect.right - left;
-      gint crop_height = dec->crop_rect.bottom - top;
-
-      guint8 *y = in->data + (top * width) + left;
-      guint8 *u = in->data + (width * height) + (top * width / 2) + (left / 2);
-      guint8 *v =
-          in->data + (width * height) + (width * height / 4) +
-          (top * width / 2) + (left / 2);
-
-      gst_droidvec_copy_plane (map_info.data + info->offset[0],
-          info->stride[0], y, width, crop_width, crop_height);
-      gst_droidvec_copy_plane (map_info.data + info->offset[1],
-          info->stride[1], u, width / 2, crop_width / 2, crop_height / 2);
-      gst_droidvec_copy_plane (map_info.data + info->offset[2],
-          info->stride[2], v, width / 2, crop_width / 2, crop_height / 2);
-
-    } else if (dec->hal_format == c.QOMX_COLOR_FormatYUV420PackedSemiPlanar32m) {
-      /* copy to the output buffer swapping the u and v planes and cropping if necessary */
-      /* NV12 format with 128 byte alignment */
-      GST_DEBUG_OBJECT (dec, "Converting from qcom NV12 semi planar");
-      gint stride = ALIGN_SIZE (width, 128);
-      gint slice_height = ALIGN_SIZE (height, 32);
-      gint top = ALIGN_SIZE (dec->crop_rect.top, 2);
-      gint left = ALIGN_SIZE (dec->crop_rect.left, 2);
-
-      guint8 *y = in->data + (top * stride) + left;
-      guint8 *uv =
-          in->data + (stride * slice_height) + (top * stride / 2) + left;
-
-      gst_droidvec_copy_plane (map_info.data + info->offset[0],
-          info->stride[0], y, stride, info->width, info->height);
-      gst_droidvec_copy_packed_planes (map_info.data + info->offset[1],
-          map_info.data + info->offset[2], info->stride[1], uv, stride,
-          info->width / 2, info->height / 2);
-
-    } else if (dec->hal_format == c.OMX_COLOR_FormatYUV420SemiPlanar) {
-      GST_DEBUG_OBJECT (dec,
-          "Converting from OMX_COLOR_FormatYUV420SemiPlanar");
-      gint stride = width;
-      gint slice_height = ALIGN_SIZE (height, 16);
-      gint top = dec->crop_rect.top;
-      gint left = dec->crop_rect.left;
-
-      guint8 *y = in->data + (top * stride) + left;
-      guint8 *uv =
-          in->data + (stride * slice_height) + (top * stride / 2) + left;
-
-      gst_droidvec_copy_plane (map_info.data + info->offset[0],
-          info->stride[0], y, stride, info->width, info->height);
-      gst_droidvec_copy_packed_planes (map_info.data + info->offset[1],
-          map_info.data + info->offset[2], info->stride[1], uv, stride,
-          info->width / 2, info->height / 2);
-
-    } else {
-      GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, (NULL),
-          ("Unknown codec colour format: %d", dec->hal_format));
-      ret = FALSE;
-      goto out;
-    }
-  }
-
-  ret = TRUE;
-
-out:
-  if (use_external_buffer && data) {
-    g_free (data);
-  }
-
-  if (map_info.data) {
     gst_buffer_unmap (out, &map_info);
   }
 
@@ -433,11 +447,11 @@ gst_droidvdec_frame_available (void *user)
   GstVideoCodecFrame *frame;
   DroidMediaBuffer *buffer;
   GstBuffer *buff;
-  DroidMediaRect rect;
   GstVideoCropMeta *crop_meta;
   DroidMediaBufferCallbacks cb;
+  DroidMediaBufferInfo droid_info;
+  GstVideoInfo video_info;
   GstFlowReturn flow_ret;
-  int64_t ts;
 
   GST_DEBUG_OBJECT (dec, "frame available");
 
@@ -477,16 +491,14 @@ gst_droidvdec_frame_available (void *user)
   }
 
   buffer = gst_droid_media_buffer_memory_get_buffer (mem);
-  width = droid_media_buffer_get_width (buffer);
-  height = droid_media_buffer_get_height (buffer);
-  rect = droid_media_buffer_get_crop_rect (buffer);
-  ts = droid_media_buffer_get_timestamp (buffer);
+  droid_media_buffer_get_info (buffer, &droid_info);
 
   gst_buffer_insert_memory (buff, 0, mem);
 
   /* Now we can configure the state */
   if (G_UNLIKELY (!dec->out_state)) {
-    if (!gst_droidvdec_configure_state (decoder, width, height)) {
+    if (!gst_droidvdec_configure_state (decoder, droid_info.width,
+            droid_info.height)) {
       dec->downstream_flow_ret = GST_FLOW_ERROR;
       gst_buffer_unref (buff);
       GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
@@ -498,17 +510,29 @@ gst_droidvdec_frame_available (void *user)
   mem = NULL;
   buffer = NULL;
 
+  if (dec->bytes_per_pixel != 0) {
+    width = ALIGN_SIZE (droid_info.stride, dec->h_align) / dec->bytes_per_pixel;
+    height = ALIGN_SIZE (droid_info.height, dec->v_align);
+  } else {
+    width = droid_info.width;
+    height = droid_info.height;
+  }
+
+  gst_video_info_set_format (&video_info, dec->format, width, height);
+
+
   crop_meta = gst_buffer_add_video_crop_meta (buff);
-  crop_meta->x = rect.left;
-  crop_meta->y = rect.top;
-  crop_meta->width = rect.right - rect.left;
-  crop_meta->height = rect.bottom - rect.top;
+  crop_meta->x = droid_info.crop_rect.left;
+  crop_meta->y = droid_info.crop_rect.top;
+  crop_meta->width = droid_info.crop_rect.right - droid_info.crop_rect.left;
+  crop_meta->height = droid_info.crop_rect.bottom - droid_info.crop_rect.top;
 
   GST_LOG_OBJECT (dec, "crop info: x=%d, y=%d, w=%d, h=%d", crop_meta->x,
       crop_meta->y, crop_meta->width, crop_meta->height);
 
-  gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE,
-      GST_VIDEO_FORMAT_YV12, width, height);
+  gst_buffer_add_video_meta_full (buff, GST_VIDEO_FRAME_FLAG_NONE, dec->format,
+      droid_info.width, droid_info.height, video_info.finfo->n_planes,
+      video_info.offset, video_info.stride);
 
   frame = gst_video_decoder_get_oldest_frame (decoder);
 
@@ -523,7 +547,7 @@ gst_droidvdec_frame_available (void *user)
   frame->output_buffer = buff;
 
   /* We get the timestamp in ns already */
-  frame->pts = ts;
+  frame->pts = droid_info.timestamp;
 
   /* we have a ref acquired by _get_oldest_frame()
    * but we don't drop it because _finish_frame() assumes 2 refs.
@@ -726,10 +750,49 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
   GstDroidVDec *dec = GST_DROIDVDEC (decoder);
   DroidMediaCodecMetaData md;
   DroidMediaRect rect;
+  DroidMediaColourFormatConstants constants;
+  int format_index, format_count;
+
+  const GstDroidVideoFormatMap formats[] = {
+    {&constants.QOMX_COLOR_FormatYUV420PackedSemiPlanar32m,
+          GST_VIDEO_FORMAT_NV12,
+        gst_droidvdec_convert_yuv420_packed_semi_planar_to_i420, 1, 128, 32},
+    {&constants.QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka,
+        GST_VIDEO_FORMAT_NV12_64Z32, NULL, 0, 0, 0},
+    {&constants.OMX_COLOR_FormatYUV420Planar, GST_VIDEO_FORMAT_I420,
+        gst_droidvdec_convert_yuv420_planar_to_i420, 1, 4, 1},
+    {&constants.OMX_COLOR_FormatYUV420PackedPlanar, GST_VIDEO_FORMAT_I420, NULL,
+        1, 1, 1},
+    {&constants.OMX_COLOR_FormatYUV420SemiPlanar, GST_VIDEO_FORMAT_NV12,
+        gst_droidvdec_convert_yuv420_semi_planar_to_i420, 1, 1, 1},
+    {&constants.OMX_COLOR_FormatL8, GST_VIDEO_FORMAT_GRAY8, NULL, 1, 1, 1},
+    {&constants.OMX_COLOR_FormatYUV422SemiPlanar, GST_VIDEO_FORMAT_NV16, NULL,
+        1, 1, 1},
+    {&constants.OMX_COLOR_FormatYCbYCr, GST_VIDEO_FORMAT_YUY2, NULL, 1, 1, 1},
+    {&constants.OMX_COLOR_FormatYCrYCb, GST_VIDEO_FORMAT_YVYU, NULL, 1, 1, 1},
+    {&constants.OMX_COLOR_FormatCbYCrY, GST_VIDEO_FORMAT_UYVY, NULL, 1, 1, 1},
+    {&constants.OMX_COLOR_Format32bitARGB8888,
+          /* There is a mismatch in omxil specification 4.2.1 between
+           * OMX_COLOR_Format32bitARGB8888 and its description
+           * Follow the description */
+          GST_VIDEO_FORMAT_ABGR,
+          NULL,
+        4, 4, 1},
+    {&constants.OMX_COLOR_Format32bitBGRA8888,
+          /* Same issue as OMX_COLOR_Format32bitARGB8888 */
+          GST_VIDEO_FORMAT_ARGB,
+          NULL,
+        4, 4, 1},
+    {&constants.OMX_COLOR_Format16bitRGB565, GST_VIDEO_FORMAT_RGB16, NULL, 2, 4,
+        1},
+    {&constants.OMX_COLOR_Format16bitBGR565, GST_VIDEO_FORMAT_BGR16, NULL, 2, 4,
+        1}
+  };
 
   memset (&md, 0x0, sizeof (md));
   memset (&rect, 0x0, sizeof (rect));
 
+  droid_media_colour_format_constants_init (&constants);
   droid_media_codec_get_output_info (dec->codec, &md, &rect);
 
   GST_INFO_OBJECT (dec,
@@ -741,9 +804,54 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
   dec->codec_reported_width = md.width;
   dec->hal_format = md.hal_format;
 
-  if (dec->format == GST_VIDEO_FORMAT_I420) {
-    width = rect.right - rect.left;
-    height = rect.bottom - rect.top;
+  if (!dec->use_hardware_buffers && !dec->convert) {
+    if (dec->codec_type->quirks & DONT_USE_DROID_CONVERT_VALUE) {
+      GST_INFO_OBJECT (dec, "not using droid convert binary");
+    } else {
+      dec->convert = droid_media_convert_create ();
+    }
+  }
+
+  format_count = sizeof (formats) / sizeof (formats[0]);
+  for (format_index = 0; format_index < format_count; ++format_index) {
+    if (*formats[format_index].hal_format == md.hal_format) {
+      break;
+    }
+  }
+
+  if (dec->use_hardware_buffers) {
+    if (format_index < format_count) {
+      dec->format = formats[format_index].gst_format;
+      dec->bytes_per_pixel = formats[format_index].bytes_per_pixel;
+      dec->h_align = formats[format_index].h_align;
+      dec->v_align = formats[format_index].v_align;
+    } else {
+      GST_INFO_OBJECT (dec, "The HAL codec format %d is unrecognized",
+          md.hal_format);
+      dec->format = GST_VIDEO_FORMAT_ENCODED;
+      dec->bytes_per_pixel = 0;
+      dec->h_align = 0;
+      dec->v_align = 0;
+    }
+  } else {
+    if (dec->convert) {
+      dec->convert_to_i420 = gst_droidvdec_convert_native_to_i420;
+    } else if (format_index < format_count) {
+      dec->convert_to_i420 = formats[format_index].convert_to_i420;
+    } else {
+      dec->convert_to_i420 = NULL;
+    }
+
+    if (dec->convert_to_i420) {
+      dec->format = GST_VIDEO_FORMAT_I420;
+
+      width = rect.right - rect.left;
+      height = rect.bottom - rect.top;
+    } else {
+      GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
+          ("HAL codec format %d is unsupported", md.hal_format));
+      goto error;
+    }
   }
 
   GST_INFO_OBJECT (dec, "configuring state: width=%d, height=%d", width,
@@ -756,16 +864,13 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
   g_assert (dec->out_state->caps == NULL);
   dec->out_state->caps = gst_video_info_to_caps (&dec->out_state->info);
 
-  if (dec->out_state->info.finfo->format == GST_VIDEO_FORMAT_YV12) {
+  if (dec->use_hardware_buffers) {
     GstCapsFeatures *feature =
         gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER,
         NULL);
     gst_caps_set_features (dec->out_state->caps, 0, feature);
   } else {
     memcpy (&dec->crop_rect, &rect, sizeof (rect));
-    if (!dec->convert) {
-      dec->convert = droid_media_convert_create ();
-    }
 
     if (dec->convert) {
       droid_media_convert_set_crop_rect (dec->convert, rect, md.width,
@@ -935,8 +1040,8 @@ gst_droidvdec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 {
   GstDroidVDec *dec = GST_DROIDVDEC (decoder);
   GstCaps *caps, *template_caps;
-  GstStructure *s;
-  const gchar *format;
+  GstCapsFeatures *features;
+  guint i, count;
 
   /*
    * destroying the droidmedia codec here will cause stagefright to call abort.
@@ -971,15 +1076,20 @@ gst_droidvdec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 
   GST_DEBUG_OBJECT (dec, "peer caps %" GST_PTR_FORMAT, caps);
 
-  caps = gst_caps_truncate (caps);
-  caps = gst_caps_fixate (caps);
+  dec->use_hardware_buffers = FALSE;
 
-  s = gst_caps_get_structure (caps, 0);
-  format = gst_structure_get_string (s, "format");
-  dec->format = gst_video_format_from_string (format);
+  count = gst_caps_get_size (caps);
+  for (i = 0; i < count; ++i) {
+    features = gst_caps_get_features (caps, i);
+    if (gst_caps_features_contains
+        (features, GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER)) {
+      dec->use_hardware_buffers = TRUE;
+    }
+  }
+
   gst_caps_unref (caps);
 
-  if (G_UNLIKELY (format == GST_VIDEO_FORMAT_UNKNOWN)) {
+  if (G_UNLIKELY (count == 0)) {
     GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL), ("Failed to parse caps"));
     return FALSE;
   }

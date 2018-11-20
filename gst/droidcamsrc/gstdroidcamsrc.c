@@ -52,7 +52,8 @@ static GstStaticPadTemplate vf_src_template_factory =
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
-        (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER, "{YV12}") ";"
+        (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER,
+            GST_DROID_MEDIA_BUFFER_MEMORY_VIDEO_FORMATS) ";"
         GST_VIDEO_CAPS_MAKE ("{NV21}")));
 
 static GstStaticPadTemplate img_src_template_factory =
@@ -1424,7 +1425,9 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
       g_rec_mutex_lock (&src->dev_lock);
       if (src->dev && src->dev->params) {
         if (data == src->vfsrc) {
-          caps = gst_droidcamsrc_params_get_viewfinder_caps (src->dev->params);
+          caps =
+              gst_droidcamsrc_params_get_viewfinder_caps (src->dev->params,
+              src->dev->viewfinder_format);
         } else if (data == src->imgsrc) {
           caps = gst_droidcamsrc_params_get_image_caps (src->dev->params);
         } else if (data == src->vidsrc) {
@@ -1493,6 +1496,7 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   gboolean ret = FALSE;
   GstCaps *peer = NULL;
   GstCaps *our_caps = NULL;
+  GstCapsFeatures *features;
   gchar *preview;
   GstVideoInfo info;
 
@@ -1500,7 +1504,9 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
 
   GST_DEBUG_OBJECT (src, "vfsrc negotiate");
 
-  our_caps = gst_droidcamsrc_params_get_viewfinder_caps (src->dev->params);
+  our_caps =
+      gst_droidcamsrc_params_get_viewfinder_caps (src->dev->params,
+      src->dev->viewfinder_format);
   GST_DEBUG_OBJECT (src, "our caps %" GST_PTR_FORMAT, our_caps);
 
   if (!our_caps || gst_caps_is_empty (our_caps)) {
@@ -1559,8 +1565,12 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   gst_droidcamsrc_params_set_string (src->dev->params, "preview-size", preview);
   g_free (preview);
 
+  features = gst_caps_get_features (our_caps, 0);
+
   g_rec_mutex_lock (&src->dev_lock);
-  src->dev->use_raw_data = info.finfo->format == GST_VIDEO_FORMAT_NV21;
+  src->dev->use_raw_data =
+      !gst_caps_features_contains (features,
+      GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER);
   g_rec_mutex_unlock (&src->dev_lock);
 
   ret = TRUE;
