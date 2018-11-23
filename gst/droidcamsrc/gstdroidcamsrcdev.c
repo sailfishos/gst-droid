@@ -566,7 +566,7 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
   hal_format = droid_media_camera_get_video_color_format (dev->cam);
 
   if (hal_format == constants.OMX_COLOR_FormatYUV420Planar) {
-    dev->viewfinder_format = GST_VIDEO_FORMAT_I420;
+    dev->viewfinder_format = GST_VIDEO_FORMAT_YV12;
   } else if (hal_format == constants.OMX_COLOR_FormatYUV422SemiPlanar) {
     dev->viewfinder_format = GST_VIDEO_FORMAT_NV16;
   } else if (hal_format == constants.OMX_COLOR_FormatYUV420SemiPlanar) {
@@ -576,6 +576,7 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
   } else if (hal_format == constants.OMX_COLOR_Format16bitRGB565) {
     dev->viewfinder_format = GST_VIDEO_FORMAT_RGB16;
   } else {
+    GST_WARNING_OBJECT (src, "Unknown HAL color format 0x%x", hal_format);
     dev->viewfinder_format = GST_VIDEO_FORMAT_ENCODED;
   }
 
