@@ -826,9 +826,14 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
       dec->h_align = formats[format_index].h_align;
       dec->v_align = formats[format_index].v_align;
     } else {
-      GST_INFO_OBJECT (dec, "The HAL codec format %d is unrecognized",
+      GST_INFO_OBJECT (dec, "The HAL codec format 0x%x is unrecognized",
           md.hal_format);
-      dec->format = GST_VIDEO_FORMAT_ENCODED;
+      /* This should be GST_VIDEO_FORMAT_ENCODED but the videoconv? element
+         can't do passthrough of that format. Since the format can't be
+         identified the reported size of the buffer will be zero and it
+         won't be possible to map it so reporting the wrong format should
+         be harmless. */
+      dec->format = GST_VIDEO_FORMAT_YV12;
       dec->bytes_per_pixel = 0;
       dec->h_align = 0;
       dec->v_align = 0;
@@ -849,7 +854,7 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
       height = rect.bottom - rect.top;
     } else {
       GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
-          ("HAL codec format %d is unsupported", md.hal_format));
+          ("HAL codec format 0x%x is unsupported", md.hal_format));
       goto error;
     }
   }
