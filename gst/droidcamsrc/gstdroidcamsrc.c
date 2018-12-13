@@ -1050,6 +1050,37 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
           "Target bitrate", 0, G_MAXINT,
           DEFAULT_TARGET_BITRATE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class,
+      PROP_SUPPORTED_WB_MODES,
+      g_param_spec_variant ("supported-wb-modes",
+          "Supported white balance modes", "Supported white balance modes",
+          G_VARIANT_TYPE_VARIANT, NULL, G_PARAM_READABLE));
+
+  g_object_class_install_property (gobject_class, PROP_SUPPORTED_COLOR_TONES,
+      g_param_spec_variant ("supported-color-tones", "Supported color tones",
+          "Supported color tones", G_VARIANT_TYPE_VARIANT, NULL,
+          G_PARAM_READABLE));
+
+  g_object_class_install_property (gobject_class, PROP_SUPPORTED_SCENE_MODES,
+      g_param_spec_variant ("supported-scene-modes",
+          "Supported scene modes", "Supported scene modes",
+          G_VARIANT_TYPE_VARIANT, NULL, G_PARAM_READABLE));
+
+  g_object_class_install_property (gobject_class, PROP_SUPPORTED_FLASH_MODES,
+      g_param_spec_variant ("supported-flash-modes", "Supported flash modes",
+          "Supported flash modes", G_VARIANT_TYPE_VARIANT, NULL,
+          G_PARAM_READABLE));
+
+  g_object_class_install_property (gobject_class, PROP_SUPPORTED_FOCUS_MODES,
+      g_param_spec_variant ("supported-focus-modes", "Supported focus modes",
+          "Supported focus modes", G_VARIANT_TYPE_VARIANT, NULL,
+          G_PARAM_READABLE));
+
+  g_object_class_install_property (gobject_class, PROP_SUPPORTED_ISO_SPEEDS,
+      g_param_spec_variant ("supported-iso-speeds", "Supported ISO speeds",
+          "Supported ISO speeds", G_VARIANT_TYPE_VARIANT, NULL,
+          G_PARAM_READABLE));
+
   gst_droidcamsrc_photography_add_overrides (gobject_class);
 
   /* Signals */
@@ -1723,8 +1754,8 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
 
   vid = g_strdup_printf ("%ix%i", info.width, info.height);
   gchar *key =
-      src->dev->
-      params->has_separate_video_size_values ? "video-size" : "preview-size";
+      src->dev->params->
+      has_separate_video_size_values ? "video-size" : "preview-size";
   gst_droidcamsrc_params_set_string (src->dev->params, key, vid);
 
   /* Now we need to find a picture size that is equal to our video size.
