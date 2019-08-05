@@ -563,6 +563,13 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
   dev->info = info;
   dev->cam = droid_media_camera_connect (dev->info->num);
 
+  if (!dev->cam) {
+    g_rec_mutex_unlock (dev->lock);
+
+    GST_ELEMENT_ERROR (src, LIBRARY, INIT, (NULL), ("error opening camera"));
+    return FALSE;
+  }
+
   hal_format = droid_media_camera_get_video_color_format (dev->cam);
 
   if (hal_format == constants.OMX_COLOR_FormatYUV420Planar) {
@@ -578,13 +585,6 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
   } else {
     GST_WARNING_OBJECT (src, "Unknown HAL color format 0x%x", hal_format);
     dev->viewfinder_format = GST_VIDEO_FORMAT_ENCODED;
-  }
-
-  if (!dev->cam) {
-    g_rec_mutex_unlock (dev->lock);
-
-    GST_ELEMENT_ERROR (src, LIBRARY, INIT, (NULL), ("error opening camera"));
-    return FALSE;
   }
 
   dev->queue = droid_media_camera_get_buffer_queue (dev->cam);
