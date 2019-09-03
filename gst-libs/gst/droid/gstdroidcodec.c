@@ -43,6 +43,8 @@ create_mpeg2vdec_codec_data_from_codec_data (GstDroidCodec *
     codec G_GNUC_UNUSED, GstBuffer * data, DroidMediaData * out);
 static gboolean create_h264dec_codec_data_from_codec_data (GstDroidCodec *
     codec, GstBuffer * data, DroidMediaData * out);
+static gboolean create_h265dec_codec_data_from_codec_data (GstDroidCodec *
+    codec, GstBuffer * data, DroidMediaData * out);
 static gboolean create_vp8vdec_codec_data_from_codec_data (GstDroidCodec *
     codec, GstBuffer * data, DroidMediaData * out);
 static gboolean create_aacdec_codec_data_from_codec_data (GstDroidCodec * codec,
@@ -134,6 +136,10 @@ static GstDroidCodecInfo codecs[] = {
         "video/mpeg, mpegversion=2", TRUE,
         NULL, NULL, NULL, NULL,
       create_mpeg2vdec_codec_data_from_codec_data, NULL, NULL},
+
+  {GST_DROID_CODEC_DECODER_VIDEO, "video/x-h265", "video/hevc",
+        "video/x-h265", FALSE, NULL, NULL, NULL, NULL,
+      create_h265dec_codec_data_from_codec_data, NULL, process_h264dec_data},
 
   /* audio encoders */
   {GST_DROID_CODEC_ENCODER_AUDIO, "audio/mpeg", "audio/mp4a-latm",
@@ -740,6 +746,38 @@ create_h264dec_codec_data_from_codec_data (GstDroidCodec * codec,
   }
 
   codec->data->h264_nal = (1 + (info.data[4] & 3));
+
+  GST_INFO ("nal prefix length %d", codec->data->h264_nal);
+
+  out->size = info.size;
+  out->data = g_malloc (info.size);
+  memcpy (out->data, info.data, info.size);
+  ret = TRUE;
+
+out:
+  gst_buffer_unmap (data, &info);
+
+  return ret;
+}
+
+static gboolean
+create_h265dec_codec_data_from_codec_data (GstDroidCodec * codec,
+    GstBuffer * data, DroidMediaData * out)
+{
+  GstMapInfo info;
+  gboolean ret = FALSE;
+
+  if (!gst_buffer_map (data, &info, GST_MAP_READ)) {
+    GST_ERROR ("failed to map buffer");
+    return FALSE;
+  }
+
+  if (info.size < 7 || info.data[0] != 1) {
+    GST_ERROR ("malformed codec_data");
+    goto out;
+  }
+
+  codec->data->h264_nal = (1 + (info.data[21] & 3));
 
   GST_INFO ("nal prefix length %d", codec->data->h264_nal);
 
