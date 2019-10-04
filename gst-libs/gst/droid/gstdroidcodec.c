@@ -38,6 +38,9 @@ static GstBuffer *create_mpeg4venc_codec_data (DroidMediaData * data);
 static GstBuffer *create_h264enc_codec_data (DroidMediaData * data);
 static gboolean create_mpeg4vdec_codec_data_from_codec_data (GstDroidCodec *
     codec, GstBuffer * data, DroidMediaData * out);
+static gboolean
+create_mpeg2vdec_codec_data_from_codec_data (GstDroidCodec *
+    codec G_GNUC_UNUSED, GstBuffer * data, DroidMediaData * out);
 static gboolean create_h264dec_codec_data_from_codec_data (GstDroidCodec *
     codec, GstBuffer * data, DroidMediaData * out);
 static gboolean create_vp8vdec_codec_data_from_codec_data (GstDroidCodec *
@@ -126,6 +129,11 @@ static GstDroidCodecInfo codecs[] = {
   {GST_DROID_CODEC_DECODER_VIDEO, "video/x-vp8", "video/x-vnd.on2.vp8",
         "video/x-vp8", TRUE, NULL, NULL, NULL, NULL,
       create_vp8vdec_codec_data_from_codec_data, NULL, NULL},
+
+  {GST_DROID_CODEC_DECODER_VIDEO, "video/mpeg", "video/mpeg2",
+        "video/mpeg, mpegversion=2", TRUE,
+        NULL, NULL, NULL, NULL,
+      create_mpeg2vdec_codec_data_from_codec_data, NULL, NULL},
 
   /* audio encoders */
   {GST_DROID_CODEC_ENCODER_AUDIO, "audio/mpeg", "audio/mp4a-latm",
@@ -614,6 +622,16 @@ h264enc_complement (GstCaps * caps)
 {
   gst_caps_set_simple (caps, "alignment", G_TYPE_STRING, "au",
       "stream-format", G_TYPE_STRING, "avc", NULL);
+}
+
+static gboolean
+create_mpeg2vdec_codec_data_from_codec_data (GstDroidCodec *
+    codec G_GNUC_UNUSED, GstBuffer * data G_GNUC_UNUSED, DroidMediaData * out)
+{
+  out->size = 0;
+  out->data = NULL;
+
+  return TRUE;
 }
 
 static gboolean
