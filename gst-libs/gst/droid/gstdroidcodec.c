@@ -129,8 +129,10 @@ static GstDroidCodecInfo codecs[] = {
       NULL, NULL, NULL, NULL, NULL, NULL},
 
   {GST_DROID_CODEC_DECODER_VIDEO, "video/x-vp8", "video/x-vnd.on2.vp8",
-        "video/x-vp8", TRUE, NULL, NULL, NULL, NULL,
-      create_vp8vdec_codec_data_from_codec_data, NULL, NULL},
+      "video/x-vp8", TRUE, NULL, NULL, NULL, NULL, NULL, NULL, NULL},
+
+  {GST_DROID_CODEC_DECODER_VIDEO, "video/x-vp9", "video/x-vnd.on2.vp9",
+      "video/x-vp9", TRUE, NULL, NULL, NULL, NULL, NULL, NULL, NULL},
 
   {GST_DROID_CODEC_DECODER_VIDEO, "video/mpeg", "video/mpeg2",
         "video/mpeg, mpegversion=2", TRUE,
@@ -698,34 +700,6 @@ create_mpeg4vdec_codec_data_from_codec_data (GstDroidCodec *
   gst_buffer_unmap (data, &info);
 
   return TRUE;
-}
-
-static gboolean
-create_vp8vdec_codec_data_from_codec_data (GstDroidCodec * codec,
-    GstBuffer * data, DroidMediaData * out)
-{
-  GstMapInfo info;
-  gboolean ret = FALSE;
-
-  if (!gst_buffer_map (data, &info, GST_MAP_READ)) {
-    GST_ERROR ("failed to map buffer");
-    return FALSE;
-  }
-
-  if (info.size < 7 || info.data[0] != 1) {
-    GST_ERROR ("malformed codec_data");
-    goto out;
-  }
-
-  out->size = info.size;
-  out->data = g_malloc (info.size);
-  memcpy (out->data, info.data, info.size);
-  ret = TRUE;
-
-out:
-  gst_buffer_unmap (data, &info);
-
-  return ret;
 }
 
 static gboolean
