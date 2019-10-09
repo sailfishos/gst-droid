@@ -132,10 +132,10 @@ static GstDroidCodecInfo codecs[] = {
       "video/x-vp8", TRUE, NULL, NULL, NULL, NULL, NULL, NULL, NULL},
 
   {GST_DROID_CODEC_DECODER_VIDEO, "video/x-vp9", "video/x-vnd.on2.vp9",
-      "video/x-vp9", FALSE, NULL, NULL, NULL, NULL, NULL, NULL, NULL},
+      "video/x-vp9", TRUE, NULL, NULL, NULL, NULL, NULL, NULL, NULL},
 
   {GST_DROID_CODEC_DECODER_VIDEO, "video/mpeg", "video/mpeg2",
-        "video/mpeg, mpegversion=2", FALSE,
+        "video/mpeg, mpegversion=2", TRUE,
         NULL, NULL, NULL, NULL,
       create_mpeg2vdec_codec_data_from_codec_data, NULL, NULL},
 
