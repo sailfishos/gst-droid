@@ -233,6 +233,20 @@ gst_droid_codec_get_all_caps (GstDroidCodecType type)
       continue;
     }
 
+    /* Verify that video codec is supported before enabling it */
+    if (type == GST_DROID_CODEC_DECODER_VIDEO
+        || type == GST_DROID_CODEC_ENCODER_VIDEO) {
+      DroidMediaCodecMetaData md;
+      md.type = codecs[x].droid;
+      md.flags = DROID_MEDIA_CODEC_HW_ONLY;
+      if (!droid_media_codec_is_supported (&md,
+              type == GST_DROID_CODEC_ENCODER_VIDEO)) {
+        GST_INFO ("No hardware support found for %s, disabling codec",
+            codecs[x].droid);
+        continue;
+      }
+    }
+
     s = gst_structure_new_from_string (codecs[x].caps);
     caps = gst_caps_merge_structure (caps, s);
   }
