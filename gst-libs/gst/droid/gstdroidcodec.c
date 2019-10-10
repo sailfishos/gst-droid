@@ -45,13 +45,11 @@ static gboolean create_h264dec_codec_data_from_codec_data (GstDroidCodec *
     codec, GstBuffer * data, DroidMediaData * out);
 static gboolean create_h265dec_codec_data_from_codec_data (GstDroidCodec *
     codec, GstBuffer * data, DroidMediaData * out);
-static gboolean create_vp8vdec_codec_data_from_codec_data (GstDroidCodec *
-    codec, GstBuffer * data, DroidMediaData * out);
 static gboolean create_aacdec_codec_data_from_codec_data (GstDroidCodec * codec,
     GstBuffer * data, DroidMediaData * out);
 static gboolean create_aacdec_codec_data_from_frame_data (GstDroidCodec * codec,
     GstBuffer * frame_data, DroidMediaData * out);
-static gboolean process_h264dec_data (GstDroidCodec * codec, GstBuffer * buffer,
+static gboolean process_h26xdec_data (GstDroidCodec * codec, GstBuffer * buffer,
     DroidMediaData * out);
 static gboolean process_aacdec_data (GstDroidCodec * codec, GstBuffer * buffer,
     DroidMediaData * out);
@@ -122,7 +120,7 @@ static GstDroidCodecInfo codecs[] = {
   {GST_DROID_CODEC_DECODER_VIDEO, "video/x-h264", "video/avc",
         "video/x-h264, stream-format=avc,alignment=au", TRUE,
         is_h264_dec, NULL, NULL, NULL,
-      create_h264dec_codec_data_from_codec_data, NULL, process_h264dec_data},
+      create_h264dec_codec_data_from_codec_data, NULL, process_h26xdec_data},
 
   {GST_DROID_CODEC_DECODER_VIDEO, "video/x-h263", "video/3gpp",
         "video/x-h263", TRUE, NULL,
@@ -141,7 +139,7 @@ static GstDroidCodecInfo codecs[] = {
 
   {GST_DROID_CODEC_DECODER_VIDEO, "video/x-h265", "video/hevc",
         "video/x-h265", FALSE, NULL, NULL, NULL, NULL,
-      create_h265dec_codec_data_from_codec_data, NULL, process_h264dec_data},
+      create_h265dec_codec_data_from_codec_data, NULL, process_h26xdec_data},
 
   /* audio encoders */
   {GST_DROID_CODEC_ENCODER_AUDIO, "audio/mpeg", "audio/mp4a-latm",
@@ -932,7 +930,7 @@ create_aacdec_codec_data_from_frame_data (GstDroidCodec * codec,
 }
 
 static gboolean
-process_h264dec_data (GstDroidCodec * codec, GstBuffer * buffer,
+process_h26xdec_data (GstDroidCodec * codec, GstBuffer * buffer,
     DroidMediaData * out)
 {
   GstMapInfo info;
