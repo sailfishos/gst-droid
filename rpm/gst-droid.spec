@@ -21,9 +21,9 @@ BuildRequires:  pkgconfig(libexif)
 BuildRequires:  automake
 BuildRequires:  libtool
 BuildRequires:  gettext
-BuildRequires:  droidmedia-devel
+BuildRequires:  droidmedia-devel >= 0.20191010.0
 BuildRequires:  pkgconfig(libandroid-properties)
-Requires:       droidmedia >= 0.20170120.0
+Requires:       droidmedia >= 0.20191010.0
 
 %description
 GStreamer droid plug-in contains elements using the Android HAL

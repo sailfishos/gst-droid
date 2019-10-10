@@ -45,13 +45,11 @@ static gboolean create_h264dec_codec_data_from_codec_data (GstDroidCodec *
     codec, GstBuffer * data, DroidMediaData * out);
 static gboolean create_h265dec_codec_data_from_codec_data (GstDroidCodec *
     codec, GstBuffer * data, DroidMediaData * out);
-static gboolean create_vp8vdec_codec_data_from_codec_data (GstDroidCodec *
-    codec, GstBuffer * data, DroidMediaData * out);
 static gboolean create_aacdec_codec_data_from_codec_data (GstDroidCodec * codec,
     GstBuffer * data, DroidMediaData * out);
 static gboolean create_aacdec_codec_data_from_frame_data (GstDroidCodec * codec,
     GstBuffer * frame_data, DroidMediaData * out);
-static gboolean process_h264dec_data (GstDroidCodec * codec, GstBuffer * buffer,
+static gboolean process_h26xdec_data (GstDroidCodec * codec, GstBuffer * buffer,
     DroidMediaData * out);
 static gboolean process_aacdec_data (GstDroidCodec * codec, GstBuffer * buffer,
     DroidMediaData * out);
@@ -122,7 +120,7 @@ static GstDroidCodecInfo codecs[] = {
   {GST_DROID_CODEC_DECODER_VIDEO, "video/x-h264", "video/avc",
         "video/x-h264, stream-format=avc,alignment=au", TRUE,
         is_h264_dec, NULL, NULL, NULL,
-      create_h264dec_codec_data_from_codec_data, NULL, process_h264dec_data},
+      create_h264dec_codec_data_from_codec_data, NULL, process_h26xdec_data},
 
   {GST_DROID_CODEC_DECODER_VIDEO, "video/x-h263", "video/3gpp",
         "video/x-h263", TRUE, NULL,
@@ -132,16 +130,16 @@ static GstDroidCodecInfo codecs[] = {
       "video/x-vp8", TRUE, NULL, NULL, NULL, NULL, NULL, NULL, NULL},
 
   {GST_DROID_CODEC_DECODER_VIDEO, "video/x-vp9", "video/x-vnd.on2.vp9",
-      "video/x-vp9", FALSE, NULL, NULL, NULL, NULL, NULL, NULL, NULL},
+      "video/x-vp9", TRUE, NULL, NULL, NULL, NULL, NULL, NULL, NULL},
 
   {GST_DROID_CODEC_DECODER_VIDEO, "video/mpeg", "video/mpeg2",
-        "video/mpeg, mpegversion=2", FALSE,
+        "video/mpeg, mpegversion=2", TRUE,
         NULL, NULL, NULL, NULL,
       create_mpeg2vdec_codec_data_from_codec_data, NULL, NULL},
 
   {GST_DROID_CODEC_DECODER_VIDEO, "video/x-h265", "video/hevc",
         "video/x-h265", FALSE, NULL, NULL, NULL, NULL,
-      create_h265dec_codec_data_from_codec_data, NULL, process_h264dec_data},
+      create_h265dec_codec_data_from_codec_data, NULL, process_h26xdec_data},
 
   /* audio encoders */
   {GST_DROID_CODEC_ENCODER_AUDIO, "audio/mpeg", "audio/mp4a-latm",
@@ -231,6 +229,20 @@ gst_droid_codec_get_all_caps (GstDroidCodecType type)
             && !codecs[x].enabled)) {
       GST_INFO ("%s is disabled", codecs[x].droid);
       continue;
+    }
+
+    /* Verify that video codec is supported before enabling it */
+    if (type == GST_DROID_CODEC_DECODER_VIDEO
+        || type == GST_DROID_CODEC_ENCODER_VIDEO) {
+      DroidMediaCodecMetaData md;
+      md.type = codecs[x].droid;
+      md.flags = DROID_MEDIA_CODEC_HW_ONLY;
+      if (!droid_media_codec_is_supported (&md,
+              type == GST_DROID_CODEC_ENCODER_VIDEO)) {
+        GST_INFO ("No hardware support found for %s, disabling codec",
+            codecs[x].droid);
+        continue;
+      }
     }
 
     s = gst_structure_new_from_string (codecs[x].caps);
@@ -918,7 +930,7 @@ create_aacdec_codec_data_from_frame_data (GstDroidCodec * codec,
 }
 
 static gboolean
-process_h264dec_data (GstDroidCodec * codec, GstBuffer * buffer,
+process_h26xdec_data (GstDroidCodec * codec, GstBuffer * buffer,
     DroidMediaData * out)
 {
   GstMapInfo info;
