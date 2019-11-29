@@ -36,10 +36,8 @@ GstAllocator * gst_droid_media_buffer_allocator_new (void);
 GstMemory    * gst_droid_media_buffer_allocator_alloc (GstAllocator * allocator,
                                                        DroidMediaBufferQueue *queue,
 						       DroidMediaBufferCallbacks *cb);
-GstMemory    * gst_droid_media_buffer_allocator_alloc_from_data (GstAllocator * allocator,
-								 GstVideoInfo * info,
-								 DroidMediaData * data,
-								 DroidMediaBufferCallbacks *cb);
+GstMemory    * gst_droid_media_buffer_allocator_alloc_new (GstAllocator * allocator,
+                GstVideoInfo * info, GstBuffer * buffer);
 
 DroidMediaBuffer * gst_droid_media_buffer_memory_get_buffer (GstMemory * mem);
 gboolean       gst_is_droid_media_buffer_memory (GstMemory * mem);

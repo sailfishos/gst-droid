@@ -27,6 +27,7 @@
 #include <gst/video/video.h>
 #include <gst/interfaces/nemovideotexture.h>
 #include "gst/droid/gstdroidmediabuffer.h"
+#include "gst/droid/gstdroidbufferpool.h"
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_eglsink_debug);
 #define GST_CAT_DEFAULT gst_droid_eglsink_debug
@@ -46,7 +47,7 @@ static GstStaticPadTemplate gst_droideglsink_sink_template_factory =
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
         (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER,
             GST_DROID_MEDIA_BUFFER_MEMORY_VIDEO_FORMATS) "; "
-        GST_VIDEO_CAPS_MAKE ("{YV12, NV21}")));
+        GST_VIDEO_CAPS_MAKE (GST_DROID_MEDIA_BUFFER_MEMORY_VIDEO_FORMATS)));
 
 enum
 {
@@ -123,7 +124,7 @@ gst_droideglsink_set_caps (GstBaseSink * bsink, GstCaps * caps)
 
   if (!gst_video_info_from_caps (&info, caps)) {
     GST_ELEMENT_ERROR (sink, STREAM, FORMAT, (NULL),
-        ("ould not locate image format from caps %" GST_PTR_FORMAT, caps));
+        ("Could not locate image format from caps %" GST_PTR_FORMAT, caps));
     return FALSE;
   }
 
@@ -132,6 +133,52 @@ gst_droideglsink_set_caps (GstBaseSink * bsink, GstCaps * caps)
 
   GST_VIDEO_SINK_WIDTH (vsink) = info.width;
   GST_VIDEO_SINK_HEIGHT (vsink) = info.height;
+
+  return TRUE;
+}
+
+static gboolean
+gst_droideglsink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
+{
+  GstDroidEglSink *sink = GST_DROIDEGLSINK (bsink);
+  GstBufferPool *pool;
+  GstCaps *caps;
+  guint size;
+  gboolean need_pool;
+  GstStructure *config;
+  GstVideoInfo video_info;
+
+  gst_query_parse_allocation (query, &caps, &need_pool);
+
+  if (!caps) {
+    GST_ERROR_OBJECT (sink, "No query caps");
+    return FALSE;
+  }
+
+  if (!gst_video_info_from_caps (&video_info, caps)) {
+    GST_ERROR_OBJECT (sink, "Unable to get video caps");
+    return FALSE;
+  }
+
+  if (need_pool) {
+    pool = gst_droid_buffer_pool_new ();
+    size = video_info.finfo->format == GST_VIDEO_FORMAT_ENCODED
+        ? 1 : video_info.size;
+
+    config = gst_buffer_pool_get_config (pool);
+    gst_buffer_pool_config_set_params (config, caps, size, 2, 0);
+    if (!gst_buffer_pool_set_config (pool, config)) {
+      GST_ERROR_OBJECT (sink, "Failed to set buffer pool configuration");
+      gst_object_unref (pool);
+      return FALSE;
+    }
+    gst_query_add_allocation_pool (query, pool, size, 0, 2);
+    gst_object_unref (pool);
+  }
+
+  gst_query_add_allocation_meta (query, GST_VIDEO_META_API_TYPE, NULL);
+
+  GST_DEBUG_OBJECT (sink, "proposed allocation");
 
   return TRUE;
 }
@@ -397,7 +444,8 @@ gst_droideglsink_class_init (GstDroidEglSinkClass * klass)
   gstbasesink_class->start = GST_DEBUG_FUNCPTR (gst_droideglsink_start);
   gstbasesink_class->stop = GST_DEBUG_FUNCPTR (gst_droideglsink_stop);
   gstbasesink_class->event = GST_DEBUG_FUNCPTR (gst_droideglsink_event);
-
+  gstbasesink_class->propose_allocation =
+      GST_DEBUG_FUNCPTR (gst_droideglsink_propose_allocation);
   videosink_class->show_frame = GST_DEBUG_FUNCPTR (gst_droideglsink_show_frame);
 
   g_object_class_override_property (gobject_class, PROP_EGL_DISPLAY,
@@ -422,79 +470,6 @@ gst_droideglsink_get_droid_media_buffer_memory (GstDroidEglSink * sink,
     if (mem && gst_memory_is_type (mem, GST_ALLOCATOR_DROID_MEDIA_BUFFER)) {
       return mem;
     }
-  }
-
-  return NULL;
-}
-
-static GstBuffer *
-gst_droideglsink_copy_buffer (GstDroidEglSink * sink, GstBuffer * buffer)
-{
-  GstMapInfo info;
-  GstVideoInfo format;
-  GstBuffer *buff = gst_buffer_new ();
-  GstMemory *mem = NULL;
-  GstCaps *caps = NULL;
-  DroidMediaData data;
-  gboolean unmap = FALSE;
-  DroidMediaBufferCallbacks cb;
-
-  GST_DEBUG_OBJECT (sink, "copy buffer");
-
-  if (!gst_pad_has_current_caps (GST_BASE_SINK_PAD (sink))) {
-    goto free_and_out;
-  }
-
-  if (!gst_buffer_copy_into (buff, buffer,
-          GST_BUFFER_COPY_FLAGS |
-          GST_BUFFER_COPY_TIMESTAMPS | GST_BUFFER_COPY_META, 0, -1)) {
-    goto free_and_out;
-  }
-
-  if (!gst_buffer_map (buffer, &info, GST_MAP_READ)) {
-    goto free_and_out;
-  }
-
-  unmap = TRUE;
-
-  caps = gst_pad_get_current_caps (GST_BASE_SINK_PAD (sink));
-  if (!gst_video_info_from_caps (&format, caps)) {
-    goto free_and_out;
-  }
-
-  cb.ref = (DroidMediaCallback) gst_buffer_ref;
-  cb.unref = (DroidMediaCallback) gst_buffer_unref;
-  cb.data = buff;
-
-  data.size = info.size;
-  data.data = info.data;
-
-  mem = gst_droid_media_buffer_allocator_alloc_from_data (sink->allocator,
-      &format, &data, &cb);
-
-  if (!mem) {
-    goto free_and_out;
-  }
-
-  gst_buffer_append_memory (buff, mem);
-  gst_buffer_unmap (buffer, &info);
-  gst_caps_unref (caps);
-
-  return buff;
-
-free_and_out:
-  if (unmap) {
-    gst_buffer_unmap (buffer, &info);
-  }
-
-  gst_buffer_unref (buff);
-
-  if (mem) {
-    gst_memory_unref (mem);
-  }
-
-  if (caps) {
-    gst_caps_unref (caps);
   }
 
   return NULL;
@@ -574,13 +549,13 @@ gst_droideglsink_acquire_frame (NemoGstVideoTexture * iface)
   mem =
       gst_droideglsink_get_droid_media_buffer_memory (sink, sink->last_buffer);
 
-  if (mem) {
-    sink->acquired_buffer = gst_buffer_ref (sink->last_buffer);
-  } else {
-    /* Construct a new buffer */
-    sink->acquired_buffer =
-        gst_droideglsink_copy_buffer (sink, sink->last_buffer);
+  if (!mem) {
+    ret = FALSE;
+    GST_WARNING_OBJECT (sink, "no droidmedia buffer available");
+    goto unlock_and_out;
   }
+
+  sink->acquired_buffer = gst_buffer_ref (sink->last_buffer);
 
   if (!sink->acquired_buffer) {
     ret = FALSE;

@@ -23,6 +23,7 @@
 #define __GST_DROID_BUFFER_POOL_H__
 
 #include <gst/gstbufferpool.h>
+#include <gst/video/video-info.h>
 
 G_BEGIN_DECLS
 
@@ -40,6 +41,8 @@ struct _GstDroidBufferPool
   GMutex lock;
   GCond cond;
   gint num_buffers;
+  GstAllocator *allocator;
+  GstVideoInfo video_info;
 };
 
 struct _GstDroidBufferPoolClass
