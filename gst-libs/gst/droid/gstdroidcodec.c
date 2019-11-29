@@ -111,6 +111,12 @@ static GstDroidCodecInfo codecs[] = {
         is_mpega, NULL, NULL, NULL, create_aacdec_codec_data_from_codec_data,
       create_aacdec_codec_data_from_frame_data, process_aacdec_data},
 
+  {GST_DROID_CODEC_DECODER_AUDIO, "audio/AMR", "audio/3gpp",
+      "audio/AMR", FALSE, NULL, NULL, NULL, NULL, NULL, NULL, NULL},
+
+  {GST_DROID_CODEC_DECODER_AUDIO, "audio/AMR-WB", "audio/amr-wb",
+      "audio/AMR-WB", FALSE, NULL, NULL, NULL, NULL, NULL, NULL, NULL},
+
   /* video decoders */
   {GST_DROID_CODEC_DECODER_VIDEO, "video/mpeg", "video/mp4v-es",
         "video/mpeg, mpegversion=4", TRUE,
