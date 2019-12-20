@@ -49,6 +49,8 @@ static gboolean create_aacdec_codec_data_from_codec_data (GstDroidCodec * codec,
     GstBuffer * data, DroidMediaData * out);
 static gboolean create_aacdec_codec_data_from_frame_data (GstDroidCodec * codec,
     GstBuffer * frame_data, DroidMediaData * out);
+static gboolean ignore_codec_data (GstDroidCodec * codec, GstBuffer * data,
+    DroidMediaData * out);
 static gboolean process_h26xdec_data (GstDroidCodec * codec, GstBuffer * buffer,
     DroidMediaData * out);
 static gboolean process_aacdec_data (GstDroidCodec * codec, GstBuffer * buffer,
@@ -112,10 +114,12 @@ static GstDroidCodecInfo codecs[] = {
       create_aacdec_codec_data_from_frame_data, process_aacdec_data},
 
   {GST_DROID_CODEC_DECODER_AUDIO, "audio/AMR", "audio/3gpp",
-      "audio/AMR", FALSE, NULL, NULL, NULL, NULL, NULL, NULL, NULL},
+        "audio/AMR", FALSE, NULL, NULL, NULL, NULL,
+      ignore_codec_data, NULL, NULL},
 
   {GST_DROID_CODEC_DECODER_AUDIO, "audio/AMR-WB", "audio/amr-wb",
-      "audio/AMR-WB", FALSE, NULL, NULL, NULL, NULL, NULL, NULL, NULL},
+        "audio/AMR-WB", FALSE, NULL, NULL, NULL, NULL,
+      ignore_codec_data, NULL, NULL},
 
   /* video decoders */
   {GST_DROID_CODEC_DECODER_VIDEO, "video/mpeg", "video/mp4v-es",
@@ -933,6 +937,15 @@ create_aacdec_codec_data_from_frame_data (GstDroidCodec * codec,
   gst_buffer_unref (data);
 
   return ret;
+}
+
+static gboolean
+ignore_codec_data (GstDroidCodec * codec G_GNUC_UNUSED,
+    GstBuffer * data G_GNUC_UNUSED, DroidMediaData * out G_GNUC_UNUSED)
+{
+  /* Some containers have codec_data which can be ignored */
+  GST_WARNING ("Ignoring codec data");
+  return TRUE;
 }
 
 static gboolean
