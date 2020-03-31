@@ -126,7 +126,7 @@ gst_droidcamsrc_params_fill_fps_range_arrays_locked (GstDroidCamSrcParams *
     return;
   }
 
-  if (!range[0] == '(') {
+  if (range[0] != '(') {
     GST_ERROR ("invalid preview-fps-range-values");
     return;
   }
@@ -384,7 +384,7 @@ gst_droidcamsrc_params_get_viewfinder_caps (GstDroidCamSrcParams * params,
   caps =
       gst_caps_merge (gst_droidcamsrc_params_get_caps_locked (params,
           "preview-size-values", "video/x-raw",
-          GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER,
+          GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER,
           gst_video_format_to_string (format)),
       gst_droidcamsrc_params_get_caps_locked (params, "preview-size-values",
           "video/x-raw", NULL, "NV21"));

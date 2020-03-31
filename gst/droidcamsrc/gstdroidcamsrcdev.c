@@ -422,30 +422,53 @@ static void
 gst_droidcamsrc_dev_buffers_released (G_GNUC_UNUSED void *user)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
+  GstBufferPool *pool = gst_object_ref (dev->pool);
 
-  GST_FIXME_OBJECT (dev, "Not sure what to do here really");
+  if (pool) {
+    gst_droid_buffer_pool_media_buffers_invalidated (pool);
+    gst_object_unref (pool);
+  }
 }
 
-static void
-gst_droidcamsrc_dev_frame_available (void *user)
+static bool
+gst_droidcamsrc_dev_buffer_created (void *user, DroidMediaBuffer * buffer)
+{
+  GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
+  bool ret = false;
+  GstBufferPool *pool = gst_object_ref (dev->pool);
+
+  if (pool) {
+    ret = gst_droid_buffer_pool_bind_media_buffer (pool, buffer);
+
+    gst_object_unref (pool);
+  }
+
+  return ret;
+}
+
+static bool
+gst_droidcamsrc_dev_frame_available (void *user, DroidMediaBuffer * buffer)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
   GstDroidCamSrcPad *pad = dev->vfsrc;
-  DroidMediaBuffer *buffer;
-  GstMemory *mem;
   DroidMediaRect rect;
-  GstBuffer *buff;
-  DroidMediaBufferCallbacks cb;
-  GstFlowReturn flow_ret;
+  GstBuffer *buff = NULL;
+  GstBufferPool *pool;
   DroidMediaBufferInfo info;
 
   GST_DEBUG_OBJECT (src, "frame available");
 
+  droid_media_buffer_get_info (buffer, &info);
+
+  GST_OBJECT_LOCK (src);
+  src->crop_rect = rect;
+  GST_OBJECT_UNLOCK (src);
+
   if (!pad->running) {
     GST_DEBUG_OBJECT (src, "vfsrc pad task is not running");
 
-    goto acquire_and_release;
+    return false;
   }
 
   /* We are accessing this without a lock because:
@@ -453,56 +476,34 @@ gst_droidcamsrc_dev_frame_available (void *user)
    * 2) We can get called when we start the preview and we will deadlock because the lock is already held
    */
   if (dev->use_raw_data) {
-    goto acquire_and_release;
+    return false;
   }
 
-  flow_ret = gst_buffer_pool_acquire_buffer (dev->pool, &buff, NULL);
-  if (flow_ret != GST_FLOW_OK) {
-    GST_WARNING_OBJECT (src, "failed to acquire buffer from pool: %s",
-        gst_flow_get_name (flow_ret));
+  pool = gst_object_ref (dev->pool);
 
-    goto acquire_and_release;
+  if (G_UNLIKELY (!pool)) {
+    GST_WARNING_OBJECT (src, "camera source doesn't have a buffer pool");
+  } else {
+    buff = gst_droid_buffer_pool_acquire_media_buffer (pool, buffer);
+
+    gst_object_unref (pool);
   }
 
-  cb.ref = (DroidMediaCallback) gst_buffer_ref;
-  cb.unref = (DroidMediaCallback) gst_buffer_unref;
-  cb.data = buff;
-
-  mem =
-      gst_droid_media_buffer_allocator_alloc (dev->media_allocator, dev->queue,
-      &cb);
-  if (!mem) {
-    GST_ERROR_OBJECT (src, "failed to acquire buffer from droidmedia");
-    gst_buffer_unref (buff);
-    return;
+  if (G_UNLIKELY (!buff)) {
+    GST_WARNING_OBJECT (src,
+        "unable to acquire a gstreamer buffer for a droid media buffer");
+    return false;
   }
-
-  buffer = gst_droid_media_buffer_memory_get_buffer (mem);
-
-  gst_buffer_insert_memory (buff, 0, mem);
-  gst_droidcamsrc_timestamp (src, buff);
-
-  rect = droid_media_buffer_get_crop_rect (buffer);
 
   gst_droidcamsrc_dev_prepare_buffer (dev, buff, rect,
-      gst_droid_media_buffer_get_video_info (mem));
+      gst_droid_media_buffer_get_video_info_from_gst_buffer (buff));
 
   g_mutex_lock (&pad->lock);
   g_queue_push_tail (pad->queue, buff);
   g_cond_signal (&pad->cond);
   g_mutex_unlock (&pad->lock);
 
-  GST_OBJECT_LOCK (src);
-  src->crop_rect = rect;
-  GST_OBJECT_UNLOCK (src);
-  return;
-
-acquire_and_release:
-  if (droid_media_buffer_queue_acquire_and_release (dev->queue, &info)) {
-    GST_OBJECT_LOCK (src);
-    src->crop_rect = info.crop_rect;
-    GST_OBJECT_UNLOCK (src);
-  }
+  return true;
 }
 
 GstDroidCamSrcDev *
@@ -533,8 +534,7 @@ gst_droidcamsrc_dev_new (GstDroidCamSrcPad * vfsrc,
 
   dev->lock = lock;
 
-  dev->pool = gst_droid_buffer_pool_new ();
-
+  dev->pool = NULL;
   dev->use_recorder = FALSE;
   dev->recorder = gst_droidcamsrc_recorder_create (vidsrc);
 
@@ -640,7 +640,9 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
   g_mutex_clear (&dev->vid->lock);
   g_cond_clear (&dev->vid->cond);
 
-  gst_object_unref (dev->pool);
+  if (dev->pool) {
+    gst_object_unref (dev->pool);
+  }
 
   gst_droidcamsrc_recorder_destroy (dev->recorder);
 
@@ -653,21 +655,9 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
 gboolean
 gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
 {
-  GstStructure *config;
-
   GST_DEBUG ("dev init");
 
   g_rec_mutex_lock (dev->lock);
-
-  /* first the buffer pool */
-  config = gst_buffer_pool_get_config (dev->pool);
-  gst_buffer_pool_config_set_params (config, NULL, 0,
-      GST_DROIDCAMSRC_NUM_BUFFERS, GST_DROIDCAMSRC_NUM_BUFFERS);
-
-  if (!gst_buffer_pool_set_config (dev->pool, config)) {
-    GST_ERROR ("Failed to configure buffer pool");
-    return FALSE;
-  }
 
   /* now the callbacks */
   {
@@ -692,6 +682,7 @@ gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
     DroidMediaBufferQueueCallbacks cb;
     cb.buffers_released = gst_droidcamsrc_dev_buffers_released;
     cb.frame_available = gst_droidcamsrc_dev_frame_available;
+    cb.buffer_created = gst_droidcamsrc_dev_buffer_created;
     droid_media_buffer_queue_set_callbacks (dev->queue, &cb, dev);
   }
 

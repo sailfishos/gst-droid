@@ -60,7 +60,6 @@ struct _GstDroidVDec
 {
   GstVideoDecoder parent;
   DroidMediaCodec *codec;
-  DroidMediaBufferQueue *queue;
   GstAllocator *allocator;
   GstDroidCodec *codec_type;
 
@@ -68,8 +67,6 @@ struct _GstDroidVDec
   GstDroidVDecState state;
   GMutex state_lock;
   GCond state_cond;
-
-  GstBufferPool *pool;
 
   /* protected by decoder stream lock */
   GstFlowReturn downstream_flow_ret;

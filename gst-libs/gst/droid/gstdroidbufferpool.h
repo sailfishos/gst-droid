@@ -24,11 +24,14 @@
 
 #include <gst/gstbufferpool.h>
 #include <gst/video/video-info.h>
+#include <droidmedia/droidmedia.h>
 
 G_BEGIN_DECLS
 
 typedef struct _GstDroidBufferPool GstDroidBufferPool;
 typedef struct _GstDroidBufferPoolClass GstDroidBufferPoolClass;
+
+typedef void *EGLDisplay;
 
 #define GST_TYPE_DROID_BUFFER_POOL      (gst_droid_buffer_pool_get_type())
 #define GST_IS_DROID_BUFFER_POOL(obj)   (G_TYPE_CHECK_INSTANCE_TYPE ((obj), GST_TYPE_DROID_BUFFER_POOL))
@@ -38,21 +41,31 @@ typedef struct _GstDroidBufferPoolClass GstDroidBufferPoolClass;
 struct _GstDroidBufferPool
 {
   GstBufferPool parent;
-  GMutex lock;
-  GCond cond;
-  gint num_buffers;
   GstAllocator *allocator;
   GstVideoInfo video_info;
+  GPtrArray *bound_buffers;
+  GPtrArray *acquired_buffers;
+  GMutex binding_lock;
+  EGLDisplay display;
+  gboolean use_queue_buffers;
 };
 
 struct _GstDroidBufferPoolClass
 {
   GstBufferPoolClass parent_class;
+
+  void (*signal_buffers_invalidated)   (GstDroidBufferPool *pool);
 };
 
 GType             gst_droid_buffer_pool_get_type        (void);
 GstBufferPool *   gst_droid_buffer_pool_new             (void);
-gboolean          gst_droid_buffer_pool_wait_for_buffer (GstBufferPool * pool);
+
+void       gst_droid_buffer_pool_set_egl_display (GstBufferPool *pool, EGLDisplay display);
+gboolean   gst_droid_buffer_pool_bind_media_buffer (GstBufferPool *pool,
+                                                    DroidMediaBuffer *buffer);
+void       gst_droid_buffer_pool_media_buffers_invalidated (GstBufferPool *pool);
+GstBuffer *gst_droid_buffer_pool_acquire_media_buffer (GstBufferPool *pool,
+                                                       DroidMediaBuffer *buffer);
 
 G_END_DECLS
 

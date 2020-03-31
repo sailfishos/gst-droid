@@ -29,16 +29,28 @@
 #include "gst/droid/gstdroidmediabuffer.h"
 #include "gst/droid/gstdroidbufferpool.h"
 
+/* Element signals and args */
+enum
+{
+  SHOW_FRAME,
+  FLUSH,
+  BUFFERS_INVALIDATED,
+  LAST_SIGNAL
+};
+
+enum
+{
+  PROP_0,
+  PROP_EGL_DISPLAY
+};
+
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_eglsink_debug);
 #define GST_CAT_DEFAULT gst_droid_eglsink_debug
 
-static void gst_droideglsink_video_texture_init (NemoGstVideoTextureClass *
-    iface);
-
 #define gst_droideglsink_parent_class parent_class
-G_DEFINE_TYPE_WITH_CODE (GstDroidEglSink, gst_droideglsink, GST_TYPE_VIDEO_SINK,
-    G_IMPLEMENT_INTERFACE (NEMO_GST_TYPE_VIDEO_TEXTURE,
-        gst_droideglsink_video_texture_init));
+G_DEFINE_TYPE (GstDroidEglSink, gst_droideglsink, GST_TYPE_VIDEO_SINK);
+
+static guint gst_droideglsink_signals[LAST_SIGNAL] = { 0 };
 
 static GstStaticPadTemplate gst_droideglsink_sink_template_factory =
     GST_STATIC_PAD_TEMPLATE ("sink",
@@ -47,43 +59,14 @@ static GstStaticPadTemplate gst_droideglsink_sink_template_factory =
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
         (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER,
             GST_DROID_MEDIA_BUFFER_MEMORY_VIDEO_FORMATS) "; "
+        GST_VIDEO_CAPS_MAKE_WITH_FEATURES
+        (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER,
+            GST_DROID_MEDIA_BUFFER_MEMORY_VIDEO_FORMATS) "; "
         GST_VIDEO_CAPS_MAKE (GST_DROID_MEDIA_BUFFER_MEMORY_VIDEO_FORMATS)));
 
-enum
-{
-  PROP_0,
-  PROP_EGL_DISPLAY
-};
-
-static void
-gst_droideglsink_destroy_sync (GstDroidEglSink * sink)
-{
-  GST_DEBUG_OBJECT (sink, "destroy sync %p", sink->sync);
-
-  if (sink->sync) {
-    sink->eglDestroySyncKHR (sink->dpy, sink->sync);
-    sink->sync = NULL;
-  }
-}
-
-static void
-gst_droideglsink_wait_sync (GstDroidEglSink * sink)
-{
-  GST_DEBUG_OBJECT (sink, "wait sync %p", sink->sync);
-
-  if (sink->sync) {
-    /* We will behave like Android does */
-    EGLint result =
-        sink->eglClientWaitSyncKHR (sink->dpy, sink->sync, 0, EGL_FOREVER_KHR);
-    if (result == EGL_FALSE) {
-      GST_WARNING_OBJECT (sink, "error 0x%x waiting for fence", eglGetError ());
-    } else if (result == EGL_TIMEOUT_EXPIRED_KHR) {
-      GST_WARNING_OBJECT (sink, "timeout waiting for fence");
-    }
-
-    gst_droideglsink_destroy_sync (sink);
-  }
-}
+static void gst_droideglsink_buffer_pool_invalidated (GstBufferPool * pool,
+    GstDroidEglSink * sink);
+static void gst_droideglsink_buffers_invalidated (GstDroidEglSink * sink);
 
 static GstCaps *
 gst_droideglsink_get_caps (GstBaseSink * bsink, GstCaps * filter)
@@ -128,9 +111,6 @@ gst_droideglsink_set_caps (GstBaseSink * bsink, GstCaps * caps)
     return FALSE;
   }
 
-  sink->fps_n = info.fps_n;
-  sink->fps_d = info.fps_d;
-
   GST_VIDEO_SINK_WIDTH (vsink) = info.width;
   GST_VIDEO_SINK_HEIGHT (vsink) = info.height;
 
@@ -141,12 +121,14 @@ static gboolean
 gst_droideglsink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
 {
   GstDroidEglSink *sink = GST_DROIDEGLSINK (bsink);
-  GstBufferPool *pool;
+  GstBufferPool *previous_pool = NULL;
+  gulong previous_pool_signal_id = 0;
   GstCaps *caps;
   guint size;
   gboolean need_pool;
-  GstStructure *config;
+  gboolean queue_pool = FALSE;
   GstVideoInfo video_info;
+  gboolean ret = FALSE;
 
   gst_query_parse_allocation (query, &caps, &need_pool);
 
@@ -160,181 +142,161 @@ gst_droideglsink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
     return FALSE;
   }
 
+  g_mutex_lock (&sink->lock);
+
+  previous_pool = sink->pool;
+  previous_pool_signal_id = sink->invalidated_signal_id;
+
+  sink->pool = NULL;
+  sink->invalidated_signal_id = 0;
+
   if (need_pool) {
-    pool = gst_droid_buffer_pool_new ();
+    GstBufferPool *pool = NULL;
+    GstStructure *config;
+    guint min = 2;
+    guint max = 0;
+    GstCapsFeatures *features = gst_caps_get_features (caps, 0);
+
+    if (gst_caps_features_contains
+        (features, GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER)) {
+      min = 0;
+      max = droid_media_buffer_queue_length ();
+      queue_pool = true;
+    }
+
     size = video_info.finfo->format == GST_VIDEO_FORMAT_ENCODED
         ? 1 : video_info.size;
 
-    config = gst_buffer_pool_get_config (pool);
-    gst_buffer_pool_config_set_params (config, caps, size, 2, 0);
-    if (!gst_buffer_pool_set_config (pool, config)) {
-      GST_ERROR_OBJECT (sink, "Failed to set buffer pool configuration");
-      gst_object_unref (pool);
-      return FALSE;
+    if (previous_pool) {
+      GstCaps *pool_caps;
+
+      config = gst_buffer_pool_get_config (previous_pool);
+      if (config
+          && gst_buffer_pool_config_get_params (config, &pool_caps, NULL, NULL,
+              NULL) && gst_caps_is_equal (caps, pool_caps)) {
+        gst_buffer_pool_config_set_params (config, caps, size, min, max);
+
+        if (gst_buffer_pool_set_config (previous_pool, config)) {
+          pool = previous_pool;
+          sink->invalidated_signal_id = previous_pool_signal_id;
+
+          previous_pool = NULL;
+        }
+      }
     }
-    gst_query_add_allocation_pool (query, pool, size, 0, 2);
-    gst_object_unref (pool);
+
+    if (!pool) {
+      pool = gst_droid_buffer_pool_new ();
+
+      gst_droid_buffer_pool_set_egl_display (pool, sink->dpy);
+
+      config = gst_buffer_pool_get_config (pool);
+      gst_buffer_pool_config_set_params (config, caps, size, min, max);
+      if (!gst_buffer_pool_set_config (pool, config)) {
+        GST_ERROR_OBJECT (sink, "Failed to set buffer pool configuration");
+        gst_object_unref (pool);
+        goto out;
+      }
+
+      if (queue_pool) {
+        sink->invalidated_signal_id =
+            g_signal_connect (pool, "buffers-invalidated",
+            G_CALLBACK (gst_droideglsink_buffer_pool_invalidated), sink);
+      }
+    }
+
+    gst_query_add_allocation_pool (query, pool, size, min,
+        min > max ? min : max);
+
+    sink->pool = pool;
   }
 
   gst_query_add_allocation_meta (query, GST_VIDEO_META_API_TYPE, NULL);
 
   GST_DEBUG_OBJECT (sink, "proposed allocation");
 
-  return TRUE;
-}
+  ret = TRUE;
 
-static void
-gst_droideglsink_get_times (GstBaseSink * bsink, GstBuffer * buf,
-    GstClockTime * start, GstClockTime * end)
-{
-  GstDroidEglSink *sink;
-
-  sink = GST_DROIDEGLSINK (bsink);
-
-  if (GST_BUFFER_TIMESTAMP_IS_VALID (buf)) {
-    *start = GST_BUFFER_TIMESTAMP (buf);
-    if (GST_BUFFER_DURATION_IS_VALID (buf)) {
-      *end = *start + GST_BUFFER_DURATION (buf);
-    } else {
-      if (sink->fps_n > 0) {
-        *end = *start +
-            gst_util_uint64_scale_int (GST_SECOND, sink->fps_d, sink->fps_n);
-      }
-    }
-  }
-}
-
-static gboolean
-gst_droideglsink_start (GstBaseSink * bsink)
-{
-  GstDroidEglSink *sink;
-
-  sink = GST_DROIDEGLSINK (bsink);
-
-  GST_DEBUG_OBJECT (sink, "start");
-
-  sink->fps_n = 0;
-  sink->fps_d = 1;
-
-  sink->image = EGL_NO_IMAGE_KHR;
-  sink->sync = NULL;
-  sink->eglCreateImageKHR = NULL;
-  sink->eglDestroyImageKHR = NULL;
-  sink->eglClientWaitSyncKHR = NULL;
-  sink->eglDestroySyncKHR = NULL;
-
-  sink->allocator = gst_droid_media_buffer_allocator_new ();
-
-  return TRUE;
-}
-
-static gboolean
-gst_droideglsink_stop (GstBaseSink * bsink)
-{
-  GstDroidEglSink *sink;
-
-  sink = GST_DROIDEGLSINK (bsink);
-
-  GST_DEBUG_OBJECT (sink, "stop");
-
-  if (sink->sync) {
-    gst_droideglsink_destroy_sync (sink);
-  }
-
-  g_mutex_lock (&sink->lock);
-
-  if (sink->image) {
-    GST_WARNING_OBJECT (sink, "destroying leftover EGLImageKHR");
-    sink->eglDestroyImageKHR (sink->dpy, sink->image);
-    sink->image = EGL_NO_IMAGE_KHR;
-  }
-
-  if (sink->acquired_buffer) {
-    GST_WARNING_OBJECT (sink, "freeing leftover acquired buffer");
-    gst_buffer_unref (sink->acquired_buffer);
-    sink->acquired_buffer = NULL;
-  }
-
+out:
   g_mutex_unlock (&sink->lock);
 
-  if (sink->last_buffer) {
-    GST_INFO_OBJECT (sink, "freeing leftover last buffer");
-    gst_buffer_unref (sink->last_buffer);
-    sink->last_buffer = NULL;
+  if (previous_pool) {
+    GST_DEBUG_OBJECT (sink, "freed previous pool\n");
+    g_signal_handler_disconnect (previous_pool, previous_pool_signal_id);
+
+    gst_buffer_pool_set_flushing (previous_pool, TRUE);
+    gst_object_unref (previous_pool);
+
+    gst_droideglsink_buffers_invalidated (sink);
   }
 
-  gst_object_unref (sink->allocator);
-  sink->allocator = NULL;
 
-  return TRUE;
+  return ret;
 }
 
 static GstFlowReturn
 gst_droideglsink_show_frame (GstVideoSink * vsink, GstBuffer * buf)
 {
-  GstDroidEglSink *sink;
-  gint n_memory;
-
-  sink = GST_DROIDEGLSINK (vsink);
-
-  GST_DEBUG_OBJECT (sink, "show frame");
-
-  n_memory = gst_buffer_n_memory (buf);
-
-  if (G_UNLIKELY (n_memory == 0)) {
-    GST_WARNING_OBJECT (sink, "received an empty buffer");
-    /* we will just drop the buffer without errors */
-    return GST_FLOW_OK;
-  }
-
-  g_mutex_lock (&sink->lock);
-  if (sink->acquired_buffer) {
-    GST_INFO_OBJECT (sink,
-        "acquired buffer exists. Not replacing current buffer");
-    g_mutex_unlock (&sink->lock);
-    return GST_FLOW_OK;
-  }
-
-  GST_LOG_OBJECT (sink, "replacing buffer %p with buffer %p", sink->last_buffer,
-      buf);
-
-  gst_buffer_replace (&sink->last_buffer, buf);
-
-  g_mutex_unlock (&sink->lock);
-
-  nemo_gst_video_texture_frame_ready (NEMO_GST_VIDEO_TEXTURE (sink), 0);
+  g_signal_emit (vsink, gst_droideglsink_signals[SHOW_FRAME], 0, buf);
 
   return GST_FLOW_OK;
 }
 
-static gboolean
-gst_droideglsink_event (GstBaseSink * bsink, GstEvent * event)
+static void
+gst_droideglsink_buffers_invalidated (GstDroidEglSink * sink)
+{
+  g_signal_emit (sink, gst_droideglsink_signals[BUFFERS_INVALIDATED], 0);
+}
+
+void
+gst_droideglsink_buffer_pool_invalidated (GstBufferPool * pool,
+    GstDroidEglSink * sink)
+{
+  GstDroidEglSinkClass *klass;
+
+  klass = GST_DROIDEGLSINK_GET_CLASS (sink);
+
+  if (klass->buffers_invalidated) {
+    klass->buffers_invalidated (sink);
+  }
+}
+
+static void
+gst_droideglsink_free_pool (GstDroidEglSink * sink)
+{
+  if (sink->pool) {
+    if (sink->invalidated_signal_id != 0) {
+      g_signal_handler_disconnect (sink->pool, sink->invalidated_signal_id);
+      sink->invalidated_signal_id = 0;
+    }
+    gst_buffer_pool_set_flushing (sink->pool, TRUE);
+    gst_object_unref (sink->pool);
+    sink->pool = NULL;
+  }
+}
+
+static GstStateChangeReturn
+gst_droideglsink_change_state (GstElement * element, GstStateChange transition)
 {
   GstDroidEglSink *sink;
+  GstStateChangeReturn ret;
 
-  sink = GST_DROIDEGLSINK (bsink);
+  sink = GST_DROIDEGLSINK (element);
 
-  switch (GST_EVENT_TYPE (event)) {
-    case GST_EVENT_FLUSH_START:
-    case GST_EVENT_EOS:
-      GST_INFO_OBJECT (sink,
-          "emitting frame-ready with -1 after %" GST_PTR_FORMAT, event);
-      g_mutex_lock (&sink->lock);
+  ret = GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
 
-      if (sink->last_buffer) {
-        gst_buffer_unref (sink->last_buffer);
-        sink->last_buffer = NULL;
-      }
-
-      g_mutex_unlock (&sink->lock);
-      nemo_gst_video_texture_frame_ready (NEMO_GST_VIDEO_TEXTURE (sink), -1);
-      break;
-
-    default:
-      break;
+  if (ret == GST_STATE_CHANGE_SUCCESS) {
+    switch (transition) {
+      case GST_STATE_CHANGE_PAUSED_TO_READY:
+        gst_droideglsink_show_frame (GST_VIDEO_SINK (element), NULL);
+        gst_droideglsink_free_pool (sink);
+        break;
+      default:
+        break;
+    }
   }
 
-  return GST_BASE_SINK_CLASS (parent_class)->event (bsink, event);
+  return ret;
 }
 
 static void
@@ -351,6 +313,7 @@ gst_droideglsink_set_property (GObject * object, guint prop_id,
     case PROP_EGL_DISPLAY:
       g_mutex_lock (&sink->lock);
       sink->dpy = g_value_get_pointer (value);
+      GST_DROIDEGLSINK (sink)->dpy = sink->dpy;
       g_mutex_unlock (&sink->lock);
       break;
     default:
@@ -385,9 +348,9 @@ gst_droideglsink_get_property (GObject * object, guint prop_id,
 static void
 gst_droideglsink_finalize (GObject * object)
 {
-  GstDroidEglSink *sink;
+  GstDroidEglSink *sink = GST_DROIDEGLSINK (object);
 
-  sink = GST_DROIDEGLSINK (object);
+  gst_droideglsink_free_pool (sink);
 
   g_mutex_clear (&sink->lock);
 
@@ -397,21 +360,9 @@ gst_droideglsink_finalize (GObject * object)
 static void
 gst_droideglsink_init (GstDroidEglSink * sink)
 {
-  gst_base_sink_set_last_sample_enabled (GST_BASE_SINK (sink), FALSE);
-
-  sink->fps_n = 0;
-  sink->fps_d = 0;
-  sink->acquired_buffer = NULL;
-  sink->last_buffer = NULL;
+  sink->pool = NULL;
   sink->dpy = EGL_NO_DISPLAY;
-  sink->image = EGL_NO_IMAGE_KHR;
-  sink->sync = NULL;
-  sink->allocator = NULL;
   g_mutex_init (&sink->lock);
-  sink->eglCreateImageKHR = NULL;
-  sink->eglDestroyImageKHR = NULL;
-  sink->eglClientWaitSyncKHR = NULL;
-  sink->eglDestroySyncKHR = NULL;
 }
 
 static void
@@ -434,314 +385,35 @@ gst_droideglsink_class_init (GstDroidEglSinkClass * klass)
   gst_element_class_add_pad_template (gstelement_class,
       gst_static_pad_template_get (&gst_droideglsink_sink_template_factory));
 
-  gobject_class->finalize = gst_droideglsink_finalize;
   gobject_class->set_property = gst_droideglsink_set_property;
   gobject_class->get_property = gst_droideglsink_get_property;
+  gobject_class->finalize = gst_droideglsink_finalize;
+
+  gstelement_class->change_state =
+      GST_DEBUG_FUNCPTR (gst_droideglsink_change_state);
 
   gstbasesink_class->get_caps = GST_DEBUG_FUNCPTR (gst_droideglsink_get_caps);
   gstbasesink_class->set_caps = GST_DEBUG_FUNCPTR (gst_droideglsink_set_caps);
-  gstbasesink_class->get_times = GST_DEBUG_FUNCPTR (gst_droideglsink_get_times);
-  gstbasesink_class->start = GST_DEBUG_FUNCPTR (gst_droideglsink_start);
-  gstbasesink_class->stop = GST_DEBUG_FUNCPTR (gst_droideglsink_stop);
-  gstbasesink_class->event = GST_DEBUG_FUNCPTR (gst_droideglsink_event);
   gstbasesink_class->propose_allocation =
       GST_DEBUG_FUNCPTR (gst_droideglsink_propose_allocation);
   videosink_class->show_frame = GST_DEBUG_FUNCPTR (gst_droideglsink_show_frame);
-
-  g_object_class_override_property (gobject_class, PROP_EGL_DISPLAY,
-      "egl-display");
-}
-
-static GstMemory *
-gst_droideglsink_get_droid_media_buffer_memory (GstDroidEglSink * sink,
-    GstBuffer * buffer)
-{
-  int x, num;
-
-  GST_DEBUG_OBJECT (sink, "get droid media buffer memory");
-
-  num = gst_buffer_n_memory (buffer);
-
-  GST_DEBUG_OBJECT (sink, "examining %d memory items", num);
-
-  for (x = 0; x < num; x++) {
-    GstMemory *mem = gst_buffer_peek_memory (buffer, x);
-
-    if (mem && gst_memory_is_type (mem, GST_ALLOCATOR_DROID_MEDIA_BUFFER)) {
-      return mem;
-    }
-  }
-
-  return NULL;
-}
-
-static gboolean
-gst_droideglsink_populate_egl_proc (GstDroidEglSink * sink)
-{
-  GST_DEBUG_OBJECT (sink, "populate egl proc");
-
-  if (G_UNLIKELY (!sink->eglCreateImageKHR)) {
-    sink->eglCreateImageKHR =
-        (PFNEGLCREATEIMAGEKHRPROC) eglGetProcAddress ("eglCreateImageKHR");
-  }
-
-  if (G_UNLIKELY (!sink->eglCreateImageKHR)) {
-    return FALSE;
-  }
-
-  if (G_UNLIKELY (!sink->eglDestroyImageKHR)) {
-    sink->eglDestroyImageKHR =
-        (PFNEGLDESTROYIMAGEKHRPROC) eglGetProcAddress ("eglDestroyImageKHR");
-  }
-
-  if (G_UNLIKELY (!sink->eglDestroyImageKHR)) {
-    return FALSE;
-  }
-
-  if (G_UNLIKELY (!sink->eglClientWaitSyncKHR)) {
-    sink->eglClientWaitSyncKHR = (PFNEGLCLIENTWAITSYNCKHRPROC)
-        eglGetProcAddress ("eglClientWaitSyncKHR");
-  }
-
-  if (G_UNLIKELY (!sink->eglClientWaitSyncKHR)) {
-    return FALSE;
-  }
-
-  if (G_UNLIKELY (!sink->eglDestroySyncKHR)) {
-    sink->eglDestroySyncKHR =
-        (PFNEGLDESTROYSYNCKHRPROC) eglGetProcAddress ("eglDestroySyncKHR");
-  }
-
-  if (G_UNLIKELY (!sink->eglDestroySyncKHR)) {
-    return FALSE;
-  }
-
-  return TRUE;
-}
-
-/* interfaces */
-static gboolean
-gst_droideglsink_acquire_frame (NemoGstVideoTexture * iface)
-{
-  GstDroidEglSink *sink;
-  gboolean ret = TRUE;
-  GstMemory *mem;
-
-  sink = GST_DROIDEGLSINK (iface);
-
-  GST_DEBUG_OBJECT (sink, "acquire frame");
-
-  g_mutex_lock (&sink->lock);
-
-  if (sink->acquired_buffer) {
-    GST_WARNING_OBJECT (sink, "buffer %p already acquired",
-        sink->acquired_buffer);
-    ret = FALSE;
-    goto unlock_and_out;
-  }
-
-  if (!sink->last_buffer) {
-    GST_WARNING_OBJECT (sink, "no buffers available for acquisition");
-    ret = FALSE;
-    goto unlock_and_out;
-  }
-
-  mem =
-      gst_droideglsink_get_droid_media_buffer_memory (sink, sink->last_buffer);
-
-  if (!mem) {
-    ret = FALSE;
-    GST_WARNING_OBJECT (sink, "no droidmedia buffer available");
-    goto unlock_and_out;
-  }
-
-  sink->acquired_buffer = gst_buffer_ref (sink->last_buffer);
-
-  if (!sink->acquired_buffer) {
-    ret = FALSE;
-    GST_INFO_OBJECT (sink, "failed to acquire a buffer");
-  }
-
-unlock_and_out:
-  g_mutex_unlock (&sink->lock);
-  return ret;
-}
-
-static gboolean
-gst_droideglsink_bind_frame (NemoGstVideoTexture * iface, EGLImageKHR * image)
-{
-  GstDroidEglSink *sink;
-  gboolean ret = FALSE;
-  EGLint eglImgAttrs[] =
-      { EGL_IMAGE_PRESERVED_KHR, EGL_TRUE, EGL_NONE, EGL_NONE };
-  GstMemory *mem;
-
-  sink = GST_DROIDEGLSINK (iface);
-
-  GST_DEBUG_OBJECT (sink, "bind frame");
-
-  g_mutex_lock (&sink->lock);
-
-  if (sink->dpy == EGL_NO_DISPLAY) {
-    GST_WARNING_OBJECT (sink, "can not bind a frame without an EGLDisplay");
-    ret = FALSE;
-    goto unlock_and_out;
-  }
-
-  if (!gst_droideglsink_populate_egl_proc (sink)) {
-    GST_WARNING_OBJECT (sink, "failed to get needed EGL function pointers");
-    ret = FALSE;
-    goto unlock_and_out;
-  }
-
-  if (!sink->acquired_buffer) {
-    GST_WARNING_OBJECT (sink, "no frames have been acquired");
-    ret = FALSE;
-    goto unlock_and_out;
-  }
-
-  /* Now we are ready */
-
-  /* We can safely use peek here because we have an extra ref to the buffer */
-  mem =
-      gst_droideglsink_get_droid_media_buffer_memory (sink,
-      sink->acquired_buffer);
-  g_assert (mem);
-
-  sink->image =
-      sink->eglCreateImageKHR (sink->dpy, EGL_NO_CONTEXT,
-      EGL_NATIVE_BUFFER_ANDROID,
-      (EGLClientBuffer) gst_droid_media_buffer_memory_get_buffer (mem),
-      eglImgAttrs);
-
-  /* Buffer will not go anywhere so we should be safe to unlock. */
-  g_mutex_unlock (&sink->lock);
-
-  *image = sink->image;
-
-  ret = TRUE;
-  goto out;
-
-unlock_and_out:
-  g_mutex_unlock (&sink->lock);
-
-out:
-  return ret;
-}
-
-static void
-gst_droideglsink_unbind_frame (NemoGstVideoTexture * iface)
-{
-  GstDroidEglSink *sink;
-
-  sink = GST_DROIDEGLSINK (iface);
-
-  GST_DEBUG_OBJECT (sink, "unbind frame");
-
-  g_mutex_lock (&sink->lock);
-
-  if (sink->image == EGL_NO_IMAGE_KHR) {
-    GST_WARNING_OBJECT (sink, "Cannot unbind without a valid EGLImageKHR");
-    goto out;
-  }
-
-  if (sink->eglDestroyImageKHR (sink->dpy, sink->image) != EGL_TRUE) {
-    GST_WARNING_OBJECT (sink, "failed to destroy EGLImageKHR %p", sink->image);
-  }
-
-  sink->image = EGL_NO_IMAGE_KHR;
-
-out:
-  g_mutex_unlock (&sink->lock);
-}
-
-static void
-gst_droideglsink_release_frame (NemoGstVideoTexture * iface, EGLSyncKHR sync)
-{
-  GstDroidEglSink *sink;
-
-  sink = GST_DROIDEGLSINK (iface);
-
-  GST_DEBUG_OBJECT (sink, "release frame");
-
-  g_mutex_lock (&sink->lock);
-
-  if (sink->acquired_buffer) {
-    gst_buffer_unref (sink->acquired_buffer);
-    sink->acquired_buffer = NULL;
-  }
-
-  g_mutex_unlock (&sink->lock);
-
-  /* Destroy any previous fence */
-  gst_droideglsink_wait_sync (sink);
-
-  /* move on */
-  sink->sync = sync;
-}
-
-static gboolean
-gst_droideglsink_get_frame_info (NemoGstVideoTexture * iface,
-    NemoGstVideoTextureFrameInfo * info)
-{
-  GstDroidEglSink *sink;
-  gboolean ret;
-
-  sink = GST_DROIDEGLSINK (iface);
-
-  GST_DEBUG_OBJECT (sink, "get frame info");
-
-  g_mutex_lock (&sink->lock);
-
-  if (!sink->acquired_buffer->pts) {
-    GST_INFO_OBJECT (sink, "no buffer has been acquired");
-
-    ret = FALSE;
-    goto unlock_and_out;
-  }
-
-  info->pts = sink->acquired_buffer->pts;
-  info->dts = sink->acquired_buffer->dts;
-  info->duration = sink->acquired_buffer->duration;
-  info->offset = sink->acquired_buffer->offset;
-  info->offset_end = sink->acquired_buffer->offset_end;
-
-  ret = TRUE;
-
-unlock_and_out:
-  g_mutex_unlock (&sink->lock);
-
-  return ret;
-}
-
-static GstMeta *
-gst_droideglsink_get_frame_meta (NemoGstVideoTexture * iface, GType api)
-{
-  GstDroidEglSink *sink;
-  GstMeta *meta = NULL;
-
-  sink = GST_DROIDEGLSINK (iface);
-
-  GST_DEBUG_OBJECT (sink, "get frame meta");
-
-  g_mutex_lock (&sink->lock);
-
-  if (sink->acquired_buffer) {
-    meta = gst_buffer_get_meta (sink->acquired_buffer, api);
-  }
-
-  g_mutex_unlock (&sink->lock);
-
-  return meta;
-}
-
-static void
-gst_droideglsink_video_texture_init (NemoGstVideoTextureClass * iface)
-{
-  iface->acquire_frame = gst_droideglsink_acquire_frame;
-  iface->bind_frame = gst_droideglsink_bind_frame;
-  iface->unbind_frame = gst_droideglsink_unbind_frame;
-  iface->release_frame = gst_droideglsink_release_frame;
-  iface->get_frame_info = gst_droideglsink_get_frame_info;
-  iface->get_frame_meta = gst_droideglsink_get_frame_meta;
+  klass->buffers_invalidated =
+      GST_DEBUG_FUNCPTR (gst_droideglsink_buffers_invalidated);
+
+  gst_droideglsink_signals[SHOW_FRAME] =
+      g_signal_new ("show-frame", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST, G_STRUCT_OFFSET (GstDroidEglSinkClass,
+          signal_show_frame), NULL, NULL, g_cclosure_marshal_generic,
+      G_TYPE_NONE, 1, GST_TYPE_BUFFER);
+  gst_droideglsink_signals[BUFFERS_INVALIDATED] =
+      g_signal_new ("buffers-invalidated", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST, G_STRUCT_OFFSET (GstDroidEglSinkClass,
+          signal_buffers_invalidated), NULL, NULL, g_cclosure_marshal_generic,
+      G_TYPE_NONE, 0);
+
+  g_object_class_install_property (gobject_class, PROP_EGL_DISPLAY,
+      g_param_spec_pointer ("egl-display",
+          "EGL display ",
+          "The application provided EGL display to be used for creating EGLImageKHR objects.",
+          G_PARAM_READWRITE));
 }

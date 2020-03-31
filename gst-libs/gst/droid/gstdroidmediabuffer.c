@@ -25,6 +25,7 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <gst/gst.h>
+#include <gst/interfaces/nemoeglimagememory.h>
 #include "gstdroidmediabuffer.h"
 #include "droidmediaconstants.h"
 
@@ -33,13 +34,15 @@ GST_DEBUG_CATEGORY_STATIC (droid_memory_debug);
 
 typedef struct
 {
-  GstAllocator parent;
+  NemoGstEglImageAllocator parent;
 
 } GstDroidMediaBufferAllocator;
 
 typedef struct
 {
-  GstAllocatorClass parent_class;
+  NemoGstEglImageAllocatorClass parent_class;
+
+  PFNEGLCREATEIMAGEKHRPROC egl_create_image_khr;
 
 } GstDroidMediaBufferAllocatorClass;
 
@@ -70,10 +73,11 @@ typedef struct
       "droid memory allocator");
 
 G_DEFINE_TYPE_WITH_CODE (GstDroidMediaBufferAllocator,
-    droid_media_buffer_allocator, GST_TYPE_ALLOCATOR, _do_init);
+    droid_media_buffer_allocator, NEMO_GST_TYPE_EGL_IMAGE_ALLOCATOR, _do_init);
 
 #define GST_TYPE_DROID_MEDIA_BUFFER_ALLOCATOR    (droid_media_buffer_allocator_get_type())
 #define GST_IS_DROID_MEDIA_BUFFER_ALLOCATOR(obj) (G_TYPE_CHECK_INSTANCE_TYPE ((obj), GST_TYPE_DROID_MEDIA_BUFFER_ALLOCATOR))
+#define GST_DROID_MEDIA_BUFFER_ALLOCATOR_GET_CLASS(obj) (G_TYPE_INSTANCE_GET_CLASS ((obj), GST_TYPE_DROID_MEDIA_BUFFER_ALLOCATOR, GstDroidMediaBufferAllocatorClass))
 
 static void gst_droid_media_buffer_allocator_free (GstAllocator * allocator,
     GstMemory * mem);
@@ -81,6 +85,9 @@ static void gst_droid_media_buffer_allocator_free (GstAllocator * allocator,
 static gpointer gst_droid_media_buffer_memory_map (GstMemory * mem,
     gsize maxsize, GstMapFlags flags);
 static void gst_droid_media_buffer_memory_unmap (GstMemory * mem);
+
+static EGLImageKHR gst_droid_media_buffer_create_image (GstMemory * mem,
+    EGLDisplay dpy, EGLContext ctx);
 
 #define GST_DROID_MEDIA_BUFFER_FORMAT_COUNT 11
 
@@ -215,6 +222,8 @@ static void
 droid_media_buffer_allocator_init (GstDroidMediaBufferAllocator * allocator)
 {
   GstAllocator *alloc = GST_ALLOCATOR_CAST (allocator);
+  NemoGstEglImageAllocator *egl_alloc =
+      NEMO_GST_EGL_IMAGE_ALLOCATOR_CAST (allocator);
 
   GST_DEBUG_OBJECT (alloc, "init");
 
@@ -225,6 +234,8 @@ droid_media_buffer_allocator_init (GstDroidMediaBufferAllocator * allocator)
   alloc->mem_copy = NULL;
   alloc->mem_share = NULL;
   alloc->mem_is_span = NULL;
+
+  egl_alloc->create_image = gst_droid_media_buffer_create_image;
 
   GST_OBJECT_FLAG_SET (allocator, GST_ALLOCATOR_FLAG_CUSTOM_ALLOC);
 }
@@ -237,12 +248,15 @@ droid_media_buffer_allocator_class_init (GstDroidMediaBufferAllocatorClass *
 {
   GstAllocatorClass *allocator_class = (GstAllocatorClass *) klass;
 
+  klass->egl_create_image_khr =
+      (PFNEGLCREATEIMAGEKHRPROC) eglGetProcAddress ("eglCreateImageKHR");
+
   allocator_class->alloc = NULL;
   allocator_class->free = gst_droid_media_buffer_allocator_free;
 }
 
 static GstDroidMediaBufferMemory *
-gst_droid_media_buffer_allocator_alloc_from_buffer (GstAllocator * allocator,
+gst_droid_media_buffer_allocator_alloc (GstAllocator * allocator,
     DroidMediaBuffer * buffer, int format_index, gsize width, gsize height,
     gsize stride, gsize size)
 {
@@ -300,12 +314,11 @@ gst_droid_media_buffer_allocator_alloc_from_buffer (GstAllocator * allocator,
 }
 
 GstMemory *
-gst_droid_media_buffer_allocator_alloc (GstAllocator * allocator,
-    DroidMediaBufferQueue * queue, DroidMediaBufferCallbacks * cb)
+gst_droid_media_buffer_allocator_alloc_from_buffer (GstAllocator * allocator,
+    DroidMediaBuffer * buffer)
 {
   GstDroidMediaBufferMemory *mem;
   DroidMediaBufferInfo info;
-  DroidMediaBuffer *buffer;
   int format_index;
 
   if (!GST_IS_DROID_MEDIA_BUFFER_ALLOCATOR (allocator)) {
@@ -314,17 +327,11 @@ gst_droid_media_buffer_allocator_alloc (GstAllocator * allocator,
     return NULL;
   }
 
-  buffer = droid_media_buffer_queue_acquire_buffer (queue, cb);
-  if (!buffer) {
-    GST_ERROR_OBJECT (allocator, "failed to acquire media buffer");
-    return NULL;
-  }
-
   droid_media_buffer_get_info (buffer, &info);
 
   format_index = gst_droid_media_buffer_index_of_hal_format (info.format);
 
-  mem = gst_droid_media_buffer_allocator_alloc_from_buffer (allocator, buffer,
+  mem = gst_droid_media_buffer_allocator_alloc (allocator, buffer,
       format_index, info.width, info.height, info.stride, 1);
 
   GST_DEBUG_OBJECT (allocator, "alloc %p", mem);
@@ -334,15 +341,13 @@ gst_droid_media_buffer_allocator_alloc (GstAllocator * allocator,
 
 GstMemory *
 gst_droid_media_buffer_allocator_alloc_new (GstAllocator * allocator,
-    GstVideoInfo * info, GstBuffer * buffer)
+    GstVideoInfo * info)
 {
   GstDroidMediaBufferMemory *mem;
   DroidMediaBuffer *dbuf;
   DroidMediaBufferInfo droid_info;
-  DroidMediaBufferCallbacks cb;
-  GstVideoMeta *video_meta;
-  int format_index;
 
+  int format_index;
   if (!GST_IS_DROID_MEDIA_BUFFER_ALLOCATOR (allocator)) {
     GST_WARNING_OBJECT (allocator,
         "allocator is not the correct allocator for droidmediabuffer");
@@ -351,7 +356,6 @@ gst_droid_media_buffer_allocator_alloc_new (GstAllocator * allocator,
 
   format_index =
       gst_droid_media_buffer_index_of_gst_format (info->finfo->format);
-
   if (format_index == GST_DROID_MEDIA_BUFFER_FORMAT_COUNT) {
     GST_WARNING_OBJECT (allocator,
         "Unknown GStreamer format %s",
@@ -360,13 +364,9 @@ gst_droid_media_buffer_allocator_alloc_new (GstAllocator * allocator,
   }
   GST_WARNING_OBJECT (allocator,
       "GStreamer format %s", gst_video_format_to_string (info->finfo->format));
-  cb.ref = (DroidMediaCallback) gst_buffer_ref;
-  cb.unref = (DroidMediaCallback) gst_buffer_unref;
-  cb.data = buffer;
   dbuf =
       droid_media_buffer_create (info->width, info->height,
-      gst_droid_media_buffer_formats[format_index].hal_format, &cb);
-
+      gst_droid_media_buffer_formats[format_index].hal_format);
   if (!dbuf) {
     GST_ERROR_OBJECT (allocator, "failed to acquire media buffer");
     return NULL;
@@ -374,20 +374,9 @@ gst_droid_media_buffer_allocator_alloc_new (GstAllocator * allocator,
 
   droid_media_buffer_get_info (dbuf, &droid_info);
   mem =
-      gst_droid_media_buffer_allocator_alloc_from_buffer (allocator, dbuf,
+      gst_droid_media_buffer_allocator_alloc (allocator, dbuf,
       format_index, info->width, info->height, droid_info.stride, info->size);
-
-  gst_buffer_append_memory (buffer, (GstMemory *) mem);
-
-  video_meta = gst_buffer_add_video_meta_full (buffer,
-      GST_VIDEO_FRAME_FLAG_NONE, mem->video_info.finfo->format,
-      mem->video_info.width, mem->video_info.height,
-      mem->video_info.finfo->n_planes, mem->video_info.offset,
-      mem->video_info.stride);
-  GST_META_FLAG_SET ((GstMeta *) video_meta, GST_META_FLAG_POOLED);
-
   GST_DEBUG_OBJECT (allocator, "alloc %p", mem);
-
   return GST_MEMORY_CAST (mem);
 }
 
@@ -402,13 +391,10 @@ gst_droid_media_buffer_allocator_free (GstAllocator * allocator,
     GstMemory * mem)
 {
   GstDroidMediaBufferMemory *m = (GstDroidMediaBufferMemory *) mem;
-
   GST_DEBUG_OBJECT (allocator, "free %p", m);
 
-  droid_media_buffer_release (m->buffer, EGL_NO_DISPLAY, EGL_NO_SYNC_KHR);
-
+  droid_media_buffer_destroy (m->buffer);
   m->buffer = NULL;
-
   g_slice_free (GstDroidMediaBufferMemory, m);
 }
 
@@ -423,15 +409,28 @@ gst_droid_media_buffer_memory_get_buffer (GstMemory * mem)
   return ((GstDroidMediaBufferMemory *) mem)->buffer;
 }
 
+DroidMediaBuffer *
+gst_droid_media_buffer_memory_get_buffer_from_gst_buffer (GstBuffer * buffer)
+{
+  gint i;
+  gint count = gst_buffer_n_memory (buffer);
+
+  for (i = 0; i < count; ++i) {
+    GstMemory *mem = gst_buffer_peek_memory (buffer, i);
+    if (mem && gst_memory_is_type (mem, GST_ALLOCATOR_DROID_MEDIA_BUFFER)) {
+      return ((GstDroidMediaBufferMemory *) mem)->buffer;
+    }
+  }
+  return NULL;
+}
+
 gpointer
 gst_droid_media_buffer_memory_map (GstMemory * mem, gsize maxsize,
     GstMapFlags flags)
 {
   GstDroidMediaBufferMemory *m = (GstDroidMediaBufferMemory *) mem;
   int f = 0;
-
   (void) maxsize;
-
   if (flags & GST_MAP_READ) {
     f |= DROID_MEDIA_BUFFER_LOCK_READ;
   }
@@ -446,7 +445,6 @@ gst_droid_media_buffer_memory_map (GstMemory * mem, gsize maxsize,
     }
   } else {
     m->map_data = droid_media_buffer_lock (m->buffer, f);
-
     if (!m->map_data) {
       GST_ERROR ("Tried to lock buffer with different flags");
       return NULL;
@@ -455,7 +453,6 @@ gst_droid_media_buffer_memory_map (GstMemory * mem, gsize maxsize,
 
   m->map_flags = f;
   m->map_count += 1;
-
   return m->map_data;
 }
 
@@ -463,10 +460,29 @@ void
 gst_droid_media_buffer_memory_unmap (GstMemory * mem)
 {
   GstDroidMediaBufferMemory *m = (GstDroidMediaBufferMemory *) mem;
-
   if (m->map_count > 0 && (m->map_count -= 1) == 0) {
     m->map_data = NULL;
     droid_media_buffer_unlock (m->buffer);
+  }
+}
+
+EGLImageKHR
+gst_droid_media_buffer_create_image (GstMemory * mem, EGLDisplay dpy,
+    EGLContext ctx)
+{
+  GstDroidMediaBufferAllocatorClass *aclass =
+      GST_DROID_MEDIA_BUFFER_ALLOCATOR_GET_CLASS (mem->allocator);
+
+  if (gst_is_droid_media_buffer_memory (mem) && aclass
+      && aclass->egl_create_image_khr) {
+    EGLint eglImgAttrs[] =
+        { EGL_IMAGE_PRESERVED_KHR, EGL_TRUE, EGL_NONE, EGL_NONE };
+
+    return (*aclass->egl_create_image_khr) (dpy, ctx, EGL_NATIVE_BUFFER_ANDROID,
+        (EGLClientBuffer) gst_droid_media_buffer_memory_get_buffer (mem),
+        eglImgAttrs);
+  } else {
+    return NULL;
   }
 }
 
@@ -479,4 +495,18 @@ gst_droid_media_buffer_get_video_info (GstMemory * mem)
   }
 
   return &((GstDroidMediaBufferMemory *) mem)->video_info;
+}
+
+GstVideoInfo *
+gst_droid_media_buffer_get_video_info_from_gst_buffer (GstBuffer * buffer)
+{
+  gint i;
+  gint count = gst_buffer_n_memory (buffer);
+  for (i = 0; i < count; ++i) {
+    GstMemory *mem = gst_buffer_peek_memory (buffer, i);
+    if (mem && gst_memory_is_type (mem, GST_ALLOCATOR_DROID_MEDIA_BUFFER)) {
+      return gst_droid_media_buffer_get_video_info (mem);
+    }
+  }
+  return NULL;
 }

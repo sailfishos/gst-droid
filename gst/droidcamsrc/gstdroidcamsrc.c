@@ -28,6 +28,7 @@
 #include "gstdroidcamsrcquirks.h"
 #include <gst/video/video.h>
 #include "gst/droid/gstdroidmediabuffer.h"
+#include "gst/droid/gstdroidbufferpool.h"
 #include "gst/droid/gstwrappedmemory.h"
 #include "gst/droid/gstdroidquery.h"
 #include "gst/droid/gstdroidcodec.h"
@@ -52,7 +53,7 @@ static GstStaticPadTemplate vf_src_template_factory =
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
-        (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER,
+        (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER,
             GST_DROID_MEDIA_BUFFER_MEMORY_VIDEO_FORMATS) ";"
         GST_VIDEO_CAPS_MAKE ("{NV21}")));
 
@@ -1530,6 +1531,8 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   GstCapsFeatures *features;
   gchar *preview;
   GstVideoInfo info;
+  gboolean use_raw_data = TRUE;
+  GstBufferPool *pool = NULL;
 
   g_rec_mutex_lock (&src->dev_lock);
 
@@ -1598,10 +1601,78 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
 
   features = gst_caps_get_features (our_caps, 0);
 
-  g_rec_mutex_lock (&src->dev_lock);
-  src->dev->use_raw_data =
+  use_raw_data =
       !gst_caps_features_contains (features,
-      GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_BUFFER);
+      GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER);
+
+  if (!use_raw_data) {
+    /* Negotiate a buffer pool or allocate one now. */
+    gint i;
+    guint min, max;
+    guint size;
+    gint count;
+    GstQuery *query = gst_query_new_allocation (our_caps, TRUE);
+
+    if (!gst_pad_peer_query (data->pad, query)) {
+      GST_DEBUG_OBJECT (src, "didn't get downstream ALLOCATION hints");
+    }
+
+    count = gst_query_get_n_allocation_pools (query);
+
+    for (i = 0; i < count; ++i) {
+      GstAllocator *allocator;
+      GstStructure *config;
+
+      gst_query_parse_nth_allocation_pool (query, i, &pool, &size, &min, &max);
+      config = gst_buffer_pool_get_config (pool);
+      gst_buffer_pool_config_get_allocator (config, &allocator, NULL);
+      if (allocator
+          && g_strcmp0 (allocator->mem_type,
+              GST_ALLOCATOR_DROID_MEDIA_BUFFER) == 0) {
+        break;
+      } else {
+        gst_object_unref (pool);
+        pool = NULL;
+      }
+    }
+
+    /* The downstream may have other ideas about what the pool size should be but the
+     * queue we're working with has a fixed size so that's the number of buffers we'll
+     * go with. */
+    min = 0;
+    max = droid_media_buffer_queue_length ();
+
+    if (!pool) {
+      /* A downstream which understands the queue buffers should also have provided a pool
+       * but for completeness add this a fallback. */
+      GstStructure *config;
+      GstVideoInfo video_info;
+      gst_video_info_from_caps (&video_info, our_caps);
+
+      pool = gst_droid_buffer_pool_new ();
+      size = video_info.finfo->format == GST_VIDEO_FORMAT_ENCODED
+          ? 1 : video_info.size;
+
+      config = gst_buffer_pool_get_config (pool);
+      gst_buffer_pool_config_set_params (config, our_caps, size, min, max);
+
+      if (!gst_buffer_pool_set_config (pool, config)) {
+        GST_ERROR_OBJECT (src, "Failed to set buffer pool configuration");
+        gst_object_unref (pool);
+        pool = NULL;
+        ret = FALSE;
+      }
+    }
+  }
+
+  g_rec_mutex_lock (&src->dev_lock);
+  src->dev->use_raw_data = use_raw_data;
+
+  if (src->dev->pool) {
+    gst_object_unref (src->dev->pool);
+  }
+  src->dev->pool = pool;
+
   g_rec_mutex_unlock (&src->dev_lock);
 
   ret = TRUE;

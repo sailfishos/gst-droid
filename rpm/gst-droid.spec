@@ -16,14 +16,14 @@ BuildRequires:  pkgconfig(gstreamer-base-1.0)
 BuildRequires:  pkgconfig(gstreamer-video-1.0)
 BuildRequires:  pkgconfig(gstreamer-plugins-bad-1.0)
 BuildRequires:  pkgconfig(gstreamer-tag-1.0)
-BuildRequires:  pkgconfig(nemo-gstreamer-interfaces-1.0)
+BuildRequires:  pkgconfig(nemo-gstreamer-interfaces-1.0) >= 0.20200421.0
 BuildRequires:  pkgconfig(libexif)
 BuildRequires:  automake
 BuildRequires:  libtool
 BuildRequires:  gettext
-BuildRequires:  droidmedia-devel >= 0.20191010.0
+BuildRequires:  droidmedia-devel >= 0.20200421.0
 BuildRequires:  pkgconfig(libandroid-properties)
-Requires:       droidmedia >= 0.20191010.0
+Requires:       droidmedia >= 0.20200421.0
 
 %description
 GStreamer droid plug-in contains elements using the Android HAL
