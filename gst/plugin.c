@@ -26,6 +26,7 @@
 #include "plugin.h"
 #include "gstdroidcamsrc.h"
 #include "gstdroideglsink.h"
+#include "gstdroidvideotexturesink.h"
 #include "gstdroidvdec.h"
 #include "gstdroidvenc.h"
 #include "gstdroidadec.h"
@@ -39,6 +40,7 @@ GST_DEBUG_CATEGORY (gst_droid_vdec_debug);
 GST_DEBUG_CATEGORY (gst_droid_venc_debug);
 GST_DEBUG_CATEGORY (gst_droid_codec_debug);
 GST_DEBUG_CATEGORY (gst_droid_eglsink_debug);
+GST_DEBUG_CATEGORY (gst_droid_videotexturesink_debug);
 
 static gboolean
 plugin_init (GstPlugin * plugin)
@@ -50,6 +52,9 @@ plugin_init (GstPlugin * plugin)
 
   GST_DEBUG_CATEGORY_INIT (gst_droid_eglsink_debug, "droideglsink",
       0, "Android EGL sink");
+
+  GST_DEBUG_CATEGORY_INIT (gst_droid_videotexturesink_debug,
+      "droidvideotexturesink", 0, "Android EGL sink");
 
   GST_DEBUG_CATEGORY_INIT (gst_droid_adec_debug, "droidadec",
       0, "Android HAL audio decoder");
@@ -70,6 +75,8 @@ plugin_init (GstPlugin * plugin)
       GST_TYPE_DROIDCAMSRC);
   ok &= gst_element_register (plugin, "droideglsink", GST_RANK_PRIMARY,
       GST_TYPE_DROIDEGLSINK);
+  ok &= gst_element_register (plugin, "droidvideotexturesink", GST_RANK_PRIMARY,
+      GST_TYPE_DROIDVIDEOTEXTURESINK);
 
   ok &= gst_element_register (plugin, "droidvdec", GST_RANK_PRIMARY + 1,
       GST_TYPE_DROIDVDEC);

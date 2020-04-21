@@ -39,6 +39,8 @@ G_BEGIN_DECLS
   (G_TYPE_CHECK_INSTANCE_TYPE((obj), GST_TYPE_DROIDEGLSINK))
 #define GST_IS_DROIDEGLSINK_CLASS(klass) \
   (G_TYPE_CHECK_CLASS_TYPE((klass), GST_TYPE_DROIDEGLSINK))
+#define GST_DROIDEGLSINK_GET_CLASS(obj) \
+  (G_TYPE_INSTANCE_GET_CLASS ((obj), GST_TYPE_DROIDEGLSINK, GstDroidEglSinkClass))
 
 typedef struct _GstDroidEglSink GstDroidEglSink;
 typedef struct _GstDroidEglSinkClass GstDroidEglSinkClass;
@@ -47,27 +49,20 @@ struct _GstDroidEglSink
 {
   GstVideoSink parent;
 
-  gint fps_n;
-  gint fps_d;
-
-  GstBuffer *acquired_buffer;
-  GstBuffer *last_buffer;
+  GstBufferPool *pool;
+  gulong invalidated_signal_id;
   EGLDisplay dpy;
-  EGLImageKHR image;
-  EGLSyncKHR sync;
   GMutex lock;
-
-  GstAllocator *allocator;
-
-  PFNEGLCREATEIMAGEKHRPROC eglCreateImageKHR;
-  PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageKHR;
-  PFNEGLCLIENTWAITSYNCKHRPROC eglClientWaitSyncKHR;
-  PFNEGLDESTROYSYNCKHRPROC eglDestroySyncKHR;
 };
 
 struct _GstDroidEglSinkClass
 {
   GstVideoSinkClass parent_class;
+
+  void (*signal_show_frame)            (GstVideoSink *sink, GstBuffer *buffer);
+  void (*signal_buffers_invalidated)   (GstVideoSink *sink);
+
+  void (* buffers_invalidated) (GstDroidEglSink *sink);
 };
 
 GType gst_droideglsink_get_type (void);

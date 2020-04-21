@@ -2,6 +2,7 @@ AM_CPPFLAGS = -DSYSCONFDIR=\"$(sysconfdir)\"
 noinst_LTLIBRARIES = libgstdroidcamsrc.la
 libgstdroidcamsrc_la_CFLAGS = $(GST_CFLAGS) $(NGI_CFLAGS) \
                               $(NGM_CFLAGS) $(EXIF_CFLAGS) \
+			      -DEGL_NO_X11 \
 			      -I$(top_builddir)/gst/ \
 			      -I$(top_builddir)/gst-libs/ \
 			      -I/usr/include/droidmedia/
