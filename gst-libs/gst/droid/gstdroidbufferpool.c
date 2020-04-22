@@ -88,7 +88,6 @@ gst_droid_buffer_pool_alloc (GstBufferPool * pool, GstBuffer ** buf,
 {
   GstDroidBufferPool *dpool = GST_DROID_BUFFER_POOL (pool);
   GstBuffer *buffer;
-  GstMemory *memory;
 
   if (!dpool->allocator) {
     return GST_FLOW_ERROR;
@@ -100,7 +99,9 @@ gst_droid_buffer_pool_alloc (GstBufferPool * pool, GstBuffer ** buf,
   }
 
   if (!dpool->use_queue_buffers) {
-    memory = gst_droid_media_buffer_allocator_alloc_new (dpool->allocator,
+    GstVideoInfo *video_info;
+    GstMemory *memory =
+        gst_droid_media_buffer_allocator_alloc_new (dpool->allocator,
         &dpool->video_info);
     if (!memory) {
       gst_buffer_unref (buffer);
@@ -108,6 +109,13 @@ gst_droid_buffer_pool_alloc (GstBufferPool * pool, GstBuffer ** buf,
     }
 
     gst_buffer_insert_memory (buffer, 0, memory);
+
+    video_info = gst_droid_media_buffer_get_video_info (memory);
+
+    gst_buffer_add_video_meta_full (buffer,
+        GST_VIDEO_FRAME_FLAG_NONE, video_info->finfo->format,
+        video_info->width, video_info->height,
+        video_info->finfo->n_planes, video_info->offset, video_info->stride);
   }
 
   *buf = buffer;
