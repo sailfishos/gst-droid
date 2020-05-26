@@ -1145,8 +1145,8 @@ gst_droidvdec_finish (GstVideoDecoder * decoder)
   g_cond_wait (&dec->state_cond, &dec->state_lock);
   g_mutex_unlock (&dec->state_lock);
   GST_VIDEO_DECODER_STREAM_LOCK (decoder);
-  g_mutex_lock (&dec->state_lock);
   GST_LOG_OBJECT (dec, "acquired stream lock");
+  g_mutex_lock (&dec->state_lock);
 
   /* We drained the codec. Better to recreate it. */
   if (dec->codec) {
