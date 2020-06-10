@@ -81,7 +81,8 @@ typedef enum
 
   /* camerabin interface */
   PROP_POST_PREVIEW,
-  PROP_PREVIEW_CAPS
+  PROP_PREVIEW_CAPS,
+  PROP_PREVIEW_FILTER
 } GstDroidCamSrcProperties;
 
 void gst_droidcamsrc_photography_register (gpointer g_iface,  gpointer iface_data);

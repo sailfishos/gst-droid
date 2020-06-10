@@ -125,6 +125,7 @@ struct _GstDroidCamSrc
   /* camerabin interface */
   gboolean post_preview;
   GstCaps *preview_caps;
+  GstElement *preview_filter;
   GstCameraBinPreviewPipelineData *preview_pipeline;
 
   /* protected with OBJECT_LOCK */

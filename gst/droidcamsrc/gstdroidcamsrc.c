@@ -211,6 +211,7 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
 
   src->post_preview = DEFAULT_POST_PREVIEW;
   src->preview_caps = NULL;
+  src->preview_filter = NULL;
   src->preview_pipeline =
       gst_camerabin_create_preview_pipeline (GST_ELEMENT_CAST (src), NULL);
 
@@ -322,6 +323,11 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
     case PROP_PREVIEW_CAPS:
       if (src->preview_caps)
         gst_value_set_caps (value, src->preview_caps);
+      break;
+
+    case PROP_PREVIEW_FILTER:
+      if (src->preview_filter)
+        g_value_set_object (value, src->preview_filter);
       break;
 
     default:
@@ -456,6 +462,17 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
       }
       gst_caps_unref (new_caps);
     }
+      break;
+
+    case PROP_PREVIEW_FILTER:
+      if (src->preview_filter)
+        gst_object_unref (src->preview_filter);
+      src->preview_filter = g_value_dup_object (value);
+      if (!gst_camerabin_preview_set_filter (src->preview_pipeline,
+              src->preview_filter)) {
+        GST_WARNING_OBJECT (src,
+            "Cannot change preview filter, is element in NULL state?");
+      }
       break;
 
     default:
@@ -1167,6 +1184,11 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
       g_param_spec_boxed ("preview-caps", "Preview caps",
           "The caps of the preview image to be posted (NULL means ANY)",
           GST_TYPE_CAPS, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_PREVIEW_FILTER,
+      g_param_spec_object ("preview-filter", "Preview filter",
+          "A custom preview filter to process preview image data",
+          GST_TYPE_ELEMENT, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   gst_droidcamsrc_photography_add_overrides (gobject_class);
 
