@@ -94,6 +94,7 @@ static gchar *gst_droidcamsrc_find_picture_resolution (GstDroidCamSrc * src,
     const gchar * resolution);
 static gboolean gst_droidcamsrc_is_zsl_and_hdr_supported (GstDroidCamSrc * src);
 static GstCaps *gst_droidcamsrc_get_video_caps_locked (GstDroidCamSrc * src);
+static gboolean gst_droidcamsrc_get_hw (GstDroidCamSrc * src);
 
 enum
 {
@@ -282,7 +283,11 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
 
     case PROP_SENSOR_MOUNT_ANGLE:
     case PROP_SENSOR_ORIENTATION:
-      g_value_set_int (value, src->info[src->camera_device].orientation * 90);
+      if (!gst_droidcamsrc_get_hw (src)) {
+        g_value_set_int (value, 0);
+      } else {
+        g_value_set_int (value, src->info[src->camera_device].orientation * 90);
+      }
       break;
 
     case PROP_IMAGE_MODE:
@@ -545,6 +550,11 @@ gst_droidcamsrc_get_hw (GstDroidCamSrc * src)
   int x, num;
 
   GST_DEBUG_OBJECT (src, "get hw");
+
+  if (src->info != NULL) {
+    GST_DEBUG_OBJECT (src, "already have info");
+    return TRUE;
+  }
 
   num = droid_media_camera_get_number_of_cameras ();
   GST_INFO_OBJECT (src, "Found %d cameras", num);
