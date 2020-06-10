@@ -363,6 +363,9 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
         GST_INFO_OBJECT (src, "camera device set to %d", src->camera_device);
       }
       g_rec_mutex_unlock (&src->dev_lock);
+
+      g_object_notify (G_OBJECT (src), "sensor-orientation");
+      g_object_notify (G_OBJECT (src), "sensor-mount-angle");
       break;
 
     case PROP_MODE:
@@ -666,9 +669,6 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         gst_droidcamsrc_quirks_apply_quirk (src->quirks, src,
             src->dev->info->direction, src->mode, quirk, TRUE);
       }
-
-      g_object_notify (G_OBJECT (src), "sensor-orientation");
-      g_object_notify (G_OBJECT (src), "sensor-mount-angle");
 
       /* now that we have camera parameters, we can update min and max ev-compensation */
       gst_droidcamsrc_update_ev_compensation_bounds (src);
