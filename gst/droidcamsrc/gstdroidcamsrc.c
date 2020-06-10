@@ -348,15 +348,14 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
 
   switch (prop_id) {
     case PROP_CAMERA_DEVICE:
+      src->camera_device = g_value_get_int (value);
       g_rec_mutex_lock (&src->dev_lock);
       if (src->dev && src->dev->info) {
-        GST_ERROR_OBJECT (src,
-            "cannot change camera-device while camera is running");
+        GST_WARNING_OBJECT (src,
+            "changing camera-device to %d will take effect next time the camera is opened.",
+            src->camera_device);
       } else {
-        src->camera_device = g_value_get_int (value);
         GST_INFO_OBJECT (src, "camera device set to %d", src->camera_device);
-        /* initialize empty photo properties */
-        gst_droidcamsrc_photography_init (src);
       }
       g_rec_mutex_unlock (&src->dev_lock);
       break;
