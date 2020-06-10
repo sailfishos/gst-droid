@@ -616,6 +616,15 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       /* set initial photography parameters */
       gst_droidcamsrc_photography_apply (src, SET_ONLY);
 
+      /* send flush stop if we start it in the previous transition */
+      if (GST_PAD_IS_FLUSHING (src->vfsrc->pad)) {
+        if (!gst_pad_push_event (src->vfsrc->pad,
+                gst_event_new_flush_stop ( /* reset_time */ TRUE))) {
+          ret = GST_STATE_CHANGE_FAILURE;
+          break;
+        }
+      }
+
       /* activate mode */
       if (!gst_droidcamsrc_select_and_activate_mode (src)) {
         ret = GST_STATE_CHANGE_FAILURE;
