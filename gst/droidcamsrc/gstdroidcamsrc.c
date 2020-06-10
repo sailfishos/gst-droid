@@ -604,7 +604,11 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
   src = GST_DROIDCAMSRC (element);
 
   switch (transition) {
-    case GST_STATE_CHANGE_NULL_TO_READY:
+    case GST_STATE_CHANGE_NULL_TO_READY:{
+      GstDroidCamSrcCamInfo *info;
+      const GstDroidCamSrcQuirk *quirk;
+      gboolean quirk_is_property = FALSE;
+
       if (!gst_droidcamsrc_get_hw (src)) {
         ret = GST_STATE_CHANGE_FAILURE;
         break;
@@ -626,14 +630,6 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       src->dev =
           gst_droidcamsrc_dev_new (src->vfsrc, src->imgsrc,
           src->vidsrc, &src->dev_lock);
-
-      break;
-
-    case GST_STATE_CHANGE_READY_TO_PAUSED:
-    {
-      GstDroidCamSrcCamInfo *info;
-      const GstDroidCamSrcQuirk *quirk;
-      gboolean quirk_is_property = FALSE;
 
       /* find the device */
       info = gst_droidcamsrc_find_camera_device (src);
@@ -679,7 +675,11 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       /* And we can also detect the supported image modes. In reality the only thing
          we are unable to detect until this moment is _ZSL_AND_HDR */
       g_object_notify (G_OBJECT (src), "supported-image-modes");
+    }
 
+      break;
+
+    case GST_STATE_CHANGE_READY_TO_PAUSED:
       /* Now add the needed orientation tag */
       gst_droidcamsrc_add_vfsrc_orientation_tag (src);
 
@@ -687,10 +687,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
        * messages on the pipeline */
       gst_element_set_state (src->preview_pipeline->pipeline,
           GST_STATE_PLAYING);
-    }
-
       break;
-
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
       /* set initial photography parameters */
       gst_droidcamsrc_photography_apply (src, SET_ONLY);
@@ -757,13 +754,12 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       break;
 
     case GST_STATE_CHANGE_PAUSED_TO_READY:
-      gst_droidcamsrc_dev_deinit (src->dev);
-      gst_droidcamsrc_dev_close (src->dev);
-
       gst_element_set_state (src->preview_pipeline->pipeline, GST_STATE_READY);
       break;
 
     case GST_STATE_CHANGE_READY_TO_NULL:
+      gst_droidcamsrc_dev_deinit (src->dev);
+      gst_droidcamsrc_dev_close (src->dev);
       gst_droidcamsrc_dev_destroy (src->dev);
       src->dev = NULL;
 
