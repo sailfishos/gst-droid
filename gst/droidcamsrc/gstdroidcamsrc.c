@@ -353,25 +353,23 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
 
       g_mutex_unlock (&src->capture_lock);
 
-      /* deactivate old mode */
-      if (src->active_mode) {
-        gst_droidcamsrc_mode_deactivate (src->active_mode);
-        src->active_mode = NULL;
-      }
-
       src->mode = mode;
 
-      g_rec_mutex_lock (&src->dev_lock);
+      if (src->active_mode != NULL) {
+        g_rec_mutex_lock (&src->dev_lock);
 
-      if (src->dev && src->dev->params) {
+        /* deactivate old mode */
+        gst_droidcamsrc_mode_deactivate (src->active_mode);
+        src->active_mode = NULL;
+
         /* activate mode. */
         gst_droidcamsrc_select_and_activate_mode (src);
 
         /* set mode settings */
         gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
-      }
 
-      g_rec_mutex_unlock (&src->dev_lock);
+        g_rec_mutex_unlock (&src->dev_lock);
+      }
     }
 
       break;
