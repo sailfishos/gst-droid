@@ -85,6 +85,8 @@ static void gst_droid_media_buffer_allocator_free (GstAllocator * allocator,
 static gpointer gst_droid_media_buffer_memory_map (GstMemory * mem,
     gsize maxsize, GstMapFlags flags);
 static void gst_droid_media_buffer_memory_unmap (GstMemory * mem);
+static GstMemory *gst_droid_media_buffer_memory_copy (GstMemory * mem,
+    gssize offset, gssize size);
 
 static EGLImageKHR gst_droid_media_buffer_create_image (GstMemory * mem,
     EGLDisplay dpy, EGLContext ctx);
@@ -231,7 +233,7 @@ droid_media_buffer_allocator_init (GstDroidMediaBufferAllocator * allocator)
 
   alloc->mem_map = gst_droid_media_buffer_memory_map;
   alloc->mem_unmap = gst_droid_media_buffer_memory_unmap;
-  alloc->mem_copy = NULL;
+  alloc->mem_copy = gst_droid_media_buffer_memory_copy;
   alloc->mem_share = NULL;
   alloc->mem_is_span = NULL;
 
@@ -464,6 +466,13 @@ gst_droid_media_buffer_memory_unmap (GstMemory * mem)
     m->map_data = NULL;
     droid_media_buffer_unlock (m->buffer);
   }
+}
+
+static GstMemory *
+gst_droid_media_buffer_memory_copy (GstMemory * mem, gssize offset, gssize size)
+{
+  GST_ERROR ("Cannot copy droidmediabuffer memory!");
+  return NULL;
 }
 
 EGLImageKHR
