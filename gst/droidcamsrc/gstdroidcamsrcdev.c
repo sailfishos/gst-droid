@@ -461,6 +461,8 @@ gst_droidcamsrc_dev_frame_available (void *user, DroidMediaBuffer * buffer)
 
   droid_media_buffer_get_info (buffer, &info);
 
+  rect = droid_media_buffer_get_crop_rect (buffer);
+
   GST_OBJECT_LOCK (src);
   src->crop_rect = rect;
   GST_OBJECT_UNLOCK (src);
