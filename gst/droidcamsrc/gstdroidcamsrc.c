@@ -105,7 +105,7 @@ enum
 
 static guint droidcamsrc_signals[LAST_SIGNAL];
 
-#define DEFAULT_CAMERA_DEVICE          GST_DROIDCAMSRC_CAMERA_DEVICE_PRIMARY
+#define DEFAULT_CAMERA_DEVICE          0
 #define DEFAULT_MODE                   MODE_IMAGE
 #define DEFAULT_MAX_ZOOM               10.0f
 #define DEFAULT_VIDEO_TORCH            FALSE
@@ -437,40 +437,28 @@ gst_droidcamsrc_finalize (GObject * object)
 
 static gboolean
 gst_droidcamsrc_fill_info (GstDroidCamSrc * src, GstDroidCamSrcCamInfo * target,
-    int facing)
+    int camera_device)
 {
   DroidMediaCameraInfo info;
-  int x;
 
-  for (x = 0; x < MAX_CAMERAS; x++) {
-    if (droid_media_camera_get_info (&info, x) == false) {
-      GST_WARNING_OBJECT (src, "Cannot get camera info for %d (facing %d)", x,
-          facing);
-      continue;
-    }
-
-    if (info.facing == facing) {
-      target->num = x;
-      target->direction =
-          facing ==
-          DROID_MEDIA_CAMERA_FACING_FRONT ? NEMO_GST_META_DEVICE_DIRECTION_FRONT
-          : NEMO_GST_META_DEVICE_DIRECTION_BACK;
-      target->orientation = info.orientation / 90;
-
-      GST_INFO_OBJECT (src, "camera %d is facing %d with orientation %d",
-          target->num, target->direction, target->orientation);
-      return TRUE;
-    }
+  if (droid_media_camera_get_info (&info, camera_device) == false) {
+    GST_WARNING_OBJECT (src, "Cannot get camera info for %d", camera_device);
+    return FALSE;
   }
 
-  return FALSE;
+  target->num = camera_device;
+  target->direction = !info.facing;
+  target->orientation = info.orientation / 90;
+
+  GST_INFO_OBJECT (src, "camera %d is facing %d with orientation %d",
+          target->num, target->direction, target->orientation);
+  return TRUE;
 }
 
 static gboolean
 gst_droidcamsrc_get_hw (GstDroidCamSrc * src)
 {
-  int num;
-  gboolean front_found, back_found;
+  int x, num;
 
   GST_DEBUG_OBJECT (src, "get hw");
 
@@ -486,25 +474,13 @@ gst_droidcamsrc_get_hw (GstDroidCamSrc * src)
     GST_WARNING_OBJECT (src, "cannot support %d cameras", num);
   }
 
-  src->info[0].num = src->info[1].num = -1;
+  for (x = 0; x < num; x++) {
+    gboolean found;
 
-  back_found =
-      gst_droidcamsrc_fill_info (src, &src->info[0],
-      DROID_MEDIA_CAMERA_FACING_BACK);
-  if (!back_found) {
-    GST_WARNING_OBJECT (src, "cannot find back camera");
-  }
-
-  front_found =
-      gst_droidcamsrc_fill_info (src, &src->info[1],
-      DROID_MEDIA_CAMERA_FACING_FRONT);
-  if (!front_found) {
-    GST_WARNING_OBJECT (src, "cannot find front camera");
-  }
-
-  if (!front_found && !back_found) {
-    GST_ERROR_OBJECT (src, "no cameras found");
-    return FALSE;
+    found = gst_droidcamsrc_fill_info (src, &src->info[x], x);
+    if (!found) {
+      GST_WARNING_OBJECT(src, "cannot find camera %d", x);
+    }
   }
 
   return TRUE;
@@ -513,20 +489,13 @@ gst_droidcamsrc_get_hw (GstDroidCamSrc * src)
 static GstDroidCamSrcCamInfo *
 gst_droidcamsrc_find_camera_device (GstDroidCamSrc * src)
 {
-  int x;
-  NemoGstDeviceDirection direction =
-      src->camera_device ==
-      GST_DROIDCAMSRC_CAMERA_DEVICE_SECONDARY ?
-      NEMO_GST_META_DEVICE_DIRECTION_FRONT :
-      NEMO_GST_META_DEVICE_DIRECTION_BACK;
+  int num = droid_media_camera_get_number_of_cameras ();
 
-  for (x = 0; x < MAX_CAMERAS; x++) {
-    if (src->info[x].direction == direction) {
-      return &src->info[x];
-    }
+  if(src->camera_device < num) {
+    return &src->info[src->camera_device];
+  } else {
+    GST_ERROR_OBJECT (src, "cannot find camera %d", src->camera_device);
   }
-
-  GST_ERROR_OBJECT (src, "cannot find camera %d", src->camera_device);
 
   return NULL;
 }
@@ -965,9 +934,10 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
   gstelement_class->send_event = GST_DEBUG_FUNCPTR (gst_droidcamsrc_send_event);
 
   g_object_class_install_property (gobject_class, PROP_CAMERA_DEVICE,
-      g_param_spec_enum ("camera-device", "Camera device",
+      g_param_spec_int ("camera-device", "Camera device",
           "Defines which camera device should be used",
-          GST_TYPE_DROIDCAMSRC_CAMERA_DEVICE,
+          0,
+          droid_media_camera_get_number_of_cameras (),
           DEFAULT_CAMERA_DEVICE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_MODE,
