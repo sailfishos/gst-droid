@@ -73,6 +73,5 @@ rm -rf $RPM_BUILD_ROOT%{_sysconfdir}/gst-droid
 
 %files tools
 %defattr(-,root,root,-)
-%{_bindir}/mk-cam-conf
 %{_bindir}/record-video
 %{_bindir}/dump-resolutions
