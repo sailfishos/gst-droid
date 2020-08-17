@@ -55,7 +55,6 @@ typedef struct
 {
   int *hal_format;
   GstVideoFormat gst_format;
-  GstDroidVideoConvertToI420 convert_to_i420;
   gsize bytes_per_pixel;
   gsize h_align;
   gsize v_align;
@@ -68,8 +67,7 @@ static GstStaticPadTemplate gst_droidvdec_src_template_factory =
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
         (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER,
-            GST_DROID_MEDIA_BUFFER_MEMORY_VIDEO_FORMATS) ";"
-        GST_VIDEO_CAPS_MAKE ("I420")));
+            GST_DROID_MEDIA_BUFFER_MEMORY_VIDEO_FORMATS)));
 
 static gboolean gst_droidvdec_configure_state (GstVideoDecoder * decoder,
     guint width, guint height);
@@ -82,10 +80,6 @@ static bool gst_droidvdec_buffer_created (void *user,
     DroidMediaBuffer * buffer);
 static bool gst_droidvdec_frame_available (void *user,
     DroidMediaBuffer * buffer);
-static void gst_droidvdec_data_available (void *data,
-    DroidMediaCodecData * encoded);
-static gboolean gst_droidvdec_convert_buffer (GstDroidVDec * dec,
-    GstBuffer * out, DroidMediaData * in, GstVideoInfo * info);
 static void gst_droidvdec_loop (GstDroidVDec * dec);
 static GstFlowReturn gst_droidvdec_finish_frame (GstVideoDecoder * decoder,
     GstVideoCodecFrame * frame);
@@ -101,178 +95,6 @@ gst_droidvdec_loop (GstDroidVDec * dec)
     GST_INFO_OBJECT (dec, "pausing task");
     gst_pad_pause_task (GST_VIDEO_DECODER_SRC_PAD (GST_VIDEO_DECODER (dec)));
   }
-}
-
-static void
-gst_droidvec_copy_plane (guint8 * out, gint stride_out, guint8 * in,
-    gint stride_in, gint width, gint height)
-{
-  int i;
-  for (i = 0; i < height; i++) {
-    orc_memcpy (out, in, width);
-    out += stride_out;
-    in += stride_in;
-  }
-}
-
-static void
-gst_droidvec_copy_packed_planes (guint8 * out0, guint8 * out1, gint stride_out,
-    guint8 * in, gint stride_in, gint width, gint height)
-{
-  int x, y;
-  for (y = 0; y < height; y++) {
-    guint8 *row = in;
-    for (x = 0; x < width; x++) {
-      out0[x] = row[0];
-      out1[x] = row[1];
-      row += 2;
-    }
-
-    out0 += stride_out;
-    out1 += stride_out;
-    in += stride_in;
-  }
-}
-
-#define ALIGN_SIZE(size, to) (((size) + to  - 1) & ~(to - 1))
-
-static gboolean
-gst_droidvdec_convert_native_to_i420 (GstDroidVDec * dec, GstMapInfo * out,
-    DroidMediaData * in, GstVideoInfo * info, gsize width, gsize height)
-{
-  gsize size = width * height * 3 / 2;
-  gboolean use_external_buffer = out->size != size;
-  guint8 *data = NULL;
-  gboolean ret = TRUE;
-
-  if (use_external_buffer) {
-    GST_DEBUG_OBJECT (dec, "using an external buffer for I420 conversion.");
-    data = g_malloc (size);
-  } else {
-    data = out->data;
-  }
-
-  if (droid_media_convert_to_i420 (dec->convert, in, data) != true) {
-    GST_ELEMENT_ERROR (dec, LIBRARY, FAILED, (NULL),
-        ("failed to convert frame"));
-
-    ret = FALSE;
-  } else if (use_external_buffer) {
-    /* fix up the buffer */
-    /* Code is based on gst-colorconv qcom backend */
-
-    gint stride = GST_VIDEO_INFO_COMP_STRIDE (info, 0);
-    gint strideUV = GST_VIDEO_INFO_COMP_STRIDE (info, 1);
-    guint8 *p = data;
-    guint8 *dst = out->data;
-    int i;
-    int x;
-
-    /* Y */
-    for (i = 0; i < info->height; i++) {
-      orc_memcpy (dst, p, info->width);
-      dst += stride;
-      p += width;
-    }
-
-    /* NOP if height == info->height */
-    p += (height - info->height) * width;
-    /* U and V */
-    for (x = 0; x < 2; x++) {
-      for (i = 0; i < info->height / 2; i++) {
-        orc_memcpy (dst, p, info->width / 2);
-        dst += strideUV;
-        p += width / 2;
-      }
-
-      /* NOP if height == info->height */
-      p += (height - info->height) / 2 * width / 2;
-    }
-  }
-
-  if (use_external_buffer && data) {
-    g_free (data);
-  }
-
-  return ret;
-}
-
-static gboolean
-gst_droidvdec_convert_yuv420_planar_to_i420 (GstDroidVDec * dec,
-    GstMapInfo * out, DroidMediaData * in, GstVideoInfo * info, gsize width,
-    gsize height)
-{
-  /* Buffer is already I420, so we can copy it straight over */
-  /* though we need to handle the cropping */
-
-  GST_DEBUG_OBJECT (dec, "Copying I420 buffer");
-  gint top = dec->crop_rect.top;
-  gint left = dec->crop_rect.left;
-  gint crop_width = dec->crop_rect.right - left;
-  gint crop_height = dec->crop_rect.bottom - top;
-
-  guint8 *y = in->data + (top * width) + left;
-  guint8 *u = in->data + (width * height) + (top * width / 2) + (left / 2);
-  guint8 *v =
-      in->data + (width * height) + (width * height / 4) +
-      (top * width / 2) + (left / 2);
-
-  gst_droidvec_copy_plane (out->data + info->offset[0],
-      info->stride[0], y, width, crop_width, crop_height);
-  gst_droidvec_copy_plane (out->data + info->offset[1],
-      info->stride[1], u, width / 2, crop_width / 2, crop_height / 2);
-  gst_droidvec_copy_plane (out->data + info->offset[2],
-      info->stride[2], v, width / 2, crop_width / 2, crop_height / 2);
-
-  return TRUE;
-}
-
-static gboolean
-gst_droidvdec_convert_yuv420_semi_planar_to_i420 (GstDroidVDec * dec,
-    GstMapInfo * out, DroidMediaData * in, GstVideoInfo * info, gsize width,
-    gsize height)
-{
-  GST_DEBUG_OBJECT (dec, "Converting from OMX_COLOR_FormatYUV420SemiPlanar");
-  gint stride = width;
-  gint slice_height = ALIGN_SIZE (height, 16);
-  gint top = dec->crop_rect.top;
-  gint left = dec->crop_rect.left;
-
-  guint8 *y = in->data + (top * stride) + left;
-  guint8 *uv = in->data + (stride * slice_height) + (top * stride / 2) + left;
-
-  gst_droidvec_copy_plane (out->data + info->offset[0],
-      info->stride[0], y, stride, info->width, info->height);
-  gst_droidvec_copy_packed_planes (out->data + info->offset[1],
-      out->data + info->offset[2], info->stride[1], uv, stride,
-      info->width / 2, info->height / 2);
-
-  return TRUE;
-}
-
-static gboolean
-gst_droidvdec_convert_yuv420_packed_semi_planar_to_i420 (GstDroidVDec * dec,
-    GstMapInfo * out, DroidMediaData * in, GstVideoInfo * info, gsize width,
-    gsize height)
-{
-  /* copy to the output buffer swapping the u and v planes and cropping if necessary */
-  /* NV12 format with 128 byte alignment */
-  GST_DEBUG_OBJECT (dec, "Converting from qcom NV12 semi planar");
-  gint stride = ALIGN_SIZE (width, 128);
-  gint slice_height = ALIGN_SIZE (height, 32);
-  gint top = ALIGN_SIZE (dec->crop_rect.top, 2);
-  gint left = ALIGN_SIZE (dec->crop_rect.left, 2);
-
-  guint8 *y = in->data + (top * stride) + left;
-  guint8 *uv = in->data + (stride * slice_height) + (top * stride / 2) + left;
-
-  gst_droidvec_copy_plane (out->data + info->offset[0],
-      info->stride[0], y, stride, info->width, info->height);
-  gst_droidvec_copy_packed_planes (out->data + info->offset[1],
-      out->data + info->offset[2], info->stride[1], uv, stride,
-      info->width / 2, info->height / 2);
-
-  return TRUE;
 }
 
 static gboolean
@@ -294,10 +116,6 @@ gst_droidvdec_create_codec (GstDroidVDec * dec, GstBuffer * input)
   md.parent.flags =
       DROID_MEDIA_CODEC_HW_ONLY | DROID_MEDIA_CODEC_USE_EXTERNAL_LOOP;
   md.codec_data.size = 0;
-
-  if (!dec->use_hardware_buffers) {
-    md.parent.flags |= DROID_MEDIA_CODEC_NO_MEDIA_BUFFER;
-  }
 
   switch (gst_droid_codec_create_decoder_codec_data (dec->codec_type,
           dec->codec_data, &md.codec_data, input)) {
@@ -337,19 +155,15 @@ gst_droidvdec_create_codec (GstDroidVDec * dec, GstBuffer * input)
     droid_media_codec_set_callbacks (dec->codec, &cb, dec);
   }
 
-  if (queue) {
+  {
     DroidMediaBufferQueueCallbacks cb;
     cb.buffers_released = gst_droidvdec_buffers_released;
     cb.buffer_created = gst_droidvdec_buffer_created;
     cb.frame_available = gst_droidvdec_frame_available;
     droid_media_buffer_queue_set_callbacks (queue, &cb, dec);
-  } else {
-    DroidMediaCodecDataCallbacks cb;
-    cb.data_available = gst_droidvdec_data_available;
-    droid_media_codec_set_data_callbacks (dec->codec, &cb, dec);
   }
 
-  if (!droid_media_codec_start (dec->codec)) {
+    if (!droid_media_codec_start (dec->codec)) {
     GST_ELEMENT_ERROR (dec, LIBRARY, INIT, (NULL),
         ("Failed to start the decoder"));
 
@@ -426,41 +240,7 @@ gst_droidvdec_buffer_created (void *user, DroidMediaBuffer * buffer)
   return ret;
 }
 
-static gboolean
-gst_droidvdec_convert_buffer (GstDroidVDec * dec,
-    GstBuffer * out, DroidMediaData * in, GstVideoInfo * info)
-{
-  gsize height = info->height;
-  gsize width = info->width;
-  gboolean ret;
-  GstMapInfo map_info;
-
-  GST_DEBUG_OBJECT (dec, "convert buffer");
-
-  if (dec->codec_type->quirks & USE_CODEC_SUPPLIED_WIDTH_VALUE) {
-    width = dec->codec_reported_width;
-    GST_INFO_OBJECT (dec, "using codec supplied width %d", width);
-  }
-
-  if (dec->codec_type->quirks & USE_CODEC_SUPPLIED_HEIGHT_VALUE) {
-    height = dec->codec_reported_height;
-    GST_INFO_OBJECT (dec, "using codec supplied height %d", height);
-  }
-
-  if (!dec->convert_to_i420) {
-    GST_ERROR_OBJECT (dec, "no i420 conversion function");
-    ret = FALSE;
-  } else if (!gst_buffer_map (out, &map_info, GST_MAP_WRITE)) {
-    GST_ERROR_OBJECT (dec, "failed to map buffer");
-    ret = FALSE;
-  } else {
-    ret = dec->convert_to_i420 (dec, &map_info, in, info, width, height);
-
-    gst_buffer_unmap (out, &map_info);
-  }
-
-  return ret;
-}
+#define ALIGN_SIZE(size, to) (((size) + to  - 1) & ~(to - 1))
 
 static bool
 gst_droidvdec_frame_available (void *user, DroidMediaBuffer * buffer)
@@ -564,80 +344,6 @@ out:
 error:
   ret = false;
   goto out;
-}
-
-static void
-gst_droidvdec_data_available (void *data, DroidMediaCodecData * encoded)
-{
-  GstDroidVDec *dec = (GstDroidVDec *) data;
-  GstVideoDecoder *decoder = GST_VIDEO_DECODER (dec);
-  GstBuffer *buff;
-  GstFlowReturn flow_ret;
-  GstVideoCodecFrame *frame;
-
-  GST_DEBUG_OBJECT (dec, "data available");
-
-  GST_VIDEO_DECODER_STREAM_LOCK (decoder);
-
-  if (dec->dirty) {
-    flow_ret = dec->downstream_flow_ret;
-    goto out;
-  }
-
-  if (dec->downstream_flow_ret != GST_FLOW_OK) {
-    GST_DEBUG_OBJECT (dec, "not handling frame in error state: %s",
-        gst_flow_get_name (dec->downstream_flow_ret));
-    flow_ret = dec->downstream_flow_ret;
-    goto out;
-  }
-
-  if (G_UNLIKELY (!dec->out_state)) {
-    /* No need to pass anything for width and height as they will be overwritten anyway */
-    if (!gst_droidvdec_configure_state (decoder, 0, 0)) {
-      flow_ret = GST_FLOW_ERROR;
-      goto out;
-    }
-  }
-
-  buff = gst_video_decoder_allocate_output_buffer (decoder);
-
-  gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE,
-      GST_VIDEO_FORMAT_I420, dec->out_state->info.width,
-      dec->out_state->info.height);
-
-  if (!gst_droidvdec_convert_buffer (dec, buff, &encoded->data,
-          &dec->out_state->info)) {
-    gst_buffer_unref (buff);
-    flow_ret = GST_FLOW_ERROR;
-    goto out;
-  }
-
-  frame = gst_video_decoder_get_oldest_frame (decoder);
-
-  if (G_UNLIKELY (!frame)) {
-    /* TODO: what should we do here? */
-    GST_WARNING_OBJECT (dec, "buffer without frame");
-    gst_buffer_unref (buff);
-    flow_ret = dec->downstream_flow_ret;
-    goto out;
-  }
-
-  /* We get the timestamp in ns already */
-  frame->pts = encoded->ts;
-  frame->output_buffer = buff;
-
-  /* we have a ref acquired by _get_oldest_frame()
-   * but we don't drop it because _finish_frame() assumes 2 refs.
-   * A ref that we obtained via _handle_frame() which we dropped already
-   * so we need to compensate it and the 2nd ref which is already owned by
-   * the base class GstVideoDecoder
-   */
-  flow_ret = gst_droidvdec_finish_frame (decoder, frame);
-
-out:
-  dec->downstream_flow_ret = flow_ret;
-  GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
-  return;
 }
 
 static GstFlowReturn
@@ -745,47 +451,35 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
 
   const GstDroidVideoFormatMap formats[] = {
     {&constants.QOMX_COLOR_FormatYUV420PackedSemiPlanar32m,
-          GST_VIDEO_FORMAT_NV12,
-        gst_droidvdec_convert_yuv420_packed_semi_planar_to_i420, 1, 128, 32},
+          GST_VIDEO_FORMAT_NV12, 1, 128, 32},
     {&constants.QOMX_COLOR_FormatYUV420PackedSemiPlanar64x32Tile2m8ka,
-        GST_VIDEO_FORMAT_NV12_64Z32, NULL, 0, 0, 0},
+        GST_VIDEO_FORMAT_NV12_64Z32, 0, 0, 0},
     {&constants.OMX_COLOR_FormatYUV420Planar,
-          GST_VIDEO_FORMAT_I420,
-        gst_droidvdec_convert_yuv420_planar_to_i420, 1, 4, 1},
+          GST_VIDEO_FORMAT_I420, 1, 4, 1},
     {&constants.OMX_COLOR_FormatYUV420PackedPlanar,
-          GST_VIDEO_FORMAT_I420, NULL,
-        1, 1, 1},
-    {&constants.OMX_COLOR_FormatYUV420SemiPlanar, GST_VIDEO_FORMAT_NV12,
-        gst_droidvdec_convert_yuv420_semi_planar_to_i420, 1, 1, 1},
-    {&constants.OMX_COLOR_FormatL8, GST_VIDEO_FORMAT_GRAY8, NULL, 1, 1,
-        1},
+          GST_VIDEO_FORMAT_I420, 1, 1, 1},
+    {&constants.OMX_COLOR_FormatYUV420SemiPlanar,
+          GST_VIDEO_FORMAT_NV12, 1, 1, 1},
+    {&constants.OMX_COLOR_FormatL8, GST_VIDEO_FORMAT_GRAY8, 1, 1, 1},
     {&constants.OMX_COLOR_FormatYUV422SemiPlanar, GST_VIDEO_FORMAT_NV16,
-          NULL,
-        1, 1, 1},
-    {&constants.OMX_COLOR_FormatYCbYCr, GST_VIDEO_FORMAT_YUY2, NULL, 1,
-        1, 1},
-    {&constants.OMX_COLOR_FormatYCrYCb, GST_VIDEO_FORMAT_YVYU, NULL, 1,
-        1, 1},
-    {&constants.OMX_COLOR_FormatCbYCrY, GST_VIDEO_FORMAT_UYVY, NULL, 1,
-        1, 1},
+           1, 1, 1},
+    {&constants.OMX_COLOR_FormatYCbYCr, GST_VIDEO_FORMAT_YUY2, 1, 1, 1},
+    {&constants.OMX_COLOR_FormatYCrYCb, GST_VIDEO_FORMAT_YVYU, 1, 1, 1},
+    {&constants.OMX_COLOR_FormatCbYCrY, GST_VIDEO_FORMAT_UYVY, 1, 1, 1},
     {&constants.OMX_COLOR_Format32bitARGB8888,
           /* There is a mismatch in omxil specification 4.2.1 between
            * OMX_COLOR_Format32bitARGB8888 and its description
            * Follow the description */
           GST_VIDEO_FORMAT_ABGR,
-          NULL,
         4, 4, 1},
     {&constants.OMX_COLOR_Format32bitBGRA8888,
           /* Same issue as OMX_COLOR_Format32bitARGB8888 */
           GST_VIDEO_FORMAT_ARGB,
-          NULL,
         4, 4, 1},
     {&constants.OMX_COLOR_Format16bitRGB565, GST_VIDEO_FORMAT_RGB16,
-          NULL, 2, 4,
-        1},
+          2, 4, 1},
     {&constants.OMX_COLOR_Format16bitBGR565, GST_VIDEO_FORMAT_BGR16,
-          NULL, 2, 4,
-        1}
+          2, 4, 1}
   };
 
   memset (&md, 0x0, sizeof (md));
@@ -803,14 +497,6 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
   dec->codec_reported_width = md.width;
   dec->hal_format = md.hal_format;
 
-  if (!dec->use_hardware_buffers && !dec->convert) {
-    if (dec->codec_type->quirks & DONT_USE_DROID_CONVERT_VALUE) {
-      GST_INFO_OBJECT (dec, "not using droid convert binary");
-    } else {
-      dec->convert = droid_media_convert_create ();
-    }
-  }
-
   format_count = sizeof (formats) / sizeof (formats[0]);
   for (format_index = 0; format_index < format_count; ++format_index) {
     if (*formats[format_index].hal_format == md.hal_format) {
@@ -818,44 +504,23 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
     }
   }
 
-  if (dec->use_hardware_buffers) {
-    if (format_index < format_count) {
-      dec->format = formats[format_index].gst_format;
-      dec->bytes_per_pixel = formats[format_index].bytes_per_pixel;
-      dec->h_align = formats[format_index].h_align;
-      dec->v_align = formats[format_index].v_align;
-    } else {
-      GST_INFO_OBJECT (dec, "The HAL codec format 0x%x is unrecognized",
-          md.hal_format);
-      /* This should be GST_VIDEO_FORMAT_ENCODED but the videoconv? element
-         can't do passthrough of that format. Since the format can't be
-         identified the reported size of the buffer will be zero and it
-         won't be possible to map it so reporting the wrong format should
-         be harmless. */
-      dec->format = GST_VIDEO_FORMAT_YV12;
-      dec->bytes_per_pixel = 0;
-      dec->h_align = 0;
-      dec->v_align = 0;
-    }
+  if (format_index < format_count) {
+    dec->format = formats[format_index].gst_format;
+    dec->bytes_per_pixel = formats[format_index].bytes_per_pixel;
+    dec->h_align = formats[format_index].h_align;
+    dec->v_align = formats[format_index].v_align;
   } else {
-    if (dec->convert) {
-      dec->convert_to_i420 = gst_droidvdec_convert_native_to_i420;
-    } else if (format_index < format_count) {
-      dec->convert_to_i420 = formats[format_index].convert_to_i420;
-    } else {
-      dec->convert_to_i420 = NULL;
-    }
-
-    if (dec->convert_to_i420) {
-      dec->format = GST_VIDEO_FORMAT_I420;
-
-      width = rect.right - rect.left;
-      height = rect.bottom - rect.top;
-    } else {
-      GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
-          ("HAL codec format 0x%x is unsupported", md.hal_format));
-      goto error;
-    }
+    GST_INFO_OBJECT (dec, "The HAL codec format 0x%x is unrecognized",
+        md.hal_format);
+    /* This should be GST_VIDEO_FORMAT_ENCODED but the videoconv? element
+       can't do passthrough of that format. Since the format can't be
+       identified the reported size of the buffer will be zero and it
+       won't be possible to map it so reporting the wrong format should
+       be harmless. */
+    dec->format = GST_VIDEO_FORMAT_YV12;
+    dec->bytes_per_pixel = 0;
+    dec->h_align = 0;
+    dec->v_align = 0;
   }
 
   GST_INFO_OBJECT (dec, "configuring state: width=%d, height=%d", width,
@@ -868,20 +533,10 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
   g_assert (dec->out_state->caps == NULL);
   dec->out_state->caps = gst_video_info_to_caps (&dec->out_state->info);
 
-  if (dec->use_hardware_buffers) {
-    GstCapsFeatures *feature =
-        gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER,
-        NULL);
-    gst_caps_set_features (dec->out_state->caps, 0, feature);
-  } else {
-    memcpy (&dec->crop_rect, &rect, sizeof (rect));
-
-    if (dec->convert) {
-      droid_media_convert_set_crop_rect (dec->convert, rect, md.width,
-          md.height);
-      GST_INFO_OBJECT (dec, "using colour conversion for output buffers");
-    }
-  }
+  GstCapsFeatures *feature =
+      gst_caps_features_new (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER,
+      NULL);
+  gst_caps_set_features (dec->out_state->caps, 0, feature);
 
   if (!gst_video_decoder_negotiate (decoder)) {
     GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL),
@@ -899,11 +554,6 @@ error:
     dec->out_state = NULL;
   }
 
-  if (dec->convert) {
-    droid_media_convert_destroy (dec->convert);
-    dec->convert = NULL;
-  }
-
   return FALSE;
 }
 
@@ -911,62 +561,54 @@ static gboolean
 gst_droidvdec_decide_allocation (GstVideoDecoder * decoder, GstQuery * query)
 {
   GstCaps *caps;
-  GstCapsFeatures *features;
-
   gst_query_parse_allocation (query, &caps, NULL);
 
-  features = gst_caps_get_features (caps, 0);
+  /* Ensure we use a buffer pool that supports droid memory queue buffers.
+   * Otherwise let the default implementation decide. */
+  GstBufferPool *pool = NULL;
+  gint i;
+  guint min, max;
+  guint size;
+  gint count = gst_query_get_n_allocation_pools (query);
 
-  /* If we've negotiated caps with the droid memory queue buffers feature then ensure we use
-   * a buffer pool that supports that. Otherwise let the default implementation decide. */
-  if (gst_caps_features_contains (features,
-          GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER)) {
-    GstBufferPool *pool = NULL;
-    gint i;
-    guint min, max;
-    guint size;
-    gint count = gst_query_get_n_allocation_pools (query);
+  for (i = 0; i < count; ++i) {
+    GstAllocator *allocator;
+    GstStructure *config;
 
-    for (i = 0; i < count; ++i) {
-      GstAllocator *allocator;
-      GstStructure *config;
-
-      gst_query_parse_nth_allocation_pool (query, i, &pool, &size, &min, &max);
-      config = gst_buffer_pool_get_config (pool);
-      gst_buffer_pool_config_get_allocator (config, &allocator, NULL);
-      if (allocator
-          && g_strcmp0 (allocator->mem_type,
-              GST_ALLOCATOR_DROID_MEDIA_BUFFER) == 0) {
-        break;
-      } else {
-        gst_object_unref (pool);
-        pool = NULL;
-      }
+    gst_query_parse_nth_allocation_pool (query, i, &pool, &size, &min, &max);
+    config = gst_buffer_pool_get_config (pool);
+    gst_buffer_pool_config_get_allocator (config, &allocator, NULL);
+    if (allocator
+        && g_strcmp0 (allocator->mem_type,
+            GST_ALLOCATOR_DROID_MEDIA_BUFFER) == 0) {
+      break;
+    } else {
+      gst_object_unref (pool);
+      pool = NULL;
     }
+  }
 
-    /* The downstream may have other ideas about what the pool size should be but the
-     * queue we're working with has a fixed size so that's the number of buffers we'll
-     * go with. */
-    min = 0;
-    max = droid_media_buffer_queue_length ();
+  /* The downstream may have other ideas about what the pool size should be but the
+   * queue we're working with has a fixed size so that's the number of buffers we'll
+   * go with. */
+  min = 0;
+  max = droid_media_buffer_queue_length ();
 
-    if (!pool) {
-      /* A downstream which understands the queue buffers should also have provided a pool
-       * but for completeness add this a fallback. */
-      GstStructure *config;
-      GstVideoInfo video_info;
-      gst_video_info_from_caps (&video_info, caps);
+  if (!pool) {
+    /* A downstream which understands the queue buffers should also have provided a pool
+     * but for completeness add this a fallback. */
+    GstStructure *config;
+    GstVideoInfo video_info;
+    gst_video_info_from_caps (&video_info, caps);
+    pool = gst_droid_buffer_pool_new ();
+    size = video_info.finfo->format == GST_VIDEO_FORMAT_ENCODED
+        ? 1 : video_info.size;
 
-      pool = gst_droid_buffer_pool_new ();
-      size = video_info.finfo->format == GST_VIDEO_FORMAT_ENCODED
-          ? 1 : video_info.size;
+    config = gst_buffer_pool_get_config (pool);
+    gst_buffer_pool_config_set_params (config, caps, size, min, max);
 
-      config = gst_buffer_pool_get_config (pool);
-      gst_buffer_pool_config_set_params (config, caps, size, min, max);
-
-      if (!gst_buffer_pool_set_config (pool, config)) {
-        GST_ERROR_OBJECT (decoder, "Failed to set buffer pool configuration");
-      }
+    if (!gst_buffer_pool_set_config (pool, config)) {
+      GST_ERROR_OBJECT (decoder, "Failed to set buffer pool configuration");
     }
 
     gst_query_set_nth_allocation_pool (query, 0, pool, size, min, max);
@@ -1009,11 +651,6 @@ gst_droidvdec_stop (GstVideoDecoder * decoder)
   if (dec->codec_type) {
     gst_droid_codec_unref (dec->codec_type);
     dec->codec_type = NULL;
-  }
-
-  if (dec->convert) {
-    droid_media_convert_destroy (dec->convert);
-    dec->convert = NULL;
   }
 
   return TRUE;
@@ -1100,8 +737,6 @@ gst_droidvdec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 {
   GstDroidVDec *dec = GST_DROIDVDEC (decoder);
   GstCaps *caps, *template_caps;
-  GstCapsFeatures *features;
-  guint i, count;
 
   /*
    * destroying the droidmedia codec here will cause stagefright to call abort.
@@ -1136,23 +771,7 @@ gst_droidvdec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 
   GST_DEBUG_OBJECT (dec, "peer caps %" GST_PTR_FORMAT, caps);
 
-  dec->use_hardware_buffers = FALSE;
-
-  count = gst_caps_get_size (caps);
-  for (i = 0; i < count; ++i) {
-    features = gst_caps_get_features (caps, i);
-    if (gst_caps_features_contains
-        (features, GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER)) {
-      dec->use_hardware_buffers = TRUE;
-    }
-  }
-
   gst_caps_unref (caps);
-
-  if (G_UNLIKELY (count == 0)) {
-    GST_ELEMENT_ERROR (dec, STREAM, FORMAT, (NULL), ("Failed to parse caps"));
-    return FALSE;
-  }
 
   dec->in_state = gst_video_codec_state_ref (state);
 
@@ -1454,7 +1073,6 @@ gst_droidvdec_init (GstDroidVDec * dec)
   dec->allocator = gst_droid_media_buffer_allocator_new ();
   dec->in_state = NULL;
   dec->out_state = NULL;
-  dec->convert = NULL;
 }
 
 static void

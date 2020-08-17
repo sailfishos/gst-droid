@@ -25,7 +25,6 @@
 #include <gst/gst.h>
 #include <gst/video/gstvideodecoder.h>
 #include "gst/droid/gstdroidcodec.h"
-#include "droidmediaconvert.h"
 
 G_BEGIN_DECLS
 
@@ -43,10 +42,6 @@ G_BEGIN_DECLS
 typedef struct _GstDroidVDec GstDroidVDec;
 typedef struct _GstDroidVDecClass GstDroidVDecClass;
 typedef enum _GstDroidVDecState GstDroidVDecState;
-
-typedef gboolean (*GstDroidVideoConvertToI420) (GstDroidVDec * dec,
-    GstMapInfo * out, DroidMediaData * in, GstVideoInfo * info, gsize width,
-    gsize height);
 
 enum _GstDroidVDecState
 {
@@ -74,7 +69,6 @@ struct _GstDroidVDec
   gboolean dirty;
   DroidMediaRect crop_rect;
   gboolean running;
-  gboolean use_hardware_buffers;
   GstVideoFormat format;
 
   gsize codec_reported_height;
@@ -85,8 +79,6 @@ struct _GstDroidVDec
 
   GstVideoCodecState *in_state;
   GstVideoCodecState *out_state;
-  DroidMediaConvert *convert;
-  GstDroidVideoConvertToI420 convert_to_i420;
   gint32 hal_format;
 };
 
