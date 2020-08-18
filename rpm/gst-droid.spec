@@ -6,7 +6,7 @@ Summary:        GStreamer droid plug-in contains elements using the Android HAL
 Version:        1.0.0
 Release:        1
 Group:          Applications/Multimedia
-License:        LGPLv2.1+
+License:        LGPLv2+
 URL:            https://github.com/sailfishos/gst-droid
 Source0:        %{name}-%{version}.tar.gz
 BuildRequires:  pkgconfig(egl)
