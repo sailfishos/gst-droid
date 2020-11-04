@@ -46,6 +46,10 @@ gst_droidcamsrc_recorder_create (GstDroidCamSrcPad * vidsrc)
 void
 gst_droidcamsrc_recorder_destroy (GstDroidCamSrcRecorder * recorder)
 {
+  if (recorder->recorder) {
+    droid_media_recorder_destroy (recorder->recorder);
+  }
+
   if (recorder->codec) {
     gst_droid_codec_unref (recorder->codec);
   }
