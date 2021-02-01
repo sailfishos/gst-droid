@@ -113,6 +113,7 @@ static guint droidcamsrc_signals[LAST_SIGNAL];
 #define DEFAULT_MAX_EV_COMPENSATION    2.5f
 #define DEFAULT_FACE_DETECTION         FALSE
 #define DEFAULT_IMAGE_NOISE_REDUCTION  TRUE
+#define DEFAULT_SENSOR_DIRECTION       0
 #define DEFAULT_SENSOR_ORIENTATION     0
 #define DEFAULT_IMAGE_MODE             GST_DROIDCAMSRC_IMAGE_MODE_NORMAL
 #define DEFAULT_TARGET_BITRATE         12000000
@@ -264,6 +265,10 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
 
     case PROP_IMAGE_NOISE_REDUCTION:
       g_value_set_boolean (value, src->image_noise_reduction);
+      break;
+
+    case PROP_SENSOR_DIRECTION:
+      g_value_set_int (value, src->info[src->camera_device].direction);
       break;
 
     case PROP_SENSOR_MOUNT_ANGLE:
@@ -1017,6 +1022,11 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
           "Vendor specific image noise reduction",
           DEFAULT_IMAGE_NOISE_REDUCTION,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_SENSOR_DIRECTION,
+      g_param_spec_int ("sensor-direction", "Sensor direction",
+          "Sensor direction as reported by HAL (0=back, 1=front)", 0, 1,
+          DEFAULT_SENSOR_DIRECTION, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SENSOR_ORIENTATION,
       g_param_spec_int ("sensor-orientation", "Sensor orientation",
