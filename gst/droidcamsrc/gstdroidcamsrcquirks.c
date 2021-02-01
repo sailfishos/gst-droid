@@ -44,7 +44,8 @@
  * prop=<property name>
  * on=<value to turn on>
  * off=<value to turn off>
- * direction=<-1 = all devices or a camera device id>
+ * camera_id=<-1 = all devices or a camera device id>
+ * (obsolete alias for camera_id) direction=<-1 = all devices or a camera device id>
  * image=<any value to enable quirk in image mode>
  * video=<any value to enable quirk in video mode>
  *
@@ -57,7 +58,8 @@
  * arg2_enable=<value of the second argument used for enabling>
  * arg1_disable=<value of the first argument used for disabling>
  * arg2_disable=<value of the second argument used for disabling>
- * direction=<-1 = all devices or a camera device id>
+ * camera_id=<-1 = all devices or a camera device id>
+ * (obsolete alias for camera_id) direction=<-1 = all devices or a camera device id>
  * image=<any value to enable quirk in image mode>
  * video=<any value to enable quirk in video mode>
  */
@@ -86,7 +88,7 @@ struct _GstDroidCamSrcQuirks
 
 struct _GstDroidCamSrcQuirk
 {
-  gint direction;
+  gint camera_id;
   gchar *id;
   gboolean image;
   gboolean video;
@@ -143,8 +145,14 @@ gst_droidcamsrc_quirk_new (GKeyFile * file, const gchar * group)
   /* common properties first */
   quirk->id = g_strdup (group);
 
-  quirk->direction = g_key_file_get_integer (file, group, "direction", &err);
-  CHECK_ERROR (err, group, "direction");
+  quirk->camera_id = g_key_file_get_integer (file, group, "camera_id", &err);
+  if (err) {
+    g_error_free (err);
+    err = NULL;
+    /* For compatibility also check the old key "direction" */
+    quirk->camera_id = g_key_file_get_integer (file, group, "direction", &err);
+    CHECK_ERROR (err, group, "direction");
+  }
 
   {
     gboolean has_image = g_key_file_has_key (file, group, "image", NULL);
@@ -270,7 +278,7 @@ gst_droidcamsrc_quirks_destroy (GstDroidCamSrcQuirks * quirks)
 
 void
 gst_droidcamsrc_quirks_apply (GstDroidCamSrcQuirks * quirks,
-    GstDroidCamSrc * src, gint direction, gint mode, const gchar * quirk_id,
+    GstDroidCamSrc * src, gint camera_id, gint mode, const gchar * quirk_id,
     gboolean enable)
 {
   const GstDroidCamSrcQuirk *quirk;
@@ -282,27 +290,27 @@ gst_droidcamsrc_quirks_apply (GstDroidCamSrcQuirks * quirks,
     return;
   }
 
-  gst_droidcamsrc_quirks_apply_quirk (quirks, src, direction, mode, quirk,
+  gst_droidcamsrc_quirks_apply_quirk (quirks, src, camera_id, mode, quirk,
       enable);
 }
 
 void
 gst_droidcamsrc_quirks_apply_quirk (GstDroidCamSrcQuirks * quirks,
-    GstDroidCamSrc * src, gint direction, gint mode,
+    GstDroidCamSrc * src, gint camera_id, gint mode,
     const GstDroidCamSrcQuirk * quirk, gboolean enable)
 {
-  gboolean same_direction;
+  gboolean same_camera_id;
   gboolean same_mode;
 
   GST_INFO_OBJECT (src,
-      "apply quirk %s: direction is %d, mode is %d, requested direction is %d",
-      quirk->id, quirk->direction, mode, direction);
+      "apply quirk %s: camera_id is %d, mode is %d, requested camera_id is %d",
+      quirk->id, quirk->camera_id, mode, camera_id);
 
-  same_direction = (quirk->direction == direction || quirk->direction == -1);
+  same_camera_id = (quirk->camera_id == camera_id || quirk->camera_id == -1);
   same_mode = ((quirk->image && mode == MODE_IMAGE) || (quirk->video
           && mode == MODE_VIDEO));
 
-  if (same_direction && same_mode && enable) {
+  if (same_camera_id && same_mode && enable) {
     GST_INFO_OBJECT (src, "enabling %s", quirk->id);
 
     if (quirk->type == GST_DROID_CAM_SRC_QUIRK_PROPERTY) {

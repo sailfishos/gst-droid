@@ -33,10 +33,10 @@ GstDroidCamSrcQuirks * gst_droidcamsrc_quirks_new ();
 void gst_droidcamsrc_quirks_destroy (GstDroidCamSrcQuirks * quirks);
 
 void gst_droidcamsrc_quirks_apply (GstDroidCamSrcQuirks * quirks,
-    GstDroidCamSrc * src, gint direction, gint mode,
+    GstDroidCamSrc * src, gint camera_id, gint mode,
     const gchar * quirk_id, gboolean enable);
 void gst_droidcamsrc_quirks_apply_quirk (GstDroidCamSrcQuirks * quirks,
-    GstDroidCamSrc * src, gint direction, gint mode,
+    GstDroidCamSrc * src, gint camera_id, gint mode,
     const GstDroidCamSrcQuirk * quirk, gboolean enable);
 
 const GstDroidCamSrcQuirk *gst_droidcamsrc_quirks_get_quirk (GstDroidCamSrcQuirks * quirks,
