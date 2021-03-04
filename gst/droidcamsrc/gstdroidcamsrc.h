@@ -48,7 +48,6 @@ G_BEGIN_DECLS
 #define GST_IS_DROIDCAMSRC_CLASS(klass) \
   (G_TYPE_CHECK_CLASS_TYPE((klass), GST_TYPE_DROIDCAMSRC))
 
-#define MAX_CAMERAS 2
 #define GST_DROIDCAMSRC_CAPTURE_START "photo-capture-start"
 #define GST_DROIDCAMSRC_CAPTURE_END "photo-capture-end"
 #define GST_DROIDCAMSRC_PREVIEW_IMAGE "photo-capture-preview"
@@ -93,7 +92,7 @@ struct _GstDroidCamSrc
   GstDroidCamSrcQuirks *quirks;
   GstDroidCamSrcDev *dev;
   GRecMutex dev_lock;
-  GstDroidCamSrcCamInfo info[MAX_CAMERAS];
+  GstDroidCamSrcCamInfo *info;
 
   GstDroidCamSrcPad *vfsrc;
   GstDroidCamSrcPad *imgsrc;
@@ -103,7 +102,7 @@ struct _GstDroidCamSrc
   GstDroidCamSrcMode *video;
   GstDroidCamSrcMode *active_mode;
 
-  GstDroidCamSrcCameraDevice camera_device;
+  int camera_device;
   GstCameraBinMode mode;
 
   int captures;
