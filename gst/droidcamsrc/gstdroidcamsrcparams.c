@@ -494,7 +494,7 @@ gst_droidcamsrc_params_choose_image_framerate (GstDroidCamSrcParams * params,
     gst_caps_unref (c);
 
     /* the fps we have is valid. Select it if higher than our current target, or wider */
-    if (max > target_max || max == target_max && min < target_min) {
+    if (max > target_max || (max == target_max && min < target_min)) {
       target_min = min;
       target_max = max;
     }
@@ -545,7 +545,7 @@ gst_droidcamsrc_params_choose_video_framerate (GstDroidCamSrcParams * params,
     gst_caps_unref (c);
 
     /* the fps we have is valid. Select it if higher than our current target, or narrower */
-    if (max > target_max || max == target_max && min > target_min) {
+    if (max > target_max || (max == target_max && min > target_min)) {
       target_min = min;
       target_max = max;
     }

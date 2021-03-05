@@ -49,7 +49,7 @@ gst_droid_query_set_video_color_format (GstQuery * query, gint format)
 gboolean
 gst_droid_query_parse_video_color_format (GstQuery * query, gint * format)
 {
-  GstStructure *structure;
+  const GstStructure *structure;
 
   structure = gst_query_get_structure (query);
 

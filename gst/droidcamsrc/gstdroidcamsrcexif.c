@@ -105,7 +105,7 @@ GstTagList *
 gst_droidcamsrc_exif_tags_from_jpeg_data (void *data, size_t size)
 {
   GstTagList *tags = NULL;
-  ExifMem *mem = exif_mem_new (g_malloc0, g_realloc, g_free);
+  ExifMem *mem = exif_mem_new ((ExifMemAllocFunc)g_malloc0, (ExifMemReallocFunc)g_realloc, g_free);
   ExifData *exif = exif_data_new_mem (mem);
   unsigned char *exif_data = NULL;
   void *_exif_data = NULL;

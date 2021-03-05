@@ -332,7 +332,7 @@ gst_droidcamsrc_quirks_apply_quirk (GstDroidCamSrcQuirks * quirks,
   }
 }
 
-G_INLINE_FUNC gint
+static inline gint
 _find_quirk (gconstpointer a, gconstpointer b)
 {
   /* a can be NULL */
