@@ -1,8 +1,8 @@
 /*
  * gst-droid
  *
- * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
- * Copyright (C) 2015 Jolla LTD.
+ * Copyright (C) 2014 Mohammed Sameer
+ * Copyright (C) 2015 Jolla Ltd.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
