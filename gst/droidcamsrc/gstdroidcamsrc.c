@@ -359,25 +359,23 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
 
       g_mutex_unlock (&src->capture_lock);
 
-      /* deactivate old mode */
-      if (src->active_mode) {
-        gst_droidcamsrc_mode_deactivate (src->active_mode);
-        src->active_mode = NULL;
-      }
-
       src->mode = mode;
 
-      g_rec_mutex_lock (&src->dev_lock);
+      if (src->active_mode != NULL) {
+        g_rec_mutex_lock (&src->dev_lock);
 
-      if (src->dev && src->dev->params) {
+        /* deactivate old mode */
+        gst_droidcamsrc_mode_deactivate (src->active_mode);
+        src->active_mode = NULL;
+
         /* activate mode. */
         gst_droidcamsrc_select_and_activate_mode (src);
 
         /* set mode settings */
         gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
-      }
 
-      g_rec_mutex_unlock (&src->dev_lock);
+        g_rec_mutex_unlock (&src->dev_lock);
+      }
     }
 
       break;
@@ -591,6 +589,15 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
       /* set initial photography parameters */
       gst_droidcamsrc_photography_apply (src, SET_ONLY);
+
+      /* send flush stop if we start it in the previous transition */
+      if (GST_PAD_IS_FLUSHING (src->vfsrc->pad)) {
+        if (!gst_pad_push_event (src->vfsrc->pad,
+                gst_event_new_flush_stop ( /* reset_time */ TRUE))) {
+          ret = GST_STATE_CHANGE_FAILURE;
+          break;
+        }
+      }
 
       /* activate mode */
       if (!gst_droidcamsrc_select_and_activate_mode (src)) {
