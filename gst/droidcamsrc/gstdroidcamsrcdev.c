@@ -726,9 +726,17 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
 
   GST_DEBUG_OBJECT (src, "dev start");
 
-  if (!gst_buffer_pool_set_active (dev->pool, TRUE)) {
-    GST_ERROR_OBJECT (src, "Failed to activate buffer pool");
-    goto out;
+  if (!dev->use_raw_data) {
+    if (!dev->pool) {
+      GST_ERROR_OBJECT (src,
+          "No droid buffer pool provided in non-raw preview mode");
+      goto out;
+    }
+
+    if (!gst_buffer_pool_set_active (dev->pool, TRUE)) {
+      GST_ERROR_OBJECT (src, "Failed to activate buffer pool");
+      goto out;
+    }
   }
 
   if (apply_settings) {
@@ -760,7 +768,7 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
   ret = TRUE;
 
 out:
-  if (ret != TRUE) {
+  if (ret != TRUE && dev->pool) {
     gst_buffer_pool_set_active (dev->pool, FALSE);
   }
 
@@ -777,7 +785,9 @@ gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev)
 
   if (dev->running) {
     GST_DEBUG ("stopping preview");
-    gst_buffer_pool_set_active (dev->pool, FALSE);
+    if (dev->pool) {
+      gst_buffer_pool_set_active (dev->pool, FALSE);
+    }
     droid_media_camera_stop_preview (dev->cam);
     dev->running = FALSE;
     GST_DEBUG ("stopped preview");
@@ -868,8 +878,6 @@ gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
 
   GST_DEBUG ("dev start video recording");
 
-  gst_buffer_pool_set_flushing (dev->pool, TRUE);
-
   g_mutex_lock (&dev->vidsrc->lock);
   dev->vidsrc->pushed_buffers = 0;
   g_mutex_unlock (&dev->vidsrc->lock);
@@ -880,6 +888,8 @@ gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
         (NULL));
     goto out;
   }
+
+  gst_buffer_pool_set_flushing (dev->pool, TRUE);
 
   dev->vid->running = TRUE;
   dev->vid->eos_sent = FALSE;
@@ -898,9 +908,9 @@ gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
   ret = TRUE;
 
 out:
-  g_rec_mutex_unlock (dev->lock);
-
   gst_buffer_pool_set_flushing (dev->pool, FALSE);
+
+  g_rec_mutex_unlock (dev->lock);
 
   return ret;
 }
