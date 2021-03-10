@@ -234,11 +234,11 @@ static GList *gst_droidcamsrc_photography_create_list (const gchar * params,
   int x;								\
   int len = g_list_length (table);					\
   if (len == 0) {							\
-    GST_WARNING_OBJECT (src, "params for %s not yet available. not applying value %d yet", droid, val); \
+    GST_WARNING_OBJECT (src, "params for %s not yet available. deferred applying value %d", droid, val); \
     GST_OBJECT_LOCK (src);						\
     src->photo->settings.memb = val;					\
     GST_OBJECT_UNLOCK (src);						\
-    return FALSE;							\
+    return TRUE;							\
   }									\
 									\
   const gchar *value = NULL;						\
@@ -1243,11 +1243,12 @@ gst_droidcamsrc_set_iso_speed (GstDroidCamSrc * src, guint iso_speed)
 
   if (len == 0 || src->photo->iso_key == NULL) {
     GST_DEBUG_OBJECT (src,
-        "params not yet fetched. not applying iso speed yet");
+        "params for iso speed not yet available. deferred applying value %u",
+        iso_speed);
     GST_OBJECT_LOCK (src);
     src->photo->settings.iso_speed = iso_speed;
     GST_OBJECT_UNLOCK (src);
-    return FALSE;
+    return TRUE;
   }
 
   for (x = 0; x < len; x++) {
@@ -1365,11 +1366,12 @@ gst_droidcamsrc_set_focus_mode (GstDroidCamSrc
 
   if (len == 0) {
     GST_DEBUG_OBJECT (src,
-        "params not yet fetched. not applying focus mode yet");
+        "params for focus mode not yet available. deferred applying value %d",
+        focus_mode);
     GST_OBJECT_LOCK (src);
     src->photo->settings.focus_mode = focus_mode;
     GST_OBJECT_UNLOCK (src);
-    return FALSE;
+    return TRUE;
   }
 
   const gchar *value = NULL;
