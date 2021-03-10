@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
  * Copyright (C) 2015-2016 Jolla LTD.
+ * Copyright (C) 2020 UBports Foundation.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -56,6 +57,10 @@ struct _GstDroidCamSrcDev
   DroidMediaCameraConstants c;
   GstVideoFormat viewfinder_format;
 
+  GstBuffer *last_preview_buffer;
+  GMutex last_preview_buffer_lock;
+  GCond last_preview_buffer_cond;
+
   gboolean use_recorder;
   GstDroidCamSrcRecorder *recorder;
 };
@@ -94,6 +99,8 @@ void gst_droidcamsrc_dev_send_command (GstDroidCamSrcDev * dev, gint cmd, gint a
 gboolean gst_droidcamsrc_dev_is_running (GstDroidCamSrcDev * dev);
 
 void gst_droidcamsrc_dev_queue_video_buffer (GstDroidCamSrcDev * dev, GstBuffer * buffer);
+
+void gst_droidcamsrc_dev_update_preview_callback_flag (GstDroidCamSrcDev * dev);
 
 G_END_DECLS
 

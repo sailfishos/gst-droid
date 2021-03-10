@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
  * Copyright (C) 2015-2016 Jolla LTD.
+ * Copyright (C) 2010 Texas Instruments, Inc
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -117,6 +118,7 @@ static guint droidcamsrc_signals[LAST_SIGNAL];
 #define DEFAULT_SENSOR_ORIENTATION     0
 #define DEFAULT_IMAGE_MODE             GST_DROIDCAMSRC_IMAGE_MODE_NORMAL
 #define DEFAULT_TARGET_BITRATE         12000000
+#define DEFAULT_POST_PREVIEW           FALSE
 
 static GstDroidCamSrcPad *
 gst_droidcamsrc_create_pad (GstDroidCamSrc * src,
@@ -206,6 +208,12 @@ gst_droidcamsrc_init (GstDroidCamSrc * src)
   src->image = gst_droidcamsrc_mode_new_image (src);
   src->video = gst_droidcamsrc_mode_new_video (src);
   src->active_mode = NULL;
+
+  src->post_preview = DEFAULT_POST_PREVIEW;
+  src->preview_caps = NULL;
+  src->preview_filter = NULL;
+  src->preview_pipeline =
+      gst_camerabin_create_preview_pipeline (GST_ELEMENT_CAST (src), NULL);
 
   GST_OBJECT_FLAG_SET (src, GST_ELEMENT_FLAG_SOURCE);
 }
@@ -308,6 +316,20 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
       g_value_set_int (value, src->target_bitrate);
       break;
 
+    case PROP_POST_PREVIEW:
+      g_value_set_boolean (value, src->post_preview);
+      break;
+
+    case PROP_PREVIEW_CAPS:
+      if (src->preview_caps)
+        gst_value_set_caps (value, src->preview_caps);
+      break;
+
+    case PROP_PREVIEW_FILTER:
+      if (src->preview_filter)
+        g_value_set_object (value, src->preview_filter);
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -406,6 +428,53 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
       src->target_bitrate = g_value_get_int (value);
       break;
 
+    case PROP_POST_PREVIEW:
+      src->post_preview = g_value_get_boolean (value);
+
+      if (src->dev) {
+        gst_droidcamsrc_dev_update_preview_callback_flag (src->dev);
+      }
+
+      break;
+
+    case PROP_PREVIEW_CAPS:{
+      GstCaps *new_caps;
+
+      new_caps = (GstCaps *) gst_value_get_caps (value);
+      if (new_caps == NULL) {
+        new_caps = gst_caps_new_any ();
+      } else {
+        new_caps = gst_caps_ref (new_caps);
+      }
+
+      if (!gst_caps_is_equal (src->preview_caps, new_caps)) {
+        gst_caps_replace (&src->preview_caps, new_caps);
+
+        if (src->preview_pipeline) {
+          GST_DEBUG_OBJECT (src,
+              "Setting preview pipeline caps %" GST_PTR_FORMAT,
+              src->preview_caps);
+          gst_camerabin_preview_set_caps (src->preview_pipeline,
+              src->preview_caps);
+        }
+      } else {
+        GST_DEBUG_OBJECT (src, "New preview caps equal current preview caps");
+      }
+      gst_caps_unref (new_caps);
+    }
+      break;
+
+    case PROP_PREVIEW_FILTER:
+      if (src->preview_filter)
+        gst_object_unref (src->preview_filter);
+      src->preview_filter = g_value_dup_object (value);
+      if (!gst_camerabin_preview_set_filter (src->preview_pipeline,
+              src->preview_filter)) {
+        GST_WARNING_OBJECT (src,
+            "Cannot change preview filter, is element in NULL state?");
+      }
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -435,6 +504,15 @@ gst_droidcamsrc_finalize (GObject * object)
   gst_droidcamsrc_quirks_destroy (src->quirks);
 
   g_rec_mutex_clear (&src->dev_lock);
+
+  if (src->preview_pipeline) {
+    gst_camerabin_destroy_preview_pipeline (src->preview_pipeline);
+    src->preview_pipeline = NULL;
+  }
+
+  if (src->preview_caps) {
+    gst_caps_replace (&src->preview_caps, NULL);
+  }
 
   G_OBJECT_CLASS (parent_class)->finalize (object);
 }
@@ -520,6 +598,19 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         break;
       }
 
+      if (src->preview_pipeline == NULL) {
+        /* failed to create preview pipeline, fail state change */
+        ret = GST_STATE_CHANGE_FAILURE;
+      }
+
+      if (src->preview_caps) {
+        GST_DEBUG_OBJECT (src,
+            "Setting preview pipeline caps %" GST_PTR_FORMAT,
+            src->preview_caps);
+        gst_camerabin_preview_set_caps (src->preview_pipeline,
+            src->preview_caps);
+      }
+
       src->dev =
           gst_droidcamsrc_dev_new (src->vfsrc, src->imgsrc,
           src->vidsrc, &src->dev_lock);
@@ -582,6 +673,11 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 
       /* Now add the needed orientation tag */
       gst_droidcamsrc_add_vfsrc_orientation_tag (src);
+
+      /* without this the preview pipeline will not post buffer
+       * messages on the pipeline */
+      gst_element_set_state (src->preview_pipeline->pipeline,
+          GST_STATE_PLAYING);
     }
 
       break;
@@ -654,6 +750,8 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
     case GST_STATE_CHANGE_PAUSED_TO_READY:
       gst_droidcamsrc_dev_deinit (src->dev);
       gst_droidcamsrc_dev_close (src->dev);
+
+      gst_element_set_state (src->preview_pipeline->pipeline, GST_STATE_READY);
       break;
 
     case GST_STATE_CHANGE_READY_TO_NULL:
@@ -662,6 +760,8 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 
       g_free (src->info);
       src->info = NULL;
+
+      gst_element_set_state (src->preview_pipeline->pipeline, GST_STATE_NULL);
       break;
 
     default:
@@ -1073,6 +1173,22 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
       g_param_spec_variant ("supported-iso-speeds", "Supported ISO speeds",
           "Supported ISO speeds", G_VARIANT_TYPE_VARIANT, NULL,
           G_PARAM_READABLE));
+
+  /* camerabin interface */
+  g_object_class_install_property (gobject_class, PROP_POST_PREVIEW,
+      g_param_spec_boolean ("post-previews", "Post Previews",
+          "If capture preview images should be posted to the bus",
+          DEFAULT_POST_PREVIEW, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_PREVIEW_CAPS,
+      g_param_spec_boxed ("preview-caps", "Preview caps",
+          "The caps of the preview image to be posted (NULL means ANY)",
+          GST_TYPE_CAPS, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_PREVIEW_FILTER,
+      g_param_spec_object ("preview-filter", "Preview filter",
+          "A custom preview filter to process preview image data",
+          GST_TYPE_ELEMENT, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   gst_droidcamsrc_photography_add_overrides (gobject_class);
 
@@ -2475,4 +2591,15 @@ gst_droidcamsrc_get_video_caps_locked (GstDroidCamSrc * src)
   GST_DEBUG_OBJECT (src, "video caps %" GST_PTR_FORMAT, caps);
 
   return caps;
+}
+
+void
+gst_droidcamsrc_post_preview (GstDroidCamSrc * src, GstSample * sample)
+{
+  if (src->post_preview) {
+    gst_camerabin_preview_pipeline_post (src->preview_pipeline, sample);
+  } else {
+    GST_DEBUG_OBJECT (src, "Previews not enabled, not posting");
+    gst_sample_unref (sample);
+  }
 }

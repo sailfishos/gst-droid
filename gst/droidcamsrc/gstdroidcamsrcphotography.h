@@ -77,7 +77,12 @@ typedef enum
   PROP_MIN_EXPOSURE_TIME,
   PROP_MAX_EXPOSURE_TIME,
   PROP_NOISE_REDUCTION,
-  PROP_EXPOSURE_MODE
+  PROP_EXPOSURE_MODE,
+
+  /* camerabin interface */
+  PROP_POST_PREVIEW,
+  PROP_PREVIEW_CAPS,
+  PROP_PREVIEW_FILTER
 } GstDroidCamSrcProperties;
 
 void gst_droidcamsrc_photography_register (gpointer g_iface,  gpointer iface_data);

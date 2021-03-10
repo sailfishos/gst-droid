@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
  * Copyright (C) 2015-2016 Jolla LTD.
+ * Copyright (C) 2020 UBports Foundation.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -50,6 +51,7 @@ struct _GstDroidCamSrcImageCaptureState
 {
   gboolean image_preview_sent;
   gboolean image_start_sent;
+  gboolean preview_image_requested;
 };
 
 struct _GstDroidCamSrcVideoCaptureState
@@ -81,6 +83,7 @@ static gboolean
 gst_droidcamsrc_dev_start_video_recording_raw_locked (GstDroidCamSrcDev * dev);
 static void gst_droidcamsrc_dev_queue_video_buffer_locked (GstDroidCamSrcDev *
     dev, GstBuffer * buffer);
+static void gst_droidcamsrc_dev_post_preview (GstDroidCamSrcDev * dev);
 
 static void
 gst_droidcamsrc_dev_shutter_callback (void *user)
@@ -96,6 +99,11 @@ gst_droidcamsrc_dev_shutter_callback (void *user)
     gst_droidcamsrc_post_message (src,
         gst_structure_new_empty (GST_DROIDCAMSRC_CAPTURE_START));
     dev->img->image_start_sent = TRUE;
+  }
+
+  if (dev->img->preview_image_requested) {
+    gst_droidcamsrc_dev_post_preview (dev);
+    dev->img->preview_image_requested = FALSE;
   }
 
   g_rec_mutex_unlock (dev->lock);
@@ -280,16 +288,6 @@ gst_droidcamsrc_dev_preview_frame_callback (void *user,
 
   GST_DEBUG_OBJECT (src, "dev preview frame callback");
 
-  /* We are accessing this without a lock because:
-   * 1) We should not be called while preview is stopped and this is when we manipulate this flag
-   * 2) We can get called when we start the preview and we will deadlock because the lock is already held
-   */
-  if (!dev->use_raw_data) {
-    GST_WARNING_OBJECT (src,
-        "preview frame callback called while not when we do not expect it");
-    return;
-  }
-
   buffer = gst_buffer_new_allocate (NULL, mem->size, NULL);
   gst_buffer_fill (buffer, 0, mem->data, mem->size);
 
@@ -303,10 +301,23 @@ gst_droidcamsrc_dev_preview_frame_callback (void *user,
 
   gst_droidcamsrc_dev_prepare_buffer (dev, buffer, rect, &video_info);
 
-  g_mutex_lock (&pad->lock);
-  g_queue_push_tail (pad->queue, buffer);
-  g_cond_signal (&pad->cond);
-  g_mutex_unlock (&pad->lock);
+  g_mutex_lock (&dev->last_preview_buffer_lock);
+  gst_buffer_replace (&dev->last_preview_buffer, buffer);
+  g_cond_signal (&dev->last_preview_buffer_cond);
+  g_mutex_unlock (&dev->last_preview_buffer_lock);
+
+  /* We are accessing dev->use_raw_data without a lock because:
+   * 1) We should not be called while preview is stopped and this is when we manipulate this flag
+   * 2) We can get called when we start the preview and we will deadlock because the lock is already held
+   */
+  if (dev->use_raw_data) {
+    g_mutex_lock (&pad->lock);
+    g_queue_push_tail (pad->queue, buffer);
+    g_cond_signal (&pad->cond);
+    g_mutex_unlock (&pad->lock);
+  } else {
+    gst_buffer_unref (buffer);
+  }
 }
 
 static void
@@ -537,6 +548,11 @@ gst_droidcamsrc_dev_new (GstDroidCamSrcPad * vfsrc,
   dev->lock = lock;
 
   dev->pool = NULL;
+
+  dev->last_preview_buffer = NULL;
+  g_mutex_init (&dev->last_preview_buffer_lock);
+  g_cond_init (&dev->last_preview_buffer_cond);
+
   dev->use_recorder = FALSE;
   dev->recorder = gst_droidcamsrc_recorder_create (vidsrc);
 
@@ -648,9 +664,14 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
 
   gst_droidcamsrc_recorder_destroy (dev->recorder);
 
+  gst_buffer_replace (&dev->last_preview_buffer, NULL);
+  g_mutex_clear (&dev->last_preview_buffer_lock);
+  g_cond_clear (&dev->last_preview_buffer_cond);
+
   g_slice_free (GstDroidCamSrcImageCaptureState, dev->img);
   g_slice_free (GstDroidCamSrcVideoCaptureState, dev->vid);
   g_slice_free (GstDroidCamSrcDev, dev);
+
   dev = NULL;
 }
 
@@ -748,22 +769,15 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
     goto out;
   }
 
-  if (dev->use_raw_data) {
-    GST_INFO_OBJECT (src, "Using raw data mode");
-    droid_media_camera_set_preview_callback_flags (dev->cam,
-        dev->c.CAMERA_FRAME_CALLBACK_FLAG_CAMERA);
-  } else {
-    GST_INFO_OBJECT (src, "Using native buffers mode");
-    droid_media_camera_set_preview_callback_flags (dev->cam,
-        dev->c.CAMERA_FRAME_CALLBACK_FLAG_NOOP);
-  }
-
   if (!droid_media_camera_start_preview (dev->cam)) {
     GST_ERROR_OBJECT (src, "error starting preview");
     goto out;
   }
 
   dev->running = TRUE;
+
+  /* Flag update is done here because the function checks for dev->running. */
+  gst_droidcamsrc_dev_update_preview_callback_flag (dev);
 
   ret = TRUE;
 
@@ -847,16 +861,42 @@ out:
 gboolean
 gst_droidcamsrc_dev_capture_image (GstDroidCamSrcDev * dev)
 {
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+
   gboolean ret = FALSE;
   int msg_type = dev->c.CAMERA_MSG_SHUTTER | dev->c.CAMERA_MSG_RAW_IMAGE
       | dev->c.CAMERA_MSG_POSTVIEW_FRAME | dev->c.CAMERA_MSG_COMPRESSED_IMAGE;
 
   GST_DEBUG ("dev capture image");
 
+  if (src->post_preview) {
+    /*
+     * We must ensure that at least 1 preview buffer exists before proceed.
+     * After take_picture() is called, we might not get additional buffer.
+     */
+
+    g_mutex_lock (&dev->last_preview_buffer_lock);
+
+    gint64 end_time = g_get_monotonic_time () + (1 * G_TIME_SPAN_SECOND);
+    while (!dev->last_preview_buffer) {
+      if (!g_cond_wait_until (&dev->last_preview_buffer_cond,
+              &dev->last_preview_buffer_lock, end_time)) {
+        GST_ERROR
+            ("dev post_preview requested but no preview buffer available.");
+        g_mutex_unlock (&dev->last_preview_buffer_lock);
+        return FALSE;           /* Because dev->lock has not been held yet. */
+      }
+    }
+
+    g_mutex_unlock (&dev->last_preview_buffer_lock);
+  }
+
   g_rec_mutex_lock (dev->lock);
 
   dev->img->image_preview_sent = FALSE;
   dev->img->image_start_sent = FALSE;
+
+  dev->img->preview_image_requested = src->post_preview;
 
   if (!droid_media_camera_take_picture (dev->cam, msg_type)) {
     GST_ERROR ("error capturing image");
@@ -877,6 +917,28 @@ gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
   gboolean ret = FALSE;
 
   GST_DEBUG ("dev start video recording");
+
+  if (src->post_preview) {
+    /*
+     * We must ensure that at least 1 preview buffer exists before proceed.
+     * After recording is started, we will not get additional buffer.
+     */
+
+    g_mutex_lock (&dev->last_preview_buffer_lock);
+
+    gint64 end_time = g_get_monotonic_time () + (1 * G_TIME_SPAN_SECOND);
+    while (!dev->last_preview_buffer) {
+      if (!g_cond_wait_until (&dev->last_preview_buffer_cond,
+              &dev->last_preview_buffer_lock, end_time)) {
+        GST_ERROR
+            ("dev post_preview requested but no preview buffer available.");
+        g_mutex_unlock (&dev->last_preview_buffer_lock);
+        return FALSE;
+      }
+    }
+
+    g_mutex_unlock (&dev->last_preview_buffer_lock);
+  }
 
   g_mutex_lock (&dev->vidsrc->lock);
   dev->vidsrc->pushed_buffers = 0;
@@ -906,6 +968,10 @@ gst_droidcamsrc_dev_start_video_recording (GstDroidCamSrcDev * dev)
     goto out;
 
   ret = TRUE;
+
+  /* Send the preview image out if requested. */
+  if (src->post_preview)
+    gst_droidcamsrc_dev_post_preview (dev);
 
 out:
   gst_buffer_pool_set_flushing (dev->pool, FALSE);
@@ -1248,4 +1314,73 @@ gst_droidcamsrc_dev_queue_video_buffer_locked (GstDroidCamSrcDev * dev,
 
   /* in case stop_video_recording() is waiting for us */
   g_cond_signal (&dev->vid->cond);
+}
+
+void
+gst_droidcamsrc_dev_update_preview_callback_flag (GstDroidCamSrcDev * dev)
+{
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+
+  gboolean use_preview_callback;
+
+  g_rec_mutex_lock (dev->lock);
+
+  if (!dev->running) {
+    GST_INFO_OBJECT (src, "preview is not running, defering flag update");
+    goto out;
+  }
+
+  if (dev->use_raw_data) {
+    GST_INFO_OBJECT (src, "preview use raw data mode");
+    use_preview_callback = TRUE;
+  } else if (src->post_preview) {
+    GST_INFO_OBJECT (src, "post_preview enabled, preview buffer required");
+    use_preview_callback = TRUE;
+  } else {
+    GST_INFO_OBJECT (src, "preview callback disabled");
+    use_preview_callback = FALSE;
+  }
+
+  if (use_preview_callback) {
+    droid_media_camera_set_preview_callback_flags (dev->cam,
+        dev->c.CAMERA_FRAME_CALLBACK_FLAG_CAMERA);
+  } else {
+    droid_media_camera_set_preview_callback_flags (dev->cam,
+        dev->c.CAMERA_FRAME_CALLBACK_FLAG_NOOP);
+  }
+
+out:
+  g_rec_mutex_unlock (dev->lock);
+}
+
+static void
+gst_droidcamsrc_dev_post_preview (GstDroidCamSrcDev * dev)
+{
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+
+  GST_DEBUG ("post preview image from last viewfinder buffer");
+
+  /*
+   * Because we've ensured that dev->last_preview_buffer exists before we
+   * start and we never remove it, we can be sure that it should exists here
+   * too.
+   */
+  g_mutex_lock (&dev->last_preview_buffer_lock);
+  GstBuffer *buffer = gst_buffer_ref (dev->last_preview_buffer);
+  g_mutex_unlock (&dev->last_preview_buffer_lock);
+
+  GstVideoMeta *video_meta = gst_buffer_get_video_meta (buffer);
+  g_assert (video_meta != NULL);        // Because we added it in _prepare_buffer
+
+  GstVideoInfo video_info;
+  gst_video_info_set_format (&video_info, video_meta->format,
+      video_meta->width, video_meta->height);
+  GstCaps *caps = gst_video_info_to_caps (&video_info);
+
+  GstSample *sample = gst_sample_new (buffer, caps, NULL, NULL);
+
+  gst_buffer_unref (buffer);
+  gst_caps_unref (caps);
+
+  gst_droidcamsrc_post_preview (src, sample);
 }

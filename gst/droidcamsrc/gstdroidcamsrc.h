@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
  * Copyright (C) 2016 Jolla LTD.
+ * Copyright (C) 2010 Texas Instruments, Inc
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -121,6 +122,12 @@ struct _GstDroidCamSrc
 
   gint32 target_bitrate;
 
+  /* camerabin interface */
+  gboolean post_preview;
+  GstCaps *preview_caps;
+  GstElement *preview_filter;
+  GstCameraBinPreviewPipelineData *preview_pipeline;
+
   /* protected with OBJECT_LOCK */
   gint width;
   gint height;
@@ -145,6 +152,8 @@ void gst_droidcamsrc_timestamp (GstDroidCamSrc * src, GstBuffer * buffer);
 gboolean gst_droidcamsrc_apply_params (GstDroidCamSrc * src);
 void gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src, GstDroidCamSrcApplyType type);
 void gst_droidcamsrc_update_max_zoom (GstDroidCamSrc * src);
+
+void gst_droidcamsrc_post_preview (GstDroidCamSrc * src, GstSample * sample);
 
 G_END_DECLS
 
