@@ -1,8 +1,8 @@
 /*
  * gst-droid
  *
- * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
- * Copyright (C) 2015 Jolla LTD.
+ * Copyright (C) 2014 Mohammed Sameer
+ * Copyright (C) 2015-2021 Jolla Ltd.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -439,12 +439,12 @@ gst_droidvdec_convert_buffer (GstDroidVDec * dec,
 
   if (dec->codec_type->quirks & USE_CODEC_SUPPLIED_WIDTH_VALUE) {
     width = dec->codec_reported_width;
-    GST_INFO_OBJECT (dec, "using codec supplied width %d", width);
+    GST_INFO_OBJECT (dec, "using codec supplied width %"G_GSIZE_FORMAT, width);
   }
 
   if (dec->codec_type->quirks & USE_CODEC_SUPPLIED_HEIGHT_VALUE) {
     height = dec->codec_reported_height;
-    GST_INFO_OBJECT (dec, "using codec supplied height %d", height);
+    GST_INFO_OBJECT (dec, "using codec supplied height %"G_GSIZE_FORMAT, height);
   }
 
   if (!dec->convert_to_i420) {

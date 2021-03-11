@@ -1,8 +1,8 @@
 /*
  * gst-droid
  *
- * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
- * Copyright (C) 2015 Jolla LTD.
+ * Copyright (C) 2014 Mohammed Sameer
+ * Copyright (C) 2015-2021 Jolla Ltd.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -133,7 +133,7 @@ gst_droidadec_data_available (void *data, DroidMediaCodecData * encoded)
   GstBuffer *out;
   GstMapInfo info;
 
-  GST_DEBUG_OBJECT (dec, "data available of size %d", encoded->data.size);
+  GST_DEBUG_OBJECT (dec, "data available of size %"G_GSSIZE_FORMAT, encoded->data.size);
 
   GST_AUDIO_DECODER_STREAM_LOCK (decoder);
 
@@ -191,7 +191,7 @@ gst_droidadec_data_available (void *data, DroidMediaCodecData * encoded)
   }
 
 push:
-  GST_DEBUG_OBJECT (dec, "pushing %d bytes out", gst_buffer_get_size (out));
+  GST_DEBUG_OBJECT (dec, "pushing %"G_GSIZE_FORMAT" bytes out", gst_buffer_get_size (out));
 
   flow_ret = gst_audio_decoder_finish_frame (decoder, out, 1);
 
@@ -545,7 +545,7 @@ gst_droidadec_handle_frame (GstAudioDecoder * decoder, GstBuffer * buffer)
   cb.unref = g_free;
   cb.data = data.data.data;
 
-  GST_DEBUG_OBJECT (dec, "decoding data of size %d (%d)",
+  GST_DEBUG_OBJECT (dec, "decoding data of size %"G_GSIZE_FORMAT" (%"G_GSSIZE_FORMAT")",
       gst_buffer_get_size (buffer), data.data.size);
 
   /*

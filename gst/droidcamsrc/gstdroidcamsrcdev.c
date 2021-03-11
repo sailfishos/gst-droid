@@ -1,8 +1,8 @@
 /*
  * gst-droid
  *
- * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
- * Copyright (C) 2015-2016 Jolla LTD.
+ * Copyright (C) 2014 Mohammed Sameer
+ * Copyright (C) 2015-2021 Jolla Ltd.
  * Copyright (C) 2020 UBports Foundation.
  *
  * This library is free software; you can redistribute it and/or
@@ -381,7 +381,7 @@ gst_droidcamsrc_dev_preview_metadata_callback (void *user,
 
   GST_DEBUG_OBJECT (src, "dev preview metadata callback");
 
-  GST_INFO_OBJECT (src, "camera detected %d faces", num_faces);
+  GST_INFO_OBJECT (src, "camera detected %"G_GSIZE_FORMAT" faces", num_faces);
 
   GST_OBJECT_LOCK (src);
   width = src->width;

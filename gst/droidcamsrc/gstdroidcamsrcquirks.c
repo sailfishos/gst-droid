@@ -1,7 +1,8 @@
 /*
  * gst-droid
  *
- * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2014 Mohammed Sameer
+ * Copyright (C) 2015-2021 Jolla Ltd.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -332,7 +333,7 @@ gst_droidcamsrc_quirks_apply_quirk (GstDroidCamSrcQuirks * quirks,
   }
 }
 
-G_INLINE_FUNC gint
+static inline gint
 _find_quirk (gconstpointer a, gconstpointer b)
 {
   /* a can be NULL */

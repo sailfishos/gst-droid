@@ -1,8 +1,8 @@
 /*
  * gst-droid
  *
- * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
- * Copyright (C) 2015 Jolla LTD.
+ * Copyright (C) 2014 Mohammed Sameer
+ * Copyright (C) 2015-2021 Jolla Ltd.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -494,7 +494,7 @@ gst_droidcamsrc_params_choose_image_framerate (GstDroidCamSrcParams * params,
     gst_caps_unref (c);
 
     /* the fps we have is valid. Select it if higher than our current target, or wider */
-    if (max > target_max || max == target_max && min < target_min) {
+    if (max > target_max || (max == target_max && min < target_min)) {
       target_min = min;
       target_max = max;
     }
@@ -545,7 +545,7 @@ gst_droidcamsrc_params_choose_video_framerate (GstDroidCamSrcParams * params,
     gst_caps_unref (c);
 
     /* the fps we have is valid. Select it if higher than our current target, or narrower */
-    if (max > target_max || max == target_max && min > target_min) {
+    if (max > target_max || (max == target_max && min > target_min)) {
       target_min = min;
       target_max = max;
     }

@@ -1,8 +1,8 @@
 /*
  * gst-droid
  *
- * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
- * Copyright (C) 2015-2016 Jolla LTD.
+ * Copyright (C) 2014 Mohammed Sameer
+ * Copyright (C) 2015-2021 Jolla Ltd.
  * Copyright (C) 2010 Texas Instruments, Inc
  *
  * This library is free software; you can redistribute it and/or
@@ -957,6 +957,14 @@ gst_droidcamsrc_send_event (GstElement * element, GstEvent * event)
     case GST_EVENT_SINK_MESSAGE:
     case GST_EVENT_QOS:
     case GST_EVENT_UNKNOWN:
+    case GST_EVENT_STREAM_COLLECTION:
+    case GST_EVENT_STREAM_GROUP_DONE:
+    case GST_EVENT_PROTECTION:
+    case GST_EVENT_SELECT_STREAMS:
+#if GST_CHECK_VERSION(1,18,0)
+    case GST_EVENT_INSTANT_RATE_CHANGE:
+    case GST_EVENT_INSTANT_RATE_SYNC_TIME:
+#endif
       break;
 
     case GST_EVENT_CUSTOM_UPSTREAM:
@@ -998,6 +1006,8 @@ gst_droidcamsrc_send_event (GstElement * element, GstEvent * event)
       res = gst_pad_push_event (src->vfsrc->pad, event);
       event = NULL;
       res = TRUE;
+      break;
+    default:
       break;
   }
 
@@ -1125,7 +1135,7 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
   g_object_class_install_property (gobject_class, PROP_DEVICE_PARAMETERS,
       g_param_spec_pointer ("device-parameters", "Device parameters",
           "The GHash table of the GstDroidCamSrcParams struct currently used",
-          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS | G_PARAM_PRIVATE));
+          G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_IMAGE_MODE,
       g_param_spec_flags ("image-mode", "Image mode",
@@ -1448,6 +1458,14 @@ gst_droidcamsrc_pad_event (GstPad * pad, GstObject * parent, GstEvent * event)
     case GST_EVENT_CUSTOM_BOTH:
     case GST_EVENT_CUSTOM_BOTH_OOB:
     case GST_EVENT_UNKNOWN:
+    case GST_EVENT_STREAM_COLLECTION:
+    case GST_EVENT_STREAM_GROUP_DONE:
+    case GST_EVENT_PROTECTION:
+    case GST_EVENT_SELECT_STREAMS:
+#if GST_CHECK_VERSION(1,18,0)
+    case GST_EVENT_INSTANT_RATE_CHANGE:
+    case GST_EVENT_INSTANT_RATE_SYNC_TIME:
+#endif
       ret = FALSE;
       break;
 
@@ -1519,6 +1537,9 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
     case GST_QUERY_UNKNOWN:
     case GST_QUERY_ALLOCATION:
     case GST_QUERY_SEGMENT:
+#if GST_CHECK_VERSION(1,16,0)
+    case GST_QUERY_BITRATE:
+#endif
       ret = FALSE;
       break;
 
@@ -2548,11 +2569,12 @@ gst_droidcamsrc_get_video_caps_locked (GstDroidCamSrc * src)
   };
 
   gboolean __map (GstCapsFeatures * features,
-      GstStructure * structure, struct Data *data)
+      GstStructure * structure, gpointer data_param)
   {
 
     /* Given structure from template caps, we need to transform Data::encoded */
     int i;
+    struct Data *data = data_param;
     GstStructure *s = gst_structure_copy (data->encoded);
     for (i = 0; i < gst_structure_n_fields (structure); i++) {
       const gchar *field = gst_structure_nth_field_name (structure, i);

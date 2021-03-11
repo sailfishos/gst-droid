@@ -1,7 +1,8 @@
 /*
  * gst-droid
  *
- * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2014 Mohammed Sameer
+ * Copyright (C) 2015-2021 Jolla Ltd.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -105,7 +106,7 @@ GstTagList *
 gst_droidcamsrc_exif_tags_from_jpeg_data (void *data, size_t size)
 {
   GstTagList *tags = NULL;
-  ExifMem *mem = exif_mem_new (g_malloc0, g_realloc, g_free);
+  ExifMem *mem = exif_mem_new ((ExifMemAllocFunc)g_malloc0, (ExifMemReallocFunc)g_realloc, g_free);
   ExifData *exif = exif_data_new_mem (mem);
   unsigned char *exif_data = NULL;
   void *_exif_data = NULL;

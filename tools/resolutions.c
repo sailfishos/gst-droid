@@ -1,7 +1,7 @@
 /*
  * gst-droid
  *
- * Copyright (C) 2016 Jolla LTD.
+ * Copyright (C) 2016-2021 Jolla Ltd.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -22,18 +22,26 @@
 #include <math.h>
 #include <float.h>
 
+int dev = 0;
+
 struct Ratio
 {
   gfloat value;
   const char *name;
 } Ratios[] = {
   {
+  0.75, "3:4"}, {
+  1.0, "1:1"}, {
+  1.2222222222f, "11:9"}, {
   1.3333333333f, "4:3"}, {
   1.7777777778f, "16:9"}, {
   1.5, "3:2"}, {
-  1.6666666667f, "16:10"},
-      /* What are those? */
-      /*  {1.8, "9:5"}, */
+  1.6666666667f, "16:10"}, {
+  1.8, "9:5"}, {
+  2.3333333333f, "21:9"}, {
+  2.6666666667f, "16:6"}, {
+  3.2, "16:5"}, {
+  3.5555555556f, "32:9"},
 };
 
 void
@@ -94,17 +102,6 @@ dump_resolution (GstStructure * s)
 
 
   return TRUE;
-
-  /*
-     gint w = 0, h = 0;
-     if (!gst_structure_get_int(s, "width", &w) ||
-     !gst_structure_get_int(s, "height", &h)) {
-     ret = FALSE;
-     goto out;
-     }
-
-     g_print("%ix%i\n", w, h);
-   */
 }
 
 gboolean
@@ -122,7 +119,7 @@ dump_pad (GstElement * src, const gchar * pad_name, const gchar * name)
     goto out;
   }
 
-  g_print (name, pad_name);
+  g_print (name, dev, pad_name);
 
   int x;
   for (x = 0; x < gst_caps_get_size (caps); x++) {
@@ -171,8 +168,19 @@ dump (Device dev, const char *name, gboolean deinit)
 int
 main (int argc, char *argv[])
 {
-  if (!dump (PRIMARY, "primary %s:\n", FALSE) ||
-      !dump (SECONDARY, "secondary %s:\n", TRUE)) {
+  if (argc != 2) {
+    g_print ("usage: %s <camera device>\n"
+        " Examples:\n"
+        "  For primary camera\n"
+        "   %s 0\n"
+        "  For secondary camera\n"
+        "   %s 1\n",
+        argv[0], argv[0], argv[0]);
+    return 0;
+  }
+
+  dev = atoi (argv[1]);
+  if (!dump (dev, "camera %d %s:\n", FALSE)) {
     return 1;
   }
 

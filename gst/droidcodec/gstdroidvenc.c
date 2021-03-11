@@ -1,8 +1,8 @@
 /*
  * gst-droid
  *
- * Copyright (C) 2014-2015 Mohammed Sameer <msameer@foolab.org>
- * Copyright (C) 2015 Jolla LTD.
+ * Copyright (C) 2014-2015 Mohammed Sameer
+ * Copyright (C) 2015-2021 Jolla Ltd.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -505,7 +505,7 @@ static GstFlowReturn
 gst_droidvenc_finish (GstVideoEncoder * encoder)
 {
   GstDroidVEnc *enc = GST_DROIDVENC (encoder);
-  GTimeVal tv;
+  gint64 tv;
 
   GST_DEBUG_OBJECT (enc, "finish");
 
@@ -518,14 +518,14 @@ gst_droidvenc_finish (GstVideoEncoder * encoder)
     goto out;
   }
 
-  g_get_current_time (&tv);
-  g_time_val_add (&tv, G_USEC_PER_SEC * GST_DROIDVENC_EOS_TIMEOUT_SEC);
+  tv = g_get_real_time ();
+  tv += G_USEC_PER_SEC * GST_DROIDVENC_EOS_TIMEOUT_SEC;
 
   /* release the lock to allow _frame_available () to do its job */
   GST_VIDEO_ENCODER_STREAM_UNLOCK (encoder);
   /* Now we wait for the codec to signal EOS. We cannot wait forever because sometimes
    * we never hear anything from the video encoders. */
-  if (!g_cond_timed_wait (&enc->eos_cond, &enc->eos_lock, &tv)) {
+  if (!g_cond_wait_until (&enc->eos_cond, &enc->eos_lock, tv)) {
     GST_WARNING_OBJECT (enc, "timeout waiting for eos");
   }
 

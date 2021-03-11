@@ -18,9 +18,7 @@ BuildRequires:  pkgconfig(gstreamer-plugins-bad-1.0)
 BuildRequires:  pkgconfig(gstreamer-tag-1.0)
 BuildRequires:  pkgconfig(nemo-gstreamer-interfaces-1.0) >= 0.20200421.0
 BuildRequires:  pkgconfig(libexif)
-BuildRequires:  automake
-BuildRequires:  libtool
-BuildRequires:  gettext
+BuildRequires:  meson
 BuildRequires:  droidmedia-devel >= 0.20200421.0
 BuildRequires:  pkgconfig(libandroid-properties)
 Requires:       droidmedia >= 0.20200421.0
@@ -46,12 +44,11 @@ Requires:  %{gstreamer}%{majorminor}-droid = %{version}-%{release}
 %setup -q
 
 %build
-NOCONFIGURE=1 ./autogen.sh
-%configure --disable-static --prefix=%_prefix --sysconfdir=%{_sysconfdir}
-make %{?jobs:-j%jobs}
+%meson
+%meson_build
 
 %install
-%make_install
+%meson_install
 
 # Clean out files that should not be part of the rpm.
 rm -rf $RPM_BUILD_ROOT%{_sysconfdir}/gst-droid
@@ -73,6 +70,5 @@ rm -rf $RPM_BUILD_ROOT%{_sysconfdir}/gst-droid
 
 %files tools
 %defattr(-,root,root,-)
-%{_bindir}/mk-cam-conf
-%{_bindir}/record-video
+%{_bindir}/dump-camera-parameters
 %{_bindir}/dump-resolutions

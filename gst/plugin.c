@@ -1,7 +1,8 @@
 /*
  * gst-droid
  *
- * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
+ * Copyright (C) 2014 Mohammed Sameer
+ * Copyright (C) 2020-2021 Jolla Ltd.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -97,4 +98,4 @@ GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
     droid,
     "Android HAL plugins",
-    plugin_init, VERSION, "LGPL", PACKAGE_NAME, "http://foolab.org/")
+    plugin_init, VERSION, "LGPL", PACKAGE_NAME, "http://sailfishos.org/")

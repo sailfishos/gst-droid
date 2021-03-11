@@ -1,7 +1,7 @@
 /*
  * gst-droid
  *
- * Copyright (C) 2015 Jolla LTD.
+ * Copyright (C) 2015-2021 Jolla Ltd.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -49,7 +49,7 @@ gst_droid_query_set_video_color_format (GstQuery * query, gint format)
 gboolean
 gst_droid_query_parse_video_color_format (GstQuery * query, gint * format)
 {
-  GstStructure *structure;
+  const GstStructure *structure;
 
   structure = gst_query_get_structure (query);
 

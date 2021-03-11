@@ -1,8 +1,8 @@
 /*
  * gst-droid
  *
- * Copyright (C) 2014-2015 Mohammed Sameer <msameer@foolab.org>
- * Copyright (C) 2015 Jolla LTD.
+ * Copyright (C) 2014-2015 Mohammed Sameer
+ * Copyright (C) 2015-2021 Jolla Ltd.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -524,7 +524,7 @@ gst_droidaenc_handle_frame (GstAudioEncoder * encoder, GstBuffer * buffer)
   if (!GST_CLOCK_TIME_IS_VALID (ts)) {
     GST_DEBUG_OBJECT (enc, "Replacing invalid timestamp: %" GST_TIME_FORMAT,
         GST_TIME_ARGS (ts));
-    GstClock *clock = gst_element_get_clock (enc);
+    GstClock *clock = gst_element_get_clock (GST_ELEMENT (enc));
     if (clock) {
       ts = gst_clock_get_time (clock) - GST_ELEMENT_CAST (enc)->base_time;
       GST_DEBUG_OBJECT (enc, "New timestamp: %" GST_TIME_FORMAT,
