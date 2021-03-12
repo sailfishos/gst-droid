@@ -1039,6 +1039,9 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
     droid_media_camera_stop_recording (dev->cam);
   }
 
+  /* Update the preview callback flag again; seems to be overwritten. */
+  gst_droidcamsrc_dev_update_preview_callback_flag (dev);
+
   gst_buffer_pool_set_flushing (dev->pool, FALSE);
 
   GST_INFO ("dev stopped video recording");
