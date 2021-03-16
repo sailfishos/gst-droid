@@ -493,8 +493,11 @@ gst_droidcamsrc_params_choose_image_framerate (GstDroidCamSrcParams * params,
 
     gst_caps_unref (c);
 
-    /* the fps we have is valid. Select it if higher than our current target, or wider */
-    if (max > target_max || (max == target_max && min < target_min)) {
+    /* the fps we have is valid. Select it if higher than our current target, or narrower */
+    /* Make the fps-range the same like gst_droidcamsrc_params_choose_video_framerate to set narrow fps range by of maximal valuee. */
+    /* Because Qualcomm camera HAL uses the max value of preview-fps-range, but MTK camera HAL uses the min value of preview-fps-range */
+    /* the setting maximal values of min and max is doing the work of the viewfinder faster on MTK devices and still fast work of viewfinder on Qualcomm devices. */
+    if (max > target_max || (max == target_max && min > target_min)) {
       target_min = min;
       target_max = max;
     }
