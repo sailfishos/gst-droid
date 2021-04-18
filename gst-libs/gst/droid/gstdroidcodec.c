@@ -45,6 +45,8 @@ static gboolean create_h264dec_codec_data_from_codec_data (GstDroidCodec *
     codec, GstBuffer * data, DroidMediaData * out);
 static gboolean create_h265dec_codec_data_from_codec_data (GstDroidCodec *
     codec, GstBuffer * data, DroidMediaData * out);
+static gboolean create_av1dec_codec_data_from_codec_data (GstDroidCodec *
+    codec, GstBuffer * data, DroidMediaData * out);
 static gboolean create_aacdec_codec_data_from_codec_data (GstDroidCodec * codec,
     GstBuffer * data, DroidMediaData * out);
 static gboolean create_aacdec_codec_data_from_frame_data (GstDroidCodec * codec,
@@ -141,6 +143,9 @@ static GstDroidCodecInfo codecs[] = {
 
   {GST_DROID_CODEC_DECODER_VIDEO, "video/x-vp9", "video/x-vnd.on2.vp9",
       "video/x-vp9", TRUE, NULL, NULL, NULL, NULL, NULL, NULL, NULL},
+
+  {GST_DROID_CODEC_DECODER_VIDEO, "video/x-av1", "video/av01",
+      "video/x-av1", FALSE, NULL, NULL, NULL, NULL, NULL, NULL, NULL},
 
   {GST_DROID_CODEC_DECODER_VIDEO, "video/mpeg", "video/mpeg2",
         "video/mpeg, mpegversion=2", TRUE,
