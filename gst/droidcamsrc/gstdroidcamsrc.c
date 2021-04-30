@@ -94,6 +94,7 @@ static gchar *gst_droidcamsrc_find_picture_resolution (GstDroidCamSrc * src,
     const gchar * resolution);
 static gboolean gst_droidcamsrc_is_zsl_and_hdr_supported (GstDroidCamSrc * src);
 static GstCaps *gst_droidcamsrc_get_video_caps_locked (GstDroidCamSrc * src);
+static gboolean gst_droidcamsrc_get_hw (GstDroidCamSrc * src);
 
 enum
 {
@@ -282,7 +283,11 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
 
     case PROP_SENSOR_MOUNT_ANGLE:
     case PROP_SENSOR_ORIENTATION:
-      g_value_set_int (value, src->info[src->camera_device].orientation * 90);
+      if (!gst_droidcamsrc_get_hw (src)) {
+        g_value_set_int (value, 0);
+      } else {
+        g_value_set_int (value, src->info[src->camera_device].orientation * 90);
+      }
       break;
 
     case PROP_IMAGE_MODE:
@@ -348,17 +353,19 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
 
   switch (prop_id) {
     case PROP_CAMERA_DEVICE:
+      src->camera_device = g_value_get_int (value);
       g_rec_mutex_lock (&src->dev_lock);
       if (src->dev && src->dev->info) {
-        GST_ERROR_OBJECT (src,
-            "cannot change camera-device while camera is running");
+        GST_WARNING_OBJECT (src,
+            "changing camera-device to %d will take effect next time the camera is opened.",
+            src->camera_device);
       } else {
-        src->camera_device = g_value_get_int (value);
         GST_INFO_OBJECT (src, "camera device set to %d", src->camera_device);
-        /* initialize empty photo properties */
-        gst_droidcamsrc_photography_init (src);
       }
       g_rec_mutex_unlock (&src->dev_lock);
+
+      g_object_notify (G_OBJECT (src), "sensor-orientation");
+      g_object_notify (G_OBJECT (src), "sensor-mount-angle");
       break;
 
     case PROP_MODE:
@@ -547,6 +554,11 @@ gst_droidcamsrc_get_hw (GstDroidCamSrc * src)
 
   GST_DEBUG_OBJECT (src, "get hw");
 
+  if (src->info != NULL) {
+    GST_DEBUG_OBJECT (src, "already have info");
+    return TRUE;
+  }
+
   num = droid_media_camera_get_number_of_cameras ();
   GST_INFO_OBJECT (src, "Found %d cameras", num);
 
@@ -592,7 +604,11 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
   src = GST_DROIDCAMSRC (element);
 
   switch (transition) {
-    case GST_STATE_CHANGE_NULL_TO_READY:
+    case GST_STATE_CHANGE_NULL_TO_READY:{
+      GstDroidCamSrcCamInfo *info;
+      const GstDroidCamSrcQuirk *quirk;
+      gboolean quirk_is_property = FALSE;
+
       if (!gst_droidcamsrc_get_hw (src)) {
         ret = GST_STATE_CHANGE_FAILURE;
         break;
@@ -614,14 +630,6 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       src->dev =
           gst_droidcamsrc_dev_new (src->vfsrc, src->imgsrc,
           src->vidsrc, &src->dev_lock);
-
-      break;
-
-    case GST_STATE_CHANGE_READY_TO_PAUSED:
-    {
-      GstDroidCamSrcCamInfo *info;
-      const GstDroidCamSrcQuirk *quirk;
-      gboolean quirk_is_property = FALSE;
 
       /* find the device */
       info = gst_droidcamsrc_find_camera_device (src);
@@ -658,9 +666,6 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
             src->dev->info->direction, src->mode, quirk, TRUE);
       }
 
-      g_object_notify (G_OBJECT (src), "sensor-orientation");
-      g_object_notify (G_OBJECT (src), "sensor-mount-angle");
-
       /* now that we have camera parameters, we can update min and max ev-compensation */
       gst_droidcamsrc_update_ev_compensation_bounds (src);
 
@@ -670,7 +675,11 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       /* And we can also detect the supported image modes. In reality the only thing
          we are unable to detect until this moment is _ZSL_AND_HDR */
       g_object_notify (G_OBJECT (src), "supported-image-modes");
+    }
 
+      break;
+
+    case GST_STATE_CHANGE_READY_TO_PAUSED:
       /* Now add the needed orientation tag */
       gst_droidcamsrc_add_vfsrc_orientation_tag (src);
 
@@ -678,10 +687,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
        * messages on the pipeline */
       gst_element_set_state (src->preview_pipeline->pipeline,
           GST_STATE_PLAYING);
-    }
-
       break;
-
     case GST_STATE_CHANGE_PAUSED_TO_PLAYING:
       /* set initial photography parameters */
       gst_droidcamsrc_photography_apply (src, SET_ONLY);
@@ -748,13 +754,12 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       break;
 
     case GST_STATE_CHANGE_PAUSED_TO_READY:
-      gst_droidcamsrc_dev_deinit (src->dev);
-      gst_droidcamsrc_dev_close (src->dev);
-
       gst_element_set_state (src->preview_pipeline->pipeline, GST_STATE_READY);
       break;
 
     case GST_STATE_CHANGE_READY_TO_NULL:
+      gst_droidcamsrc_dev_deinit (src->dev);
+      gst_droidcamsrc_dev_close (src->dev);
       gst_droidcamsrc_dev_destroy (src->dev);
       src->dev = NULL;
 
