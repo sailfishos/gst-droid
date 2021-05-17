@@ -17,24 +17,20 @@ droid_conf = configuration_data()
 gst_req = '>= 1.0.0'
 
 # Mandatory GST deps
-gst_dep = dependency('gstreamer-1.0', version : gst_req,
-  fallback : ['gstreamer', 'gst_dep'])
-gstbase_dep = dependency('gstreamer-base-1.0', version : gst_req,
-  fallback : ['gstreamer', 'gst_base_dep'])
-gstaudio_dep = dependency('gstreamer-audio-1.0', version : gst_req,
-  fallback : ['gst-plugins-base', 'audio_dep'])
-gstpbutils_dep = dependency('gstreamer-pbutils-1.0', version : gst_req,
-  fallback : ['gst-plugins-base', 'pbutils_dep'])
-gsttag_dep = dependency('gstreamer-tag-1.0', version : gst_req,
-  fallback : ['gst-plugins-base', 'tag_dep'])
-gstvideo_dep = dependency('gstreamer-video-1.0', version : gst_req,
-  fallback : ['gst-plugins-base', 'video_dep'])
-gstpluginsbad_dep = dependency('gstreamer-plugins-bad-1.0', version : gst_req,
-  fallback : ['gst-plugins-bad', 'plugins_bad_dep'])
-gstcodecparsers_dep = dependency('gstreamer-codecparsers-1.0', version : gst_req,
-  fallback : ['gstreamer-plugins-bad', 'codecparsers_dep'])
-gstphotography_dep = dependency('gstreamer-photography-1.0', version : gst_req,
-  fallback : ['gstreamer-plugins-bad', 'photography_dep'])
+gst_dep = dependency('gstreamer-1.0', version : gst_req, required : true)
+gstbase_dep = dependency('gstreamer-base-1.0', version : gst_req, required : true)
+gstaudio_dep = dependency('gstreamer-audio-1.0', version : gst_req, required : true)
+gstpbutils_dep = dependency('gstreamer-pbutils-1.0', version : gst_req, required : true)
+gsttag_dep = dependency('gstreamer-tag-1.0', version : gst_req, required : true)
+gstvideo_dep = dependency('gstreamer-video-1.0', version : gst_req, required : true)
+gstpluginsbad_dep = dependency('gstreamer-plugins-bad-1.0', version : gst_req, required : true)
+gstcodecparsers_dep = dependency('gstreamer-codecparsers-1.0', version : gst_req, required : true)
+
+gstphotography_dep = dependency('gstreamer-photography-1.0', version : gst_req, required : false)
+# Fallback if gstreamer-photography-1.0 is not found using pkg-config
+if not gstphotography_dep.found()
+  gstphotography_dep = cc.find_library('gstphotography-1.0')
+endif
 
 gstcamerabinsrc_dep = cc.find_library('gstbasecamerabinsrc-1.0', required: true)
 gstnemointerfaces_dep = dependency('nemo-gstreamer-interfaces-1.0', required : true)
