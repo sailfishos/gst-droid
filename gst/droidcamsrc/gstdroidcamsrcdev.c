@@ -282,13 +282,33 @@ gst_droidcamsrc_dev_preview_frame_callback (void *user,
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
   GstDroidCamSrcPad *pad = dev->vfsrc;
   GstVideoInfo video_info;
-  GstBuffer *buffer;
+  GstBufferPool *pool;
+  GstBuffer *buffer = NULL;
   gsize width, height;
   DroidMediaRect rect;
 
   GST_DEBUG_OBJECT (src, "dev preview frame callback");
 
-  buffer = gst_buffer_new_allocate (NULL, mem->size, NULL);
+  pool = gst_object_ref (dev->raw_pool);
+  gst_buffer_pool_acquire_buffer (pool, &buffer, NULL);
+
+  if (buffer) {
+    gsize buffer_size = gst_buffer_get_size (buffer);
+    if (buffer_size < mem->size) {
+      /* Holy shit! We get the size wrong! */
+      GST_WARNING_OBJECT (src, "Raw buffer from the pool is too small! "
+            "(requires %ld, got %lu)",
+            (long) mem->size, (unsigned long) buffer_size);
+      /* Fail back to self-allocating. */
+      gst_buffer_replace (&buffer, NULL);
+    }
+  }
+
+  if (!buffer) {
+    GST_WARNING_OBJECT (src, "Fallback to self-allocating buffer.");
+    buffer = gst_buffer_new_allocate (NULL, mem->size, NULL);
+  }
+
   gst_buffer_fill (buffer, 0, mem->data, mem->size);
 
   GST_OBJECT_LOCK (src);
@@ -318,6 +338,8 @@ gst_droidcamsrc_dev_preview_frame_callback (void *user,
   } else {
     gst_buffer_unref (buffer);
   }
+
+  gst_object_unref (pool);
 }
 
 static void
@@ -548,6 +570,8 @@ gst_droidcamsrc_dev_new (GstDroidCamSrcPad * vfsrc,
   dev->lock = lock;
 
   dev->pool = NULL;
+  dev->raw_pool = NULL;
+  dev->raw_pool_configured = FALSE;
 
   dev->last_preview_buffer = NULL;
   g_mutex_init (&dev->last_preview_buffer_lock);
@@ -660,6 +684,10 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
 
   if (dev->pool) {
     gst_object_unref (dev->pool);
+  }
+
+  if (dev->raw_pool) {
+    gst_object_unref (dev->raw_pool);
   }
 
   gst_droidcamsrc_recorder_destroy (dev->recorder);
@@ -812,6 +840,11 @@ gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev)
   g_queue_foreach (dev->vfsrc->queue, (GFunc) gst_buffer_unref, NULL);
   g_queue_clear (dev->vfsrc->queue);
   g_mutex_unlock (&dev->vfsrc->lock);
+
+  if (dev->raw_pool) {
+    gst_buffer_pool_set_active (dev->raw_pool, /* active */ FALSE);
+    dev->raw_pool_configured = FALSE;
+  }
 
   g_rec_mutex_unlock (dev->lock);
 }
@@ -1319,6 +1352,55 @@ gst_droidcamsrc_dev_queue_video_buffer_locked (GstDroidCamSrcDev * dev,
   g_cond_signal (&dev->vid->cond);
 }
 
+static void
+gst_droidcamsrc_dev_ensure_raw_pool_locked (GstDroidCamSrcDev * dev)
+{
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+  GstCaps *caps = NULL;
+  GstStructure *config;
+  gint width, height;
+  gint min, max;
+  GstVideoInfo video_info;
+
+  if (dev->raw_pool && dev->raw_pool_configured) {
+    return;
+  }
+
+  if (!dev->raw_pool) {
+    dev->raw_pool = gst_buffer_pool_new ();
+  }
+
+  /* Configure the pool. */
+  /* TODO: research if this can results in a deadlock. */
+  GST_OBJECT_LOCK (src);
+  width = src->width;
+  height = src->height;
+  GST_OBJECT_UNLOCK (src);
+
+  gst_video_info_set_format (&video_info, GST_VIDEO_FORMAT_NV21, width, height);
+  caps = gst_video_info_to_caps (&video_info);
+
+  config = gst_buffer_pool_get_config (dev->raw_pool);
+
+  /* TODO: are these appropriate values? */
+  min = 0;
+  max = droid_media_buffer_queue_length ();
+  gst_buffer_pool_config_set_params (config, caps, video_info.size, min, max);
+
+  if (!gst_buffer_pool_set_config (dev->raw_pool, config) ||
+        !gst_buffer_pool_set_active (dev->raw_pool, /* active */ TRUE)) {
+    /* TODO: what should I do? */
+    GST_WARNING_OBJECT (src, "Can't configure raw buffer pool.");
+    goto out;
+  }
+
+  dev->raw_pool_configured = TRUE;
+
+out:
+
+  gst_caps_unref (caps);
+}
+
 void
 gst_droidcamsrc_dev_update_preview_callback_flag (GstDroidCamSrcDev * dev)
 {
@@ -1345,6 +1427,8 @@ gst_droidcamsrc_dev_update_preview_callback_flag (GstDroidCamSrcDev * dev)
   }
 
   if (use_preview_callback) {
+    gst_droidcamsrc_dev_ensure_raw_pool_locked (dev);
+
     droid_media_camera_set_preview_callback_flags (dev->cam,
         dev->c.CAMERA_FRAME_CALLBACK_FLAG_CAMERA);
   } else {
