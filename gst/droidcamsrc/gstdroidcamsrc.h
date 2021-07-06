@@ -4,6 +4,7 @@
  * Copyright (C) 2014 Mohammed Sameer
  * Copyright (C) 2016 Jolla Ltd.
  * Copyright (C) 2010 Texas Instruments, Inc
+ * Copyright (C) 2021 Open Mobile Platform LLC.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -121,6 +122,7 @@ struct _GstDroidCamSrc
   gfloat ev_step;
 
   gint32 target_bitrate;
+  guint jpeg_quality;
 
   /* camerabin interface */
   gboolean post_preview;

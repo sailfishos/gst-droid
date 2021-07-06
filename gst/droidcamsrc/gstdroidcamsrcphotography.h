@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
  * Copyright (C) 2015-2018 Jolla Ltd.
+ * Copyright (C) 2021 Open Mobile Platform LLC.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -54,6 +55,7 @@ typedef enum
   PROP_SUPPORTED_FLASH_MODES,
   PROP_SUPPORTED_FOCUS_MODES,
   PROP_SUPPORTED_ISO_SPEEDS,
+  PROP_JPEG_QUALITY,
 
   /* photography interface */
   PROP_WB_MODE,
