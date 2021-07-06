@@ -49,6 +49,7 @@ GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
 
 struct _GstDroidCamSrcImageCaptureState
 {
+  gboolean running;
   gboolean image_preview_sent;
   gboolean image_start_sent;
   gboolean preview_image_requested;
@@ -560,6 +561,8 @@ gst_droidcamsrc_dev_new (GstDroidCamSrcPad * vfsrc,
 
   dev->viewfinder_format = GST_VIDEO_FORMAT_UNKNOWN;
 
+  dev->task_pool = gst_task_pool_new ();
+
   return dev;
 }
 
@@ -668,6 +671,9 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
   g_mutex_clear (&dev->last_preview_buffer_lock);
   g_cond_clear (&dev->last_preview_buffer_cond);
 
+  gst_task_pool_cleanup (dev->task_pool);       // Just in case
+  gst_object_unref (dev->task_pool);
+
   g_slice_free (GstDroidCamSrcImageCaptureState, dev->img);
   g_slice_free (GstDroidCamSrcVideoCaptureState, dev->vid);
   g_slice_free (GstDroidCamSrcDev, dev);
@@ -678,6 +684,8 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
 gboolean
 gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
 {
+  GError *err = NULL;
+
   GST_DEBUG ("dev init");
 
   g_rec_mutex_lock (dev->lock);
@@ -713,6 +721,13 @@ gst_droidcamsrc_dev_init (GstDroidCamSrcDev * dev)
 
   g_rec_mutex_unlock (dev->lock);
 
+  gst_task_pool_prepare (dev->task_pool, &err);
+  if (err != NULL) {
+    GST_ERROR ("Failed to prepare thread pool: %s", err->message);
+    g_error_free (err);
+    return FALSE;
+  }
+
   return TRUE;
 }
 
@@ -729,6 +744,8 @@ gst_droidcamsrc_dev_deinit (GstDroidCamSrcDev * dev)
   }
 
   g_rec_mutex_unlock (dev->lock);
+
+  gst_task_pool_cleanup (dev->task_pool);
 }
 
 gboolean
@@ -858,14 +875,36 @@ out:
   return ret;
 }
 
+static void
+_take_picture (gpointer user_data)
+{
+  GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user_data;
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
+
+  const int msg_type = dev->c.CAMERA_MSG_SHUTTER | dev->c.CAMERA_MSG_RAW_IMAGE
+      | dev->c.CAMERA_MSG_POSTVIEW_FRAME | dev->c.CAMERA_MSG_COMPRESSED_IMAGE;
+
+  GST_DEBUG ("really calling droid_media_camera_take_picture");
+
+  g_rec_mutex_lock (dev->lock);
+
+  if (!droid_media_camera_take_picture (dev->cam, msg_type)) {
+    GST_ERROR ("error capturing image");
+    GST_ELEMENT_ERROR (src, LIBRARY, FAILED, (NULL), ("take_picture fails"));
+  }
+
+  dev->img->running = FALSE;
+
+  g_rec_mutex_unlock (dev->lock);
+}
+
 gboolean
 gst_droidcamsrc_dev_capture_image (GstDroidCamSrcDev * dev)
 {
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
   gboolean ret = FALSE;
-  int msg_type = dev->c.CAMERA_MSG_SHUTTER | dev->c.CAMERA_MSG_RAW_IMAGE
-      | dev->c.CAMERA_MSG_POSTVIEW_FRAME | dev->c.CAMERA_MSG_COMPRESSED_IMAGE;
+  GError *err = NULL;
 
   GST_DEBUG ("dev capture image");
 
@@ -893,13 +932,27 @@ gst_droidcamsrc_dev_capture_image (GstDroidCamSrcDev * dev)
 
   g_rec_mutex_lock (dev->lock);
 
+  if (dev->img->running) {
+    GST_ERROR ("another capture is already in progress (?)");
+    goto out;
+  }
+
+  dev->img->running = TRUE;
   dev->img->image_preview_sent = FALSE;
   dev->img->image_start_sent = FALSE;
 
   dev->img->preview_image_requested = src->post_preview;
 
-  if (!droid_media_camera_take_picture (dev->cam, msg_type)) {
-    GST_ERROR ("error capturing image");
+  /*
+   * Call droid_media_camera_take_picture from another thread. take_picture
+   * call in HAL sometimes need to read information from preview frames for
+   * e.g. auto exposure when using flash. If the calling thread also handles
+   * pulling preview frames, this will create a deadlock.
+   */
+  gst_task_pool_push (dev->task_pool, _take_picture, dev, &err);
+  if (err) {
+    GST_ERROR ("Failed to start take_picture task: %s", err->message);
+    g_error_free (err);
     goto out;
   }
 
