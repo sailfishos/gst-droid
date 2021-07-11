@@ -1052,6 +1052,11 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
       gst_caps_merge (caps,
       gst_caps_from_string (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
           (GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA, "{YV12}")));
+  caps =
+      gst_caps_merge (caps,
+      gst_caps_from_string (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
+          (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER, "{YV12}")));
+
   tpl =
       gst_pad_template_new (GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME, GST_PAD_SRC,
       GST_PAD_ALWAYS, caps);
@@ -1655,6 +1660,71 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
   return ret;
 }
 
+static GstBufferPool *
+gst_droidcamsrc_negotiate_buffer_pool (GstDroidCamSrcPad * data,
+    GstCaps * our_caps)
+{
+  GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (data->pad));
+  gint i;
+  guint min, max;
+  guint size;
+  gint count;
+  GstQuery *query = gst_query_new_allocation (our_caps, TRUE);
+  GstBufferPool *pool = NULL;
+
+  if (!gst_pad_peer_query (data->pad, query)) {
+    GST_DEBUG_OBJECT (src, "didn't get downstream ALLOCATION hints");
+  }
+
+  count = gst_query_get_n_allocation_pools (query);
+
+  for (i = 0; i < count; ++i) {
+    GstAllocator *allocator;
+    GstStructure *config;
+
+    gst_query_parse_nth_allocation_pool (query, i, &pool, &size, &min, &max);
+    config = gst_buffer_pool_get_config (pool);
+    gst_buffer_pool_config_get_allocator (config, &allocator, NULL);
+    if (allocator
+        && g_strcmp0 (allocator->mem_type,
+            GST_ALLOCATOR_DROID_MEDIA_BUFFER) == 0) {
+      break;
+    } else {
+      gst_object_unref (pool);
+      pool = NULL;
+    }
+  }
+
+  /* The downstream may have other ideas about what the pool size should be but the
+   * queue we're working with has a fixed size so that's the number of buffers we'll
+   * go with. */
+  min = 0;
+  max = droid_media_buffer_queue_length ();
+
+  if (!pool) {
+    /* A downstream which understands the queue buffers should also have provided a pool
+     * but for completeness add this a fallback. */
+    GstStructure *config;
+    GstVideoInfo video_info;
+    gst_video_info_from_caps (&video_info, our_caps);
+
+    pool = gst_droid_buffer_pool_new ();
+    size = video_info.finfo->format == GST_VIDEO_FORMAT_ENCODED
+        ? 1 : video_info.size;
+
+    config = gst_buffer_pool_get_config (pool);
+    gst_buffer_pool_config_set_params (config, our_caps, size, min, max);
+
+    if (!gst_buffer_pool_set_config (pool, config)) {
+      GST_ERROR_OBJECT (src, "Failed to set buffer pool configuration");
+      gst_object_unref (pool);
+      pool = NULL;
+    }
+  }
+
+  return pool;
+}
+
 static gboolean
 gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
 {
@@ -1740,63 +1810,7 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
       GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER);
 
   if (!use_raw_data) {
-    /* Negotiate a buffer pool or allocate one now. */
-    gint i;
-    guint min, max;
-    guint size;
-    gint count;
-    GstQuery *query = gst_query_new_allocation (our_caps, TRUE);
-
-    if (!gst_pad_peer_query (data->pad, query)) {
-      GST_DEBUG_OBJECT (src, "didn't get downstream ALLOCATION hints");
-    }
-
-    count = gst_query_get_n_allocation_pools (query);
-
-    for (i = 0; i < count; ++i) {
-      GstAllocator *allocator;
-      GstStructure *config;
-
-      gst_query_parse_nth_allocation_pool (query, i, &pool, &size, &min, &max);
-      config = gst_buffer_pool_get_config (pool);
-      gst_buffer_pool_config_get_allocator (config, &allocator, NULL);
-      if (allocator
-          && g_strcmp0 (allocator->mem_type,
-              GST_ALLOCATOR_DROID_MEDIA_BUFFER) == 0) {
-        break;
-      } else {
-        gst_object_unref (pool);
-        pool = NULL;
-      }
-    }
-
-    /* The downstream may have other ideas about what the pool size should be but the
-     * queue we're working with has a fixed size so that's the number of buffers we'll
-     * go with. */
-    min = 0;
-    max = droid_media_buffer_queue_length ();
-
-    if (!pool) {
-      /* A downstream which understands the queue buffers should also have provided a pool
-       * but for completeness add this a fallback. */
-      GstStructure *config;
-      GstVideoInfo video_info;
-      gst_video_info_from_caps (&video_info, our_caps);
-
-      pool = gst_droid_buffer_pool_new ();
-      size = video_info.finfo->format == GST_VIDEO_FORMAT_ENCODED
-          ? 1 : video_info.size;
-
-      config = gst_buffer_pool_get_config (pool);
-      gst_buffer_pool_config_set_params (config, our_caps, size, min, max);
-
-      if (!gst_buffer_pool_set_config (pool, config)) {
-        GST_ERROR_OBJECT (src, "Failed to set buffer pool configuration");
-        gst_object_unref (pool);
-        pool = NULL;
-        ret = FALSE;
-      }
-    }
+    pool = gst_droidcamsrc_negotiate_buffer_pool (data, our_caps);
   }
 
   g_rec_mutex_lock (&src->dev_lock);
@@ -1809,8 +1823,8 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
 
   g_rec_mutex_unlock (&src->dev_lock);
 
-  ret = TRUE;
-
+  if (use_raw_data || pool)
+    ret = TRUE;
 out:
   if (peer) {
     gst_caps_unref (peer);
@@ -1907,6 +1921,9 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
   GstCaps *our_caps = NULL;
   gchar *vid, *pic;
   GstVideoInfo info;
+  GstBufferPool *pool = NULL;
+  GstCapsFeatures *features;
+  gboolean use_raw_data = TRUE;
 
   g_rec_mutex_lock (&src->dev_lock);
 
@@ -1974,18 +1991,37 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
     g_free (pic);
   }
 
-  ret = TRUE;
-
   if (info.finfo->format == GST_VIDEO_FORMAT_ENCODED) {
     GST_INFO_OBJECT (src, "using external recorder");
     src->dev->use_recorder = TRUE;
   } else {
     GST_INFO_OBJECT (src, "using raw recorder");
     src->dev->use_recorder = FALSE;
+
+    features = gst_caps_get_features (our_caps, 0);
+
+    use_raw_data =
+        !gst_caps_features_contains (features,
+        GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER);
+
+    if (!use_raw_data) {
+      pool = gst_droidcamsrc_negotiate_buffer_pool (data, our_caps);
+    }
   }
+
+  g_rec_mutex_lock (&src->dev_lock);
+
+  if (src->dev->video_pool) {
+    gst_object_unref (src->dev->video_pool);
+  }
+  src->dev->video_pool = pool;
+
+  g_rec_mutex_unlock (&src->dev_lock);
 
   gst_droidcamsrc_recorder_update_vid (src->dev->recorder, &info, our_caps);
 
+  if (src->dev->use_recorder || use_raw_data || pool)
+    ret = TRUE;
 out:
   if (peer) {
     gst_caps_unref (peer);
