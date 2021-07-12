@@ -1050,12 +1050,15 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
   /* add raw caps */
   caps =
       gst_caps_merge (caps,
-      gst_caps_from_string (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
-          (GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA, "{YV12}")));
+      gst_caps_from_string (GST_VIDEO_CAPS_MAKE ("{YV12}")));
   caps =
       gst_caps_merge (caps,
       gst_caps_from_string (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
           (GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER, "{YV12}")));
+  caps =
+      gst_caps_merge (caps,
+      gst_caps_from_string (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
+          (GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA, "{YV12}")));
 
   tpl =
       gst_pad_template_new (GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME, GST_PAD_SRC,
