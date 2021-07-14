@@ -405,7 +405,15 @@ gst_droidcamsrc_params_get_video_caps (GstDroidCamSrcParams * params)
       "preview-size-values";
 
   caps = gst_droidcamsrc_params_get_caps_locked (params, key,
-      "video/x-raw", GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA, "YV12");
+      "video/x-raw", NULL, "YV12");
+  caps = gst_caps_merge (caps,
+      gst_droidcamsrc_params_get_caps_locked (params, key,
+          "video/x-raw", GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER,
+          "YV12"));
+  caps = gst_caps_merge (caps,
+      gst_droidcamsrc_params_get_caps_locked (params, key,
+          "video/x-raw", GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA,
+          "YV12"));
 
   g_mutex_unlock (&params->lock);
 
