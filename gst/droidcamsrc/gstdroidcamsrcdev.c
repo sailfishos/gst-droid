@@ -1400,11 +1400,13 @@ gst_droidcamsrc_dev_start_video_recording_raw_locked (GstDroidCamSrcDev * dev)
 {
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
-  /* TODO: get that from caps */
-  if (!droid_media_camera_store_meta_data_in_buffers (dev->cam, true)) {
+  if (dev->needs_meta_data_in_buffers &&
+      !droid_media_camera_store_meta_data_in_buffers (dev->cam, true)) {
     GST_ELEMENT_ERROR (src, LIBRARY, SETTINGS,
         ("error storing meta data in buffers for video recording"), (NULL));
     return FALSE;
+  } else {
+    droid_media_camera_store_meta_data_in_buffers (dev->cam, false);
   }
 
   if (!droid_media_camera_start_recording (dev->cam)) {

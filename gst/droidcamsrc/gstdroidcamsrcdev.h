@@ -64,6 +64,7 @@ struct _GstDroidCamSrcDev
   GCond last_preview_buffer_cond;
 
   gboolean use_recorder;
+  gboolean needs_meta_data_in_buffers;
   GstDroidCamSrcRecorder *recorder;
 };
 

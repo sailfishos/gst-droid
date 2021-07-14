@@ -1997,6 +1997,7 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
   if (info.finfo->format == GST_VIDEO_FORMAT_ENCODED) {
     GST_INFO_OBJECT (src, "using external recorder");
     src->dev->use_recorder = TRUE;
+    src->dev->needs_meta_data_in_buffers = FALSE;
   } else {
     GST_INFO_OBJECT (src, "using raw recorder");
     src->dev->use_recorder = FALSE;
@@ -2006,6 +2007,12 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
     use_raw_data =
         !gst_caps_features_contains (features,
         GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER);
+
+    src->dev->needs_meta_data_in_buffers =
+        gst_caps_features_contains (features,
+        GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER) |
+        gst_caps_features_contains (features,
+        GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA);
 
     if (!use_raw_data) {
       pool = gst_droidcamsrc_negotiate_buffer_pool (data, our_caps);
