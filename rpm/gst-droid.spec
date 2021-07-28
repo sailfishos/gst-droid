@@ -20,7 +20,6 @@ BuildRequires:  pkgconfig(nemo-gstreamer-interfaces-1.0) >= 0.20200421.0
 BuildRequires:  pkgconfig(libexif)
 BuildRequires:  meson
 BuildRequires:  droidmedia-devel >= 0.20200421.0
-BuildRequires:  pkgconfig(libandroid-properties)
 Requires:       droidmedia >= 0.20200421.0
 
 %description

@@ -16,13 +16,13 @@ gstdroid_headers = [
 ]
 
 gstdroid_deps = [
+  dl_dep,
   gst_dep,
   gstbase_dep,
   gstcodecparsers_dep,
   gstvideo_dep,
   egl_dep,
   gstnemointerfaces_dep,
-  hybris_dep
 ]
 
 install_headers(gstdroid_headers, subdir : 'gstreamer-@0@/gst/allocators'.format(api_version))
