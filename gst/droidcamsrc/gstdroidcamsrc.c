@@ -1065,12 +1065,15 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
       GST_DEBUG_FUNCPTR (gst_droidcamsrc_change_state);
   gstelement_class->send_event = GST_DEBUG_FUNCPTR (gst_droidcamsrc_send_event);
 
-  g_object_class_install_property (gobject_class, PROP_CAMERA_DEVICE,
-      g_param_spec_int ("camera-device", "Camera device",
-          "Defines which camera device should be used",
-          0,
-          droid_media_camera_get_number_of_cameras (),
-          DEFAULT_CAMERA_DEVICE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  /* Add camera-device property only if cameras have been found */
+  if (droid_media_camera_get_number_of_cameras () > 0) {
+    g_object_class_install_property (gobject_class, PROP_CAMERA_DEVICE,
+        g_param_spec_int ("camera-device", "Camera device",
+            "Defines which camera device should be used",
+            0,
+            droid_media_camera_get_number_of_cameras () - 1,
+            DEFAULT_CAMERA_DEVICE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+  }
 
   g_object_class_install_property (gobject_class, PROP_MODE,
       g_param_spec_enum ("mode", "Mode",
