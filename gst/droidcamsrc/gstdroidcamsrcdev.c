@@ -607,19 +607,6 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
 
   dev->queue = droid_media_camera_get_buffer_queue (dev->cam);
 
-  if (!droid_media_camera_lock (dev->cam)) {
-    droid_media_camera_disconnect (dev->cam);
-    dev->cam = NULL;
-    dev->queue = NULL;
-
-    GST_ELEMENT_ERROR (src, LIBRARY, INIT, (NULL), ("error locking camera"));
-    return FALSE;
-  }
-
-  /* disable shutter sound */
-  gst_droidcamsrc_dev_send_command (dev,
-      dev->c.CAMERA_CMD_ENABLE_SHUTTER_SOUND, 0, 0);
-
   g_rec_mutex_unlock (dev->lock);
 
   return TRUE;
@@ -747,6 +734,16 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
 
   GST_DEBUG_OBJECT (src, "dev start");
 
+  if (!droid_media_camera_lock (dev->cam)) {
+    GST_ERROR_OBJECT (src, "error locking camera");
+    goto out;
+  }
+
+  /* disable shutter sound */
+  gst_droidcamsrc_dev_send_command (dev,
+      dev->c.CAMERA_CMD_ENABLE_SHUTTER_SOUND, 0, 0);
+
+
   if (!dev->use_raw_data) {
     if (!dev->pool) {
       GST_ERROR_OBJECT (src,
@@ -812,6 +809,8 @@ gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev)
   g_queue_foreach (dev->vfsrc->queue, (GFunc) gst_buffer_unref, NULL);
   g_queue_clear (dev->vfsrc->queue);
   g_mutex_unlock (&dev->vfsrc->lock);
+
+  droid_media_camera_unlock (dev->cam);
 
   g_rec_mutex_unlock (dev->lock);
 }
