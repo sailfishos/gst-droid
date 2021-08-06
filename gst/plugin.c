@@ -89,7 +89,7 @@ plugin_init (GstPlugin * plugin)
       GST_TYPE_DROIDAENC);
 
   if (ok)
-    droid_media_init ();
+    ok = droid_media_init ();
 
   return ok;
 }

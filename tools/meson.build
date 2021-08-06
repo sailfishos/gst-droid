@@ -4,7 +4,7 @@ executable('dump-resolutions',
   ['common.c', 'resolutions.c'],
   install: true,
   c_args : gstdroid_args,
-  include_directories : [configinc, libsinc, droidmedia_h],
+  include_directories : [configinc, libsinc],
   dependencies : tool_deps,
 )
 
@@ -12,6 +12,6 @@ executable('dump-camera-parameters',
   ['common.c', 'gstdroidcamparams.c'],
   install: true,
   c_args : gstdroid_args,
-  include_directories : [configinc, libsinc, droidmedia_h],
+  include_directories : [configinc, libsinc],
   dependencies : tool_deps,
 )

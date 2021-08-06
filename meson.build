@@ -50,8 +50,7 @@ droid_conf.set_quoted('PACKAGE_NAME', 'GstDroid library')
 droid_conf.set_quoted('PACKAGE_STRING', 'GstDroid library')
 
 root_dir = include_directories('.')
-droidmedia_h = include_directories('/usr/include/droidmedia')
-hybris_dep = cc.find_library('hybris-common', required: true)
+droidmedia_dep = dependency('droidmedia', required : true)
 
 gstdroid_args = ['-DHAVE_CONFIG_H', '-DSYSCONFDIR="/etc"']
 
