@@ -226,10 +226,12 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
   GstDroidCamSrc *src = GST_DROIDCAMSRC (object);
   GArray *supported_image_modes = NULL;
   int mode = DEFAULT_IMAGE_MODE;
+  GST_WARNING_OBJECT (src, "gst_droidcamsrc_get_property 1 : %i", prop_id);
 
   if (gst_droidcamsrc_photography_get_property (src, prop_id, value, pspec)) {
     return;
   }
+  GST_WARNING_OBJECT (src, "gst_droidcamsrc_get_property 2 : %i", prop_id);
 
   switch (prop_id) {
     case PROP_DEVICE_PARAMETERS:
@@ -279,6 +281,7 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
 
     case PROP_SENSOR_DIRECTION:
       g_value_set_int (value, src->info[src->camera_device].direction);
+      GST_WARNING_OBJECT (src, "gst_droidcamsrc_get_property 3 : %i value %i", prop_id, g_value_get_int(value));
       break;
 
     case PROP_SENSOR_MOUNT_ANGLE:
@@ -288,6 +291,7 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
       } else {
         g_value_set_int (value, src->info[src->camera_device].orientation * 90);
       }
+      GST_WARNING_OBJECT (src, "gst_droidcamsrc_get_property 3 : %i value %i", prop_id, g_value_get_int(value));
       break;
 
     case PROP_IMAGE_MODE:
@@ -346,10 +350,12 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec)
 {
   GstDroidCamSrc *src = GST_DROIDCAMSRC (object);
+  GST_WARNING_OBJECT (src, "gst_droidcamsrc_set_property 1 : %i", prop_id);
 
   if (gst_droidcamsrc_photography_set_property (src, prop_id, value, pspec)) {
     return;
   }
+  GST_WARNING_OBJECT (src, "gst_droidcamsrc_set_property 2 : %i", prop_id);
 
   switch (prop_id) {
     case PROP_CAMERA_DEVICE:
@@ -610,12 +616,14 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       gboolean quirk_is_property = FALSE;
 
       if (!gst_droidcamsrc_get_hw (src)) {
+        GST_WARNING_OBJECT (src, "!gst_droidcamsrc_get_hw (src)");
         ret = GST_STATE_CHANGE_FAILURE;
         break;
       }
 
       if (src->preview_pipeline == NULL) {
         /* failed to create preview pipeline, fail state change */
+        GST_WARNING_OBJECT (src, "src->preview_pipeline == NULL");
         ret = GST_STATE_CHANGE_FAILURE;
       }
 
@@ -635,6 +643,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       info = gst_droidcamsrc_find_camera_device (src);
 
       if (!info) {
+        GST_WARNING_OBJECT (src, "!info");
         ret = GST_STATE_CHANGE_FAILURE;
         break;
       }
@@ -647,6 +656,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       GST_DEBUG_OBJECT (src, "using camera device %i", info->num);
 
       if (!gst_droidcamsrc_dev_open (src->dev, info)) {
+        GST_WARNING_OBJECT (src, "!gst_droidcamsrc_dev_open (src->dev, info)");
         ret = GST_STATE_CHANGE_FAILURE;
         break;
       }
@@ -657,6 +667,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       }
 
       if (!gst_droidcamsrc_dev_init (src->dev)) {
+        GST_WARNING_OBJECT (src, "!gst_droidcamsrc_dev_init (src->dev)");
         ret = GST_STATE_CHANGE_FAILURE;
         break;
       }
@@ -696,6 +707,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       if (GST_PAD_IS_FLUSHING (src->vfsrc->pad)) {
         if (!gst_pad_push_event (src->vfsrc->pad,
                 gst_event_new_flush_stop ( /* reset_time */ TRUE))) {
+        GST_WARNING_OBJECT (src, "!gst_pad_push_event (src->vfsrc->pad, gst_event_new_flush_stop ( /* reset_time */ TRUE))");
           ret = GST_STATE_CHANGE_FAILURE;
           break;
         }
@@ -703,6 +715,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 
       /* activate mode */
       if (!gst_droidcamsrc_select_and_activate_mode (src)) {
+        GST_WARNING_OBJECT (src, "!gst_droidcamsrc_select_and_activate_mode (src)");
         ret = GST_STATE_CHANGE_FAILURE;
         break;
       }
@@ -712,6 +725,7 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 
       /* now start */
       if (!gst_droidcamsrc_dev_start (src->dev, FALSE)) {
+        GST_WARNING_OBJECT (src, "!gst_droidcamsrc_dev_start (src->dev, FALSE)");
         ret = GST_STATE_CHANGE_FAILURE;
       }
 
@@ -725,12 +739,14 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
   }
 
   if (ret == GST_STATE_CHANGE_FAILURE) {
+        GST_WARNING_OBJECT (src, "ret == GST_STATE_CHANGE_FAILURE 1");
     return ret;
   }
 
   ret = GST_ELEMENT_CLASS (parent_class)->change_state (element, transition);
 
   if (ret == GST_STATE_CHANGE_FAILURE) {
+        GST_WARNING_OBJECT (src, "ret == GST_STATE_CHANGE_FAILURE 2");
     return ret;
   }
 
@@ -776,8 +792,10 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
   if (ret == GST_STATE_CHANGE_SUCCESS
       && (transition == GST_STATE_CHANGE_READY_TO_PAUSED
           || transition == GST_STATE_CHANGE_PLAYING_TO_PAUSED)) {
+        GST_WARNING_OBJECT (src, "ret == GST_STATE_CHANGE_SUCCESS && (transition == GST_STATE_CHANGE_READY_TO_PAUSED || transition == GST_STATE_CHANGE_PLAYING_TO_PAUSED)");
     ret = GST_STATE_CHANGE_NO_PREROLL;
   }
+        GST_WARNING_OBJECT (src, "gst_droidcamsrc_change_state end %i", ret);
 
   return ret;
 }
