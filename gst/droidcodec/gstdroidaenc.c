@@ -520,7 +520,7 @@ gst_droidaenc_handle_frame (GstAudioEncoder * encoder, GstBuffer * buffer)
  * encoder's clock, as some versions of libstagefright throw away frames if
  * it doesn't increase
  */
-  GstClockTime ts = GST_BUFFER_TIMESTAMP (buffer);
+  GstClockTime ts = GST_BUFFER_PTS (buffer);
   if (!GST_CLOCK_TIME_IS_VALID (ts)) {
     GST_DEBUG_OBJECT (enc, "Replacing invalid timestamp: %" GST_TIME_FORMAT,
         GST_TIME_ARGS (ts));

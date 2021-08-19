@@ -929,7 +929,7 @@ create_aacdec_codec_data_from_frame_data (GstDroidCodec * codec,
 
   GST_WRITE_UINT16_BE (codec_data, codec_data_data);
 
-  data = gst_buffer_new_and_alloc (2);
+  data = gst_buffer_new_allocate(NULL, 2, NULL);
   gst_buffer_fill (data, 0, codec_data, 2);
 
   ret = create_aacdec_codec_data_from_codec_data (codec, data, out);
