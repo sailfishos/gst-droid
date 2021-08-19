@@ -112,8 +112,8 @@ gst_droidvideotexturesink_get_times (GstBaseSink * bsink, GstBuffer * buf,
 
   sink = GST_DROIDVIDEOTEXTURESINK (bsink);
 
-  if (GST_BUFFER_TIMESTAMP_IS_VALID (buf)) {
-    *start = GST_BUFFER_TIMESTAMP (buf);
+  if (GST_BUFFER_PTS_IS_VALID (buf)) {
+    *start = GST_BUFFER_PTS (buf);
     if (GST_BUFFER_DURATION_IS_VALID (buf)) {
       *end = *start + GST_BUFFER_DURATION (buf);
     } else {

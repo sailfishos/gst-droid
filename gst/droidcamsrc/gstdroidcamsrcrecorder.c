@@ -149,7 +149,7 @@ gst_droidcamsrc_recorder_data_available (void *data,
     current = NULL;
 
     gst_caps_set_simple (caps, "codec_data", GST_TYPE_BUFFER, codec_data, NULL);
-    ret = gst_pad_set_caps (recorder->vidsrc->pad, caps);
+    ret = gst_pad_push_event (recorder->vidsrc->pad, gst_event_new_caps (caps));
     gst_caps_unref (caps);
 
     if (!ret) {
