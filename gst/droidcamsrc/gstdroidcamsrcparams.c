@@ -465,8 +465,8 @@ gst_droidcamsrc_params_get_string (GstDroidCamSrcParams * params,
 }
 
 void
-gst_droidcamsrc_params_choose_image_framerate (GstDroidCamSrcParams * params,
-    GstCaps * caps)
+gst_droidcamsrc_params_choose_framerate (GstDroidCamSrcParams * params,
+    GstCaps * caps, gboolean widest, const char *set_param_name)
 {
   int x;
   int target_min = -1, target_max = -1;
@@ -493,75 +493,50 @@ gst_droidcamsrc_params_choose_image_framerate (GstDroidCamSrcParams * params,
 
     gst_caps_unref (c);
 
-    /* the fps we have is valid. Select it if higher than our current target, or wider */
-    if (max > target_max || (max == target_max && min < target_min)) {
-      target_min = min;
-      target_max = max;
+    if (widest) {
+      /* the fps we have is valid. Select it if higher than our current target, or wider */
+      if (max > target_max || (max == target_max && min < target_min)) {
+        target_min = min;
+        target_max = max;
+      }
+    } else {
+      /* the fps we have is valid. Select it if higher than our current target, or narrower */
+      if (max > target_max || (max == target_max && min > target_min)) {
+        target_min = min;
+        target_max = max;
+      }
     }
   }
 
   if (target_min != -1 && target_max != -1) {
-    gchar *var;
 
     /* use the max */
     gst_caps_set_simple (caps, "framerate", GST_TYPE_FRACTION,
         target_max / 1000, 1, NULL);
 
-    var = g_strdup_printf ("%d,%d", target_min, target_max);
-    gst_droidcamsrc_params_set_string_locked (params, "preview-fps-range", var);
-    g_free (var);
+    if (set_param_name) {
+      gchar *var;
+      var = g_strdup_printf ("%d,%d", target_min, target_max);
+      gst_droidcamsrc_params_set_string_locked (params, "preview-fps-range", var);
+      g_free (var);
+    }
   }
 
   g_mutex_unlock (&params->lock);
 }
 
 void
+gst_droidcamsrc_params_choose_image_framerate (GstDroidCamSrcParams * params,
+    GstCaps * caps)
+{
+  gst_droidcamsrc_params_choose_framerate (params,
+    caps, TRUE, "preview-fps-range");
+}
+
+void
 gst_droidcamsrc_params_choose_video_framerate (GstDroidCamSrcParams * params,
     GstCaps * caps)
 {
-  int x;
-  int target_min = -1, target_max = -1;
-
-  g_mutex_lock (&params->lock);
-
-  for (x = 0; x < params->min_fps_range->len; x++) {
-    int min = g_array_index (params->min_fps_range, gint, x);
-    int max = g_array_index (params->max_fps_range, gint, x);
-
-    GstCaps *c = gst_caps_copy (caps);
-    if (min == max) {
-      gst_caps_set_simple (c, "framerate", GST_TYPE_FRACTION, min / 1000, 1,
-          NULL);
-    } else {
-      gst_caps_set_simple (c, "framerate", GST_TYPE_FRACTION_RANGE,
-          min / 1000, 1, max / 1000, 1, NULL);
-    }
-
-    if (!gst_caps_can_intersect (caps, c)) {
-      gst_caps_unref (c);
-      continue;
-    }
-
-    gst_caps_unref (c);
-
-    /* the fps we have is valid. Select it if higher than our current target, or narrower */
-    if (max > target_max || (max == target_max && min > target_min)) {
-      target_min = min;
-      target_max = max;
-    }
-  }
-
-  if (target_min != -1 && target_max != -1) {
-    gchar *var;
-
-    /* use the max */
-    gst_caps_set_simple (caps, "framerate", GST_TYPE_FRACTION,
-        target_max / 1000, 1, NULL);
-
-    var = g_strdup_printf ("%d,%d", target_min, target_max);
-    gst_droidcamsrc_params_set_string_locked (params, "preview-fps-range", var);
-    g_free (var);
-  }
-
-  g_mutex_unlock (&params->lock);
+  gst_droidcamsrc_params_choose_framerate (params,
+    caps, FALSE, "preview-fps-range");
 }

@@ -1937,12 +1937,7 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
   our_caps = gst_caps_make_writable (our_caps);
   our_caps = gst_droidcamsrc_pick_largest_resolution (src, our_caps);
 
-  /* just in case.
-   * TODO: a better way of doing it is to get the current fps preview range and use its
-   * upper bound
-   */
-  gst_structure_fixate_field_nearest_fraction (gst_caps_get_structure (our_caps,
-          0), "framerate", G_MAXINT, 1);
+  gst_droidcamsrc_params_choose_framerate (src->dev->params, our_caps, FALSE, NULL);
 
   if (!gst_pad_push_event (data->pad, gst_event_new_caps (our_caps))) {
     GST_ERROR_OBJECT (src, "failed to set caps");
