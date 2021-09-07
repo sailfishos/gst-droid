@@ -433,11 +433,13 @@ static void
 gst_droidcamsrc_dev_buffers_released (G_GNUC_UNUSED void *user)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
-  GstBufferPool *pool = gst_object_ref (dev->pool);
+  if (dev->pool) {
+    GstBufferPool *pool = gst_object_ref (dev->pool);
 
-  if (pool) {
-    gst_droid_buffer_pool_media_buffers_invalidated (pool);
-    gst_object_unref (pool);
+    if (pool) {
+      gst_droid_buffer_pool_media_buffers_invalidated (pool);
+      gst_object_unref (pool);
+    }
   }
 }
 
@@ -446,12 +448,14 @@ gst_droidcamsrc_dev_buffer_created (void *user, DroidMediaBuffer * buffer)
 {
   GstDroidCamSrcDev *dev = (GstDroidCamSrcDev *) user;
   bool ret = false;
-  GstBufferPool *pool = gst_object_ref (dev->pool);
+  if (dev->pool) {
+    GstBufferPool *pool = gst_object_ref (dev->pool);
 
-  if (pool) {
-    ret = gst_droid_buffer_pool_bind_media_buffer (pool, buffer);
+    if (pool) {
+      ret = gst_droid_buffer_pool_bind_media_buffer (pool, buffer);
 
-    gst_object_unref (pool);
+      gst_object_unref (pool);
+    }
   }
 
   return ret;
