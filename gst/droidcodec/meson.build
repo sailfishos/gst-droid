@@ -1,4 +1,5 @@
 gstdroidcodec_sources = [
+  '/usr/share/droidmedia/hybris.c',
   'gstdroidvdec.c',
   'gstdroidvenc.c',
   'gstdroidadec.c',
@@ -13,7 +14,7 @@ gstdroidcodec_headers = [
 ]
 
 gstdroidcodec_deps = [
-  droidmedia_dep,
+  dl_dep,
   gst_dep,
   gstaudio_dep,
   gstbase_dep,
@@ -27,7 +28,7 @@ gstdroidcodec_deps = [
 gstdroidcodec = static_library('gstdroidcodec-@0@'.format(api_version),
   gstdroidcodec_sources + gstdroidcodec_headers,
   c_args : gstdroid_args + ['-DGST_USE_UNSTABLE_API'],
-  include_directories : ['..', configinc, libsinc],
+  include_directories : ['..', configinc, libsinc, droidmedia_h],
   dependencies : gstdroidcodec_deps
 )
 

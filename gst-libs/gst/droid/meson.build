@@ -1,4 +1,5 @@
 gstdroid_sources = [
+  '/usr/share/droidmedia/hybris.c',
   'gstdroidbufferpool.c',
   'gstdroidcodec.c',
   'gstdroidmediabuffer.c',
@@ -15,7 +16,7 @@ gstdroid_headers = [
 ]
 
 gstdroid_deps = [
-  droidmedia_dep,
+  dl_dep,
   gst_dep,
   gstbase_dep,
   gstcodecparsers_dep,
@@ -29,7 +30,7 @@ install_headers(gstdroid_headers, subdir : 'gstreamer-@0@/gst/allocators'.format
 gstdroid = library('gstdroid-@0@'.format(api_version),
   gstdroid_sources + gstdroid_headers,
   c_args : gstdroid_args + ['-DGST_USE_UNSTABLE_API'],
-  include_directories : [configinc, libsinc],
+  include_directories : [configinc, libsinc, droidmedia_h],
   version : lib_version,
   soversion : so_version,
   install : true,

@@ -1,4 +1,5 @@
 gstdroidcamsrc_sources = [
+  '/usr/share/droidmedia/hybris.c',
   'gstdroidcamsrc.c',
   'gstdroidcamsrcdev.c',
   'gstdroidcamsrcparams.c',
@@ -23,7 +24,7 @@ gstdroidcamsrc_headers = [
 ]
 
 gstdroidcamsrc_deps = [
-  droidmedia_dep,
+  dl_dep,
   gst_dep,
   gstbase_dep,
   gstcamerabinsrc_dep,
@@ -39,7 +40,7 @@ gstdroidcamsrc_deps = [
 gstdroidcamsrc = static_library('gstdroidcamsrc-@0@'.format(api_version),
   gstdroidcamsrc_sources + gstdroidcamsrc_headers,
   c_args : gstdroid_args + ['-DGST_USE_UNSTABLE_API'],
-  include_directories : ['..', configinc, libsinc],
+  include_directories : ['..', configinc, libsinc, droidmedia_h],
   dependencies : gstdroidcamsrc_deps
 )
 
