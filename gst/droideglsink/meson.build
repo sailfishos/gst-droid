@@ -10,7 +10,6 @@ gstdroideglsink_headers = [
 ]
 
 gstdroideglsink_deps = [
-  dl_dep,
   gst_dep,
   gstdroid_dep,
   gstnemointerfaces_dep,

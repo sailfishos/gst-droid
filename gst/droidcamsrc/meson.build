@@ -24,7 +24,6 @@ gstdroidcamsrc_headers = [
 ]
 
 gstdroidcamsrc_deps = [
-  dl_dep,
   gst_dep,
   gstbase_dep,
   gstcamerabinsrc_dep,
@@ -35,6 +34,7 @@ gstdroidcamsrc_deps = [
   gstvideo_dep,
   egl_dep,
   exif_dep,
+  hybris_dep
 ]
 
 gstdroidcamsrc = static_library('gstdroidcamsrc-@0@'.format(api_version),

@@ -14,7 +14,6 @@ gstdroidcodec_headers = [
 ]
 
 gstdroidcodec_deps = [
-  dl_dep,
   gst_dep,
   gstaudio_dep,
   gstbase_dep,
@@ -22,6 +21,7 @@ gstdroidcodec_deps = [
   gstdroid_dep,
   gstvideo_dep,
   egl_dep,
+  hybris_dep,
   orc_dep
 ]
 
