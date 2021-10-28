@@ -4,6 +4,7 @@
  * Copyright (C) 2014 Mohammed Sameer
  * Copyright (C) 2015-2021 Jolla Ltd.
  * Copyright (C) 2010 Texas Instruments, Inc
+ * Copyright (C) 2021 Open Mobile Platform LLC.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -736,6 +737,17 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
 
   switch (transition) {
     case GST_STATE_CHANGE_PLAYING_TO_PAUSED:
+    /**
+     * Send flush start to make sure the sink will drop its buffers.
+     *
+     * It is required to flush it before calling gst_droidcamsrc_dev_stop()
+     * to avoid deadlock in android::BufferQueueProducer::dequeueBuffer()
+     */
+      g_mutex_lock (&src->vfsrc->lock);
+      GST_INFO_OBJECT (src, "pushing flush start");
+      gst_pad_push_event (src->vfsrc->pad, gst_event_new_flush_start ());
+      g_mutex_unlock (&src->vfsrc->lock);
+
       /* TODO: stop recording if we are recording */
       gst_droidcamsrc_dev_stop (src->dev);
       src->captures = 0;
@@ -746,11 +758,6 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         src->active_mode = NULL;
       }
 
-      /* Send flush start to make sure the sink will drop its buffers */
-      g_mutex_lock (&src->vfsrc->lock);
-      GST_INFO_OBJECT (src, "pushing flush start");
-      gst_pad_push_event (src->vfsrc->pad, gst_event_new_flush_start ());
-      g_mutex_unlock (&src->vfsrc->lock);
       break;
 
     case GST_STATE_CHANGE_PAUSED_TO_READY:
