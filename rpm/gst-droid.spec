@@ -57,6 +57,7 @@ rm -rf $RPM_BUILD_ROOT%{_sysconfdir}/gst-droid
 
 %files
 %defattr(-,root,root,-)
+%license COPYING
 %{_libdir}/gstreamer-%{majorminor}/*.so
 %{_libdir}/*.so.*
 
