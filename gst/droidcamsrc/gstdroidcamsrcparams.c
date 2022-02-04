@@ -517,7 +517,7 @@ gst_droidcamsrc_params_choose_framerate (GstDroidCamSrcParams * params,
     if (set_param_name) {
       gchar *var;
       var = g_strdup_printf ("%d,%d", target_min, target_max);
-      gst_droidcamsrc_params_set_string_locked (params, "preview-fps-range", var);
+      gst_droidcamsrc_params_set_string_locked (params, set_param_name, var);
       g_free (var);
     }
   }
