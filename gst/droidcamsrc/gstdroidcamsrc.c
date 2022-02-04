@@ -4,7 +4,7 @@
  * Copyright (C) 2014 Mohammed Sameer
  * Copyright (C) 2015-2021 Jolla Ltd.
  * Copyright (C) 2010 Texas Instruments, Inc
- * Copyright (C) 2021 Open Mobile Platform LLC.
+ * Copyright (C) 2021-2022 Open Mobile Platform LLC.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -1971,7 +1971,7 @@ gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data)
   our_caps = gst_caps_make_writable (our_caps);
   our_caps = gst_droidcamsrc_pick_largest_resolution (src, our_caps);
 
-  gst_droidcamsrc_params_choose_framerate (src->dev->params, our_caps, FALSE, NULL);
+  gst_droidcamsrc_params_choose_framerate (src->dev->params, our_caps, NULL);
 
   if (!gst_pad_push_event (data->pad, gst_event_new_caps (our_caps))) {
     GST_ERROR_OBJECT (src, "failed to set caps");
