@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2014 Mohammed Sameer <msameer@foolab.org>
  * Copyright (C) 2015-2018 Jolla Ltd.
+ * Copyright (C) 2022 Open Mobile Platform LLC.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -56,7 +57,7 @@ int gst_droidcamsrc_params_get_int (GstDroidCamSrcParams * params, const char *k
 float gst_droidcamsrc_params_get_float (GstDroidCamSrcParams * params, const char *key);
 
 void gst_droidcamsrc_params_choose_framerate (GstDroidCamSrcParams * params,
-  GstCaps * caps, gboolean widest, const char *set_param);
+  GstCaps * caps, const char *set_param_name);
 void gst_droidcamsrc_params_choose_image_framerate (GstDroidCamSrcParams * params, GstCaps * caps);
 void gst_droidcamsrc_params_choose_video_framerate (GstDroidCamSrcParams * params, GstCaps * caps);
 

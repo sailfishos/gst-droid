@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2014 Mohammed Sameer
  * Copyright (C) 2015-2021 Jolla Ltd.
+ * Copyright (C) 2022 Open Mobile Platform LLC.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -466,7 +467,7 @@ gst_droidcamsrc_params_get_string (GstDroidCamSrcParams * params,
 
 void
 gst_droidcamsrc_params_choose_framerate (GstDroidCamSrcParams * params,
-    GstCaps * caps, gboolean widest, const char *set_param_name)
+    GstCaps * caps, const char *set_param_name)
 {
   int x;
   int target_min = -1, target_max = -1;
@@ -493,18 +494,10 @@ gst_droidcamsrc_params_choose_framerate (GstDroidCamSrcParams * params,
 
     gst_caps_unref (c);
 
-    if (widest) {
-      /* the fps we have is valid. Select it if higher than our current target, or wider */
-      if (max > target_max || (max == target_max && min < target_min)) {
-        target_min = min;
-        target_max = max;
-      }
-    } else {
-      /* the fps we have is valid. Select it if higher than our current target, or narrower */
-      if (max > target_max || (max == target_max && min > target_min)) {
-        target_min = min;
-        target_max = max;
-      }
+    /* the fps we have is valid. Select it if higher than our current target, or wider */
+    if (max > target_max || (max == target_max && min < target_min)) {
+      target_min = min;
+      target_max = max;
     }
   }
 
@@ -517,7 +510,7 @@ gst_droidcamsrc_params_choose_framerate (GstDroidCamSrcParams * params,
     if (set_param_name) {
       gchar *var;
       var = g_strdup_printf ("%d,%d", target_min, target_max);
-      gst_droidcamsrc_params_set_string_locked (params, "preview-fps-range", var);
+      gst_droidcamsrc_params_set_string_locked (params, set_param_name, var);
       g_free (var);
     }
   }
@@ -530,7 +523,7 @@ gst_droidcamsrc_params_choose_image_framerate (GstDroidCamSrcParams * params,
     GstCaps * caps)
 {
   gst_droidcamsrc_params_choose_framerate (params,
-    caps, TRUE, "preview-fps-range");
+    caps, "preview-fps-range");
 }
 
 void
@@ -538,5 +531,5 @@ gst_droidcamsrc_params_choose_video_framerate (GstDroidCamSrcParams * params,
     GstCaps * caps)
 {
   gst_droidcamsrc_params_choose_framerate (params,
-    caps, FALSE, "preview-fps-range");
+    caps, "preview-fps-range");
 }
