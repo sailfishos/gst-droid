@@ -1321,7 +1321,6 @@ gst_droidcamsrc_set_flash_mode (GstDroidCamSrc
 static gboolean
 gst_droidcamsrc_set_zoom (GstDroidCamSrc * src, gfloat zoom)
 {
-  int step = zoom;
   int max_zoom;
   gboolean ret;
   gchar *value;
@@ -1330,9 +1329,9 @@ gst_droidcamsrc_set_zoom (GstDroidCamSrc * src, gfloat zoom)
   max_zoom = src->max_zoom;
   GST_OBJECT_UNLOCK (src);
 
-  if (step > max_zoom) {
-    GST_WARNING_OBJECT (src, "requested zoom (%d) is larger than max zoom (%d)",
-        step, max_zoom);
+  if (zoom > max_zoom) {
+    GST_WARNING_OBJECT (src, "requested zoom (%f) is larger than max zoom (%d)",
+        zoom, max_zoom);
     return FALSE;
   }
 
@@ -1340,8 +1339,7 @@ gst_droidcamsrc_set_zoom (GstDroidCamSrc * src, gfloat zoom)
   src->photo->settings.zoom = zoom;
   GST_OBJECT_UNLOCK (src);
 
-  step -= 1;
-  value = g_strdup_printf ("%d", step);
+  value = g_strdup_printf ("%f", zoom);
   ret = gst_droidcamsrc_set_and_apply (src, "zoom", value);
 
   GST_DEBUG_OBJECT (src, "zoom set to %s", value);
