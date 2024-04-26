@@ -2348,9 +2348,15 @@ gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
   gst_droidcamsrc_apply_quirk (src, "image-noise-reduction",
       src->image_noise_reduction);
 
+  /* Noise reduction quirk */
+  gst_droidcamsrc_apply_quirk (src, "noise-reduction", TRUE);
+
   /* ZSL quirk */
   gst_droidcamsrc_apply_quirk (src, "zsl",
       (src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_ZSL));
+
+  /* Edge mode quirk */
+  gst_droidcamsrc_apply_quirk (src, "edge-mode", TRUE);
 
   /* HDR quirk */
   gst_droidcamsrc_apply_quirk (src, "hdr",
