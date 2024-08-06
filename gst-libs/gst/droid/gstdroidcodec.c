@@ -45,8 +45,6 @@ static gboolean create_h264dec_codec_data_from_codec_data (GstDroidCodec *
     codec, GstBuffer * data, DroidMediaData * out);
 static gboolean create_h265dec_codec_data_from_codec_data (GstDroidCodec *
     codec, GstBuffer * data, DroidMediaData * out);
-static gboolean create_av1dec_codec_data_from_codec_data (GstDroidCodec *
-    codec, GstBuffer * data, DroidMediaData * out);
 static gboolean create_aacdec_codec_data_from_codec_data (GstDroidCodec * codec,
     GstBuffer * data, DroidMediaData * out);
 static gboolean create_aacdec_codec_data_from_frame_data (GstDroidCodec * codec,
