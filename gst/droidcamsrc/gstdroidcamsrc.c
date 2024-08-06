@@ -1579,6 +1579,9 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
 #if GST_CHECK_VERSION(1,16,0)
     case GST_QUERY_BITRATE:
 #endif
+#if GST_CHECK_VERSION(1,22,0)
+    case GST_QUERY_SELECTABLE:
+#endif
       ret = FALSE;
       break;
 
@@ -2667,7 +2670,7 @@ static gboolean
 gst_droidcamsrc_update_jpeg_quality(GstDroidCamSrc * src)
 {
   gboolean ret = FALSE;
-  const gchar* str = NULL;
+  gchar* str = NULL;
   gint jpeg_quality = 0;
 
   GST_DEBUG_OBJECT (src, "update jpeg quality");
