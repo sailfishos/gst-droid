@@ -1100,7 +1100,6 @@ gst_droidvdec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 {
   GstDroidVDec *dec = GST_DROIDVDEC (decoder);
   GstCaps *caps, *template_caps;
-  GstCapsFeatures *features;
   guint i, count;
 
   /*
@@ -1140,7 +1139,7 @@ gst_droidvdec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 
   count = gst_caps_get_size (caps);
   for (i = 0; i < count; ++i) {
-    features = gst_caps_get_features (caps, i);
+    GstCapsFeatures *features = gst_caps_get_features (caps, i);
     if (gst_caps_features_contains
         (features, GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER)) {
       dec->use_hardware_buffers = TRUE;

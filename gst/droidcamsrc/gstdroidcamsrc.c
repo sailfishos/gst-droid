@@ -814,7 +814,7 @@ gst_droidcamsrc_handle_roi_event (GstDroidCamSrc * src,
   /* the code below is mostly based on subdevsrc gst_subdevsrc_libomap3camd_handle_roi_event */
   guint width, height, count;
   guint w, h, top, left, prio;
-  const GValue *regions, *region;
+  const GValue *regions;
   guint x;
   GPtrArray *focus_areas, *metering_areas;
   gboolean reset_focus_areas = FALSE, reset_metering_areas = FALSE;
@@ -878,7 +878,7 @@ gst_droidcamsrc_handle_roi_event (GstDroidCamSrc * src,
 
   for (x = 0; x < count; x++) {
     const GstStructure *rs;
-    region = gst_value_list_get_value (regions, x);
+    const GValue *region = gst_value_list_get_value (regions, x);
     rs = gst_value_get_structure (region);
     if (!gst_structure_get_uint (rs, "region-x", &left)
         || !gst_structure_get_uint (rs, "region-y", &top)
@@ -1035,7 +1035,6 @@ gst_droidcamsrc_send_event (GstElement * element, GstEvent * event)
     case GST_EVENT_CUSTOM_BOTH_OOB:
       res = gst_pad_push_event (src->vfsrc->pad, event);
       event = NULL;
-      res = TRUE;
       break;
     default:
       break;
@@ -1832,6 +1831,7 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
         gst_object_unref (pool);
         pool = NULL;
         ret = FALSE;
+        goto out;
       }
     }
   }
@@ -2671,11 +2671,11 @@ gst_droidcamsrc_update_jpeg_quality(GstDroidCamSrc * src)
 {
   gboolean ret = FALSE;
   gchar* str = NULL;
-  gint jpeg_quality = 0;
 
   GST_DEBUG_OBJECT (src, "update jpeg quality");
 
   do {
+    gint jpeg_quality = 0;
     g_rec_mutex_lock (&src->dev_lock);
 
     if (!src->dev || !src->dev->params)

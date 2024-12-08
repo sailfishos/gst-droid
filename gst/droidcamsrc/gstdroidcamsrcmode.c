@@ -113,7 +113,7 @@ gst_droidcamsrc_mode_deactivate (GstDroidCamSrcMode * mode)
 
 gboolean
 gst_droidcamsrc_mode_pad_is_significant (GstDroidCamSrcMode * mode,
-    GstPad * pad)
+    const GstPad * pad)
 {
   return mode->vfsrc == pad || mode->modesrc == pad;
 }

@@ -882,7 +882,6 @@ create_aacdec_codec_data_from_codec_data (GstDroidCodec * codec G_GNUC_UNUSED,
   offset += 1;                  /* SL Descriptor tag */
   offset += write_len (out->data + offset, 1);
   GST_WRITE_UINT8 (out->data + offset, 2);
-  offset += 1;
 
   gst_buffer_unmap (data, &info);
 

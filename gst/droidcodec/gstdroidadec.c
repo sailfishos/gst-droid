@@ -149,18 +149,18 @@ gst_droidadec_data_available (void *data, DroidMediaCodecData * encoded)
               (dec))->finfo->format == GST_AUDIO_FORMAT_UNKNOWN)) {
     DroidMediaCodecMetaData md;
     DroidMediaRect crop;        /* TODO: get rid of that */
-    GstAudioInfo info;
+    GstAudioInfo audio_info;
 
     memset (&md, 0x0, sizeof (md));
     droid_media_codec_get_output_info (dec->codec, &md, &crop);
     GST_INFO_OBJECT (dec, "output rate=%d, output channels=%d", md.sample_rate,
         md.channels);
 
-    gst_audio_info_init (&info);
-    gst_audio_info_set_format (&info, GST_AUDIO_FORMAT_S16, md.sample_rate,
+    gst_audio_info_init (&audio_info);
+    gst_audio_info_set_format (&audio_info, GST_AUDIO_FORMAT_S16, md.sample_rate,
         md.channels, NULL);
 
-    if (!gst_audio_decoder_set_output_format (decoder, &info)) {
+    if (!gst_audio_decoder_set_output_format (decoder, &audio_info)) {
       flow_ret = GST_FLOW_ERROR;
       goto out;
     }
