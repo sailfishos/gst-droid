@@ -83,7 +83,6 @@ common_create_encoding_profile (char *container_name, char *container_caps,
     char *video_caps, char *audio_caps)
 {
   GstEncodingVideoProfile *vp;
-  GstEncodingAudioProfile *ap;
   GstCaps *caps = gst_caps_from_string (container_caps);
   GstEncodingContainerProfile *p =
       gst_encoding_container_profile_new (container_name,
@@ -99,6 +98,7 @@ common_create_encoding_profile (char *container_name, char *container_caps,
   gst_caps_unref (caps);
 
   if (audio_caps) {
+    GstEncodingAudioProfile *ap;
     caps = gst_caps_from_string (audio_caps);
     ap = gst_encoding_audio_profile_new (caps, NULL, NULL, 1);
     gst_encoding_container_profile_add_profile (p, (GstEncodingProfile *) ap);

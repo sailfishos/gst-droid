@@ -320,9 +320,8 @@ gst_droidcamsrc_params_get_caps_locked (GstDroidCamSrcParams * params,
 
   while (*tmp) {
     int w, h;
-    GstCaps *caps2;
     if (gst_droidcamsrc_params_parse_dimension (*tmp, &w, &h)) {
-      caps2 = gst_caps_new_simple (media,
+      GstCaps *caps2 = gst_caps_new_simple (media,
           "width", G_TYPE_INT, w, "height", G_TYPE_INT, h, NULL);
 
       if (format) {

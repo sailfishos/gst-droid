@@ -341,10 +341,9 @@ gst_droid_camsrc_glist_to_array (GList * list)
   GVariantBuilder *builder;
   builder = g_variant_builder_new (G_VARIANT_TYPE ("ai"));
 
-  struct DataEntry *entry;
   GList *l;
   for (l = list; l != NULL; l = l->next) {
-    entry = l->data;
+    struct DataEntry *entry = l->data;
     g_variant_builder_add (builder, "i", entry->key);
   }
 
@@ -791,9 +790,9 @@ sort_desc (gconstpointer a, gconstpointer b)
 void
 gst_droidcamsrc_photography_init (GstDroidCamSrc * src)
 {
-  int x;
-
   if (!src->photo) {
+    int x;
+
     src->photo = g_slice_new0 (GstDroidCamSrcPhotography);
     src->photo->settings.wb_mode = GST_PHOTOGRAPHY_WB_MODE_AUTO;
     src->photo->settings.tone_mode = GST_PHOTOGRAPHY_COLOR_TONE_MODE_NORMAL;

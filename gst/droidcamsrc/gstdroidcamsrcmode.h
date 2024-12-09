@@ -42,7 +42,7 @@ void gst_droidcamsrc_mode_free (GstDroidCamSrcMode * mode);
 gboolean gst_droidcamsrc_mode_activate (GstDroidCamSrcMode * mode);
 void gst_droidcamsrc_mode_deactivate (GstDroidCamSrcMode * mode);
 
-gboolean gst_droidcamsrc_mode_pad_is_significant (GstDroidCamSrcMode * mode, GstPad * pad);
+gboolean gst_droidcamsrc_mode_pad_is_significant (GstDroidCamSrcMode * mode, const GstPad * pad);
 gboolean gst_droidcamsrc_mode_negotiate (GstDroidCamSrcMode * mode, GstPad * pad);
 
 G_END_DECLS

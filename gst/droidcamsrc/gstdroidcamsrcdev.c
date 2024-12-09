@@ -31,7 +31,6 @@
 #include "gst/droid/gstdroidmediabuffer.h"
 #include "gst/droid/gstwrappedmemory.h"
 #include "gst/droid/gstdroidbufferpool.h"
-#include <unistd.h>             /* usleep() */
 #include <string.h>             /* memcpy() */
 #ifndef GST_USE_UNSTABLE_API
 #define GST_USE_UNSTABLE_API
@@ -675,8 +674,6 @@ gst_droidcamsrc_dev_destroy (GstDroidCamSrcDev * dev)
   g_slice_free (GstDroidCamSrcImageCaptureState, dev->img);
   g_slice_free (GstDroidCamSrcVideoCaptureState, dev->vid);
   g_slice_free (GstDroidCamSrcDev, dev);
-
-  dev = NULL;
 }
 
 gboolean
@@ -1029,7 +1026,7 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
       GST_INFO ("waiting for queued frames to reach 0 from %i",
           dev->vid->queued_frames);
       g_rec_mutex_unlock (dev->lock);
-      usleep (VIDEO_RECORDING_STOP_TIMEOUT);
+      g_usleep (VIDEO_RECORDING_STOP_TIMEOUT);
       g_rec_mutex_lock (dev->lock);
     }
 

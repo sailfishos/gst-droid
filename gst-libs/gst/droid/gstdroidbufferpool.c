@@ -247,7 +247,7 @@ gst_droid_buffer_pool_acquire_media_buffer (GstBufferPool * pool,
 
   gst_buffer = (GstBuffer *) droid_media_buffer_get_user_data (buffer);
 
-  if (gst_buffer->pool != pool) {
+  if (!gst_buffer || gst_buffer->pool != pool) {
     droid_media_buffer_set_user_data (buffer, NULL);
 
     g_mutex_unlock (&dpool->binding_lock);
