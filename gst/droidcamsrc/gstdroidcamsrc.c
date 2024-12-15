@@ -1703,6 +1703,13 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
   GstVideoInfo info;
   gboolean use_raw_data = TRUE;
   GstBufferPool *pool = NULL;
+  GstBufferPool *raw_pool = NULL;
+
+  gint i;
+  guint min, max;
+  guint size;
+  gint count;
+  GstQuery *query;
 
   g_rec_mutex_lock (&src->dev_lock);
 
@@ -1775,37 +1782,38 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
       !gst_caps_features_contains (features,
       GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER);
 
+  /* Negotiate a buffer pool or allocate one now. Useful whether using queue
+   * buffers or not. Note that if raw_pool does not exist it'll be created
+   * inside dev as post_preview may also require it. */
+  query = gst_query_new_allocation (our_caps, TRUE);
+
+  if (!gst_pad_peer_query (data->pad, query)) {
+    GST_DEBUG_OBJECT (src, "didn't get downstream ALLOCATION hints");
+  }
+
+  count = gst_query_get_n_allocation_pools (query);
+
+  for (i = 0; i < count; ++i) {
+    GstAllocator *allocator;
+    GstStructure *config;
+
+    gst_query_parse_nth_allocation_pool (query, i, &pool, &size, &min, &max);
+    config = gst_buffer_pool_get_config (pool);
+    gst_buffer_pool_config_get_allocator (config, &allocator, NULL);
+    if (allocator
+        && g_strcmp0 (allocator->mem_type,
+            GST_ALLOCATOR_DROID_MEDIA_BUFFER) == 0) {
+      break;
+    } else if (!raw_pool) {
+      raw_pool = pool;
+      pool = NULL;
+    } else {
+      gst_object_unref (pool);
+      pool = NULL;
+    }
+  }
+
   if (!use_raw_data) {
-    /* Negotiate a buffer pool or allocate one now. */
-    gint i;
-    guint min, max;
-    guint size;
-    gint count;
-    GstQuery *query = gst_query_new_allocation (our_caps, TRUE);
-
-    if (!gst_pad_peer_query (data->pad, query)) {
-      GST_DEBUG_OBJECT (src, "didn't get downstream ALLOCATION hints");
-    }
-
-    count = gst_query_get_n_allocation_pools (query);
-
-    for (i = 0; i < count; ++i) {
-      GstAllocator *allocator;
-      GstStructure *config;
-
-      gst_query_parse_nth_allocation_pool (query, i, &pool, &size, &min, &max);
-      config = gst_buffer_pool_get_config (pool);
-      gst_buffer_pool_config_get_allocator (config, &allocator, NULL);
-      if (allocator
-          && g_strcmp0 (allocator->mem_type,
-              GST_ALLOCATOR_DROID_MEDIA_BUFFER) == 0) {
-        break;
-      } else {
-        gst_object_unref (pool);
-        pool = NULL;
-      }
-    }
-
     /* The downstream may have other ideas about what the pool size should be but the
      * queue we're working with has a fixed size so that's the number of buffers we'll
      * go with. */
@@ -1843,6 +1851,15 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
     gst_object_unref (src->dev->pool);
   }
   src->dev->pool = pool;
+
+  /* Don't replace raw_pool unless we're given a new one. */
+  if (raw_pool) {
+    if (src->dev->raw_pool) {
+      gst_object_unref (src->dev->raw_pool);
+    }
+    src->dev->raw_pool = raw_pool;
+    src->dev->raw_pool_configured = FALSE;
+  }
 
   g_rec_mutex_unlock (&src->dev_lock);
 
