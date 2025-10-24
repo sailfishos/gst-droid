@@ -967,6 +967,11 @@ gst_droidvdec_decide_allocation (GstVideoDecoder * decoder, GstQuery * query)
       if (!gst_buffer_pool_set_config (pool, config)) {
         GST_ERROR_OBJECT (decoder, "Failed to set buffer pool configuration");
       }
+
+      gint count = gst_query_get_n_allocation_pools (query);
+      if (count == 0) {
+        gst_query_add_allocation_pool(query, pool, size, min, max);
+      }
     }
 
     gst_query_set_nth_allocation_pool (query, 0, pool, size, min, max);
