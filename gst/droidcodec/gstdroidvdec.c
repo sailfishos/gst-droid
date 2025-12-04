@@ -87,6 +87,7 @@ static void gst_droidvdec_data_available (void *data,
 static gboolean gst_droidvdec_convert_buffer (GstDroidVDec * dec,
     GstBuffer * out, DroidMediaData * in, GstVideoInfo * info);
 static void gst_droidvdec_loop (GstDroidVDec * dec);
+static void gst_droidvdec_stop_loop (GstDroidVDec * dec);
 static GstFlowReturn gst_droidvdec_finish_frame (GstVideoDecoder * decoder,
     GstVideoCodecFrame * frame);
 
@@ -992,6 +993,10 @@ gst_droidvdec_stop (GstVideoDecoder * decoder)
   GstDroidVDec *dec = GST_DROIDVDEC (decoder);
 
   GST_DEBUG_OBJECT (dec, "stop");
+
+  if (dec->running) {
+    gst_droidvdec_stop_loop (dec);
+  }
 
   if (dec->codec) {
     droid_media_codec_stop (dec->codec);
