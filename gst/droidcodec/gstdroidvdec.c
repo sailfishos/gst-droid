@@ -28,6 +28,7 @@
 #include "gst/droid/gstdroidbufferpool.h"
 #include "plugin.h"
 #include "droidmediaconstants.h"
+#include <gst/video/video.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <string.h>             /* memset() */
@@ -90,6 +91,8 @@ static void gst_droidvdec_loop (GstDroidVDec * dec);
 static void gst_droidvdec_stop_loop (GstDroidVDec * dec);
 static GstFlowReturn gst_droidvdec_finish_frame (GstVideoDecoder * decoder,
     GstVideoCodecFrame * frame);
+static GstFlowReturn gst_droidvdec_finish (GstVideoDecoder * decoder);
+static gboolean gst_droidvdec_can_create_codec_now (GstDroidVDec * dec);
 
 static void
 gst_droidvdec_loop (GstDroidVDec * dec)
@@ -369,6 +372,29 @@ gst_droidvdec_create_codec (GstDroidVDec * dec, GstBuffer * input)
   return TRUE;
 
 error:
+  return FALSE;
+}
+
+static gboolean
+gst_droidvdec_can_create_codec_now (GstDroidVDec * dec)
+{
+  DroidMediaData codec_data;
+
+  memset (&codec_data, 0x0, sizeof (codec_data));
+
+  switch (gst_droid_codec_create_decoder_codec_data (dec->codec_type,
+          dec->codec_data, &codec_data, NULL)) {
+    case GST_DROID_CODEC_CODEC_DATA_OK:
+      g_free (codec_data.data);
+      return TRUE;
+
+    case GST_DROID_CODEC_CODEC_DATA_NOT_NEEDED:
+      return TRUE;
+
+    case GST_DROID_CODEC_CODEC_DATA_ERROR:
+      return FALSE;
+  }
+
   return FALSE;
 }
 
@@ -1111,6 +1137,7 @@ gst_droidvdec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   GstDroidVDec *dec = GST_DROIDVDEC (decoder);
   GstCaps *caps, *template_caps;
   guint i, count;
+  gboolean created_now = FALSE;
 
   /*
    * destroying the droidmedia codec here will cause stagefright to call abort.
@@ -1120,9 +1147,12 @@ gst_droidvdec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   GST_DEBUG_OBJECT (dec, "set format %" GST_PTR_FORMAT, state->caps);
 
   if (dec->codec) {
-    GST_FIXME_OBJECT (dec, "What to do here?");
-    GST_ERROR_OBJECT (dec, "codec already configured");
-    return FALSE;
+    GST_INFO_OBJECT (dec, "Reconfiguring codec for new caps");
+  }
+
+  if (dec->codec_type) {
+    gst_droid_codec_unref (dec->codec_type);
+    dec->codec_type = NULL;
   }
 
   dec->codec_type =
@@ -1163,6 +1193,10 @@ gst_droidvdec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
     return FALSE;
   }
 
+  if (dec->in_state) {
+    gst_video_codec_state_unref (dec->in_state);
+  }
+
   dec->in_state = gst_video_codec_state_ref (state);
 
   if (dec->out_state) {
@@ -1172,8 +1206,30 @@ gst_droidvdec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 
   gst_buffer_replace (&dec->codec_data, state->codec_data);
 
-  /* handle_frame will create the codec */
-  dec->dirty = TRUE;
+  if (gst_droidvdec_can_create_codec_now (dec)) {
+    if (dec->codec) {
+      GstFlowReturn finish_res;
+
+      GST_INFO_OBJECT (dec, "draining old codec during caps change");
+      finish_res = gst_droidvdec_finish (decoder);
+      if (finish_res != GST_FLOW_OK) {
+        GST_DEBUG_OBJECT (dec,
+            "decoder will be recreated when the first frame arrives");
+        dec->dirty = TRUE;
+        return TRUE;
+      }
+    }
+
+    GST_INFO_OBJECT (dec, "creating codec during caps change");
+    if (!gst_droidvdec_create_codec (dec, NULL)) {
+      return FALSE;
+    }
+
+    created_now = TRUE;
+  }
+
+  /* Fall back to creating the codec from the first frame when needed. */
+  dec->dirty = !created_now;
 
   return TRUE;
 }
@@ -1321,15 +1377,8 @@ gst_droidvdec_handle_frame (GstVideoDecoder * decoder,
 
   /* We must create the codec before we process any data. _create_codec will call
    * construct_decoder_codec_data which will store the nal prefix length for H264.
-   * This is a bad situation. TODO: fix it
    */
   if (G_UNLIKELY (dec->dirty)) {
-    if (!GST_VIDEO_CODEC_FRAME_IS_SYNC_POINT (frame)) {
-      ret = GST_FLOW_OK;
-      gst_video_decoder_drop_frame (decoder, frame);
-      goto out;
-    }
-
     if (dec->codec) {
       gst_droidvdec_finish (decoder);
     }
