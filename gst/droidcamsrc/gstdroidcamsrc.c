@@ -65,14 +65,11 @@ GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_IMAGE_PAD_NAME,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS ("image/jpeg"));
 
-#if 0
 static GstStaticPadTemplate vid_src_template_factory =
 GST_STATIC_PAD_TEMPLATE (GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME,
     GST_PAD_SRC,
     GST_PAD_ALWAYS,
-    GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
-        (GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA, "{YV12}")));
-#endif
+    GST_STATIC_CAPS_ANY);
 
 static gboolean gst_droidcamsrc_pad_activate_mode (GstPad * pad,
     GstObject * parent, GstPadMode mode, gboolean active);
@@ -126,6 +123,13 @@ static guint droidcamsrc_signals[LAST_SIGNAL];
 #define DEFAULT_JPEG_QUALITY           90
 #define DEFAULT_MIN_JPEG_QUALITY       10
 #define DEFAULT_MAX_JPEG_QUALITY       100
+
+#define CAMERA_STARTUP_CREATE(format, ...) \
+  G_STMT_START { \
+    if (gst_droid_camera_startup_logging_enabled ()) \
+      g_message ("CAMERA_STARTUP gst-droid-create %" G_GINT64_FORMAT " ms " format, \
+          gst_droid_camera_startup_mono_ms (), ##__VA_ARGS__); \
+  } G_STMT_END
 
 static GstDroidCamSrcPad *
 gst_droidcamsrc_create_pad (GstDroidCamSrc * src,
@@ -285,7 +289,11 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
       break;
 
     case PROP_SENSOR_DIRECTION:
-      g_value_set_int (value, src->info[src->camera_device].direction);
+      if (!gst_droidcamsrc_get_hw (src)) {
+        g_value_set_int (value, 0);
+      } else {
+        g_value_set_int (value, src->info[src->camera_device].direction);
+      }
       break;
 
     case PROP_SENSOR_MOUNT_ANGLE:
@@ -734,6 +742,11 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         ret = GST_STATE_CHANGE_FAILURE;
       }
 
+      if (ret != GST_STATE_CHANGE_FAILURE) {
+        gst_droidcamsrc_dev_update_params (src->dev);
+        gst_droidcamsrc_update_max_zoom (src);
+      }
+
       src->captures = 0;
       g_object_notify (G_OBJECT (src), "ready-for-capture");
 
@@ -1052,8 +1065,8 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
 {
   GObjectClass *gobject_class;
   GstElementClass *gstelement_class;
-  GstCaps *caps;
-  GstPadTemplate *tpl;
+
+  CAMERA_STARTUP_CREATE ("class_init begin");
 
   gobject_class = (GObjectClass *) klass;
   gstelement_class = (GstElementClass *) klass;
@@ -1065,21 +1078,13 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
   gst_element_class_add_pad_template (gstelement_class,
       gst_static_pad_template_get (&vf_src_template_factory));
 
+
   gst_element_class_add_pad_template (gstelement_class,
       gst_static_pad_template_get (&img_src_template_factory));
-
-  /* encoded caps */
-  caps = gst_droid_codec_get_all_caps (GST_DROID_CODEC_ENCODER_VIDEO);
-
-  /* add raw caps */
-  caps =
-      gst_caps_merge (caps,
-      gst_caps_from_string (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
-          (GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA, "{YV12}")));
-  tpl =
-      gst_pad_template_new (GST_BASE_CAMERA_SRC_VIDEO_PAD_NAME, GST_PAD_SRC,
-      GST_PAD_ALWAYS, caps);
-  gst_element_class_add_pad_template (gstelement_class, tpl);
+  /* Avoid codec enumeration during type initialization. Detailed video caps
+   * are queried lazily when configuring video capture. */
+  gst_element_class_add_pad_template (gstelement_class,
+      gst_static_pad_template_get (&vid_src_template_factory));
 
   gobject_class->set_property = gst_droidcamsrc_set_property;
   gobject_class->get_property = gst_droidcamsrc_get_property;
@@ -1090,12 +1095,14 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
   gstelement_class->send_event = GST_DEBUG_FUNCPTR (gst_droidcamsrc_send_event);
 
   /* Add camera-device property only if cameras have been found */
-  if (droid_media_camera_get_number_of_cameras () > 0) {
+  CAMERA_STARTUP_CREATE ("camera count begin");
+  gint camera_count = droid_media_camera_get_number_of_cameras ();
+  CAMERA_STARTUP_CREATE ("camera count done count=%d", camera_count);
+  if (camera_count > 0) {
     g_object_class_install_property (gobject_class, PROP_CAMERA_DEVICE,
         g_param_spec_int ("camera-device", "Camera device",
             "Defines which camera device should be used",
-            0,
-            droid_media_camera_get_number_of_cameras () - 1,
+            0, camera_count - 1,
             DEFAULT_CAMERA_DEVICE, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   }
 
@@ -1254,6 +1261,8 @@ gst_droidcamsrc_class_init (GstDroidCamSrcClass * klass)
       G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
       G_CALLBACK (gst_droidcamsrc_stop_capture),
       NULL, NULL, g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0);
+
+  CAMERA_STARTUP_CREATE ("class_init done");
 }
 
 static void

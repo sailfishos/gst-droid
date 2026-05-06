@@ -49,6 +49,8 @@ struct _GstDroidCamSrcDev
   GstAllocator *media_allocator;
   gboolean running;
   gboolean use_raw_data;
+  gboolean first_preview_frame_seen;
+  gboolean first_frame_available_seen;
   GRecMutex *lock;
   GstDroidCamSrcCamInfo *info;
   GstDroidCamSrcImageCaptureState *img;

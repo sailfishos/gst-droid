@@ -24,6 +24,7 @@
 #include <config.h>
 #endif
 
+#include "../plugin.h"
 #include "gstdroidcamsrcdev.h"
 #include <stdlib.h>
 #include "gstdroidcamsrc.h"
@@ -42,6 +43,17 @@
 
 GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
 #define GST_CAT_DEFAULT gst_droid_camsrc_debug
+
+#define CAMERA_STARTUP_DEV(format, ...) \
+  G_STMT_START { \
+    if (gst_droid_camera_startup_logging_enabled ()) \
+      g_message ("CAMERA_STARTUP gst-droid-dev %" G_GINT64_FORMAT " ms " format, \
+          gst_droid_camera_startup_mono_ms (), ##__VA_ARGS__); \
+  } G_STMT_END
+
+#define CAMERA_STARTUP_DEV_ALWAYS(format, ...) \
+  g_message ("CAMERA_STARTUP gst-droid-dev %" G_GINT64_FORMAT " ms " format, \
+      gst_droid_camera_startup_mono_ms (), ##__VA_ARGS__)
 
 #define VIDEO_RECORDING_STOP_TIMEOUT                 100000     /* us */
 #define GST_DROIDCAMSRC_NUM_BUFFERS                  2
@@ -286,6 +298,11 @@ gst_droidcamsrc_dev_preview_frame_callback (void *user,
   DroidMediaRect rect;
 
   GST_DEBUG_OBJECT (src, "dev preview frame callback");
+  if (!dev->first_preview_frame_seen) {
+    dev->first_preview_frame_seen = TRUE;
+    CAMERA_STARTUP_DEV_ALWAYS ("first raw preview callback size=%" G_GSIZE_FORMAT " use_raw_data=%d",
+        (gsize) mem->size, dev->use_raw_data);
+  }
 
   buffer = gst_buffer_new_allocate (NULL, mem->size, NULL);
   gst_buffer_fill (buffer, 0, mem->data, mem->size);
@@ -472,6 +489,10 @@ gst_droidcamsrc_dev_frame_available (void *user, DroidMediaBuffer * buffer)
   DroidMediaBufferInfo info;
 
   GST_DEBUG_OBJECT (src, "frame available");
+  if (!dev->first_frame_available_seen) {
+    dev->first_frame_available_seen = TRUE;
+    CAMERA_STARTUP_DEV_ALWAYS ("first buffer-queue frame available use_raw_data=%d", dev->use_raw_data);
+  }
 
   droid_media_buffer_get_info (buffer, &info);
 
@@ -580,9 +601,12 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
   src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
   GST_DEBUG_OBJECT (src, "dev open");
+  CAMERA_STARTUP_DEV ("dev_open begin camera=%d", info ? info->num : -1);
 
   dev->info = info;
+  CAMERA_STARTUP_DEV ("droid_media_camera_connect begin camera=%d", dev->info->num);
   dev->cam = droid_media_camera_connect (dev->info->num);
+  CAMERA_STARTUP_DEV ("droid_media_camera_connect done camera=%d cam=%p", dev->info->num, dev->cam);
 
   if (!dev->cam) {
     g_rec_mutex_unlock (dev->lock);
@@ -625,6 +649,7 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
 
   g_rec_mutex_unlock (dev->lock);
 
+  CAMERA_STARTUP_DEV ("dev_open done camera=%d", dev->info->num);
   return TRUE;
 }
 
@@ -738,6 +763,8 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
   gboolean ret = FALSE;
   GstDroidCamSrc *src = GST_DROIDCAMSRC (GST_PAD_PARENT (dev->imgsrc->pad));
 
+  CAMERA_STARTUP_DEV ("dev_start begin apply_settings=%d running=%d use_raw_data=%d",
+      apply_settings, dev->running, dev->use_raw_data);
   g_rec_mutex_lock (dev->lock);
 
   if (dev->running) {
@@ -762,18 +789,25 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
   }
 
   if (apply_settings) {
+    CAMERA_STARTUP_DEV ("apply_mode_settings from dev_start begin");
     gst_droidcamsrc_apply_mode_settings (src, SET_ONLY);
+    CAMERA_STARTUP_DEV ("apply_mode_settings from dev_start done");
   }
 
   /* now set params */
+  CAMERA_STARTUP_DEV ("dev_set_params from dev_start begin");
   if (!gst_droidcamsrc_dev_set_params (dev)) {
     goto out;
   }
 
+  CAMERA_STARTUP_DEV ("dev_set_params from dev_start done");
+
+  CAMERA_STARTUP_DEV ("droid_media_camera_start_preview begin");
   if (!droid_media_camera_start_preview (dev->cam)) {
     GST_ERROR_OBJECT (src, "error starting preview");
     goto out;
   }
+  CAMERA_STARTUP_DEV ("droid_media_camera_start_preview done");
 
   dev->running = TRUE;
 
@@ -788,6 +822,7 @@ out:
   }
 
   g_rec_mutex_unlock (dev->lock);
+  CAMERA_STARTUP_DEV ("dev_start done ret=%d running=%d", ret, dev->running);
   return ret;
 }
 
@@ -844,13 +879,15 @@ gst_droidcamsrc_dev_set_params (GstDroidCamSrcDev * dev)
   params = gst_droidcamsrc_params_to_string (dev->params);
   GST_LOG ("setting parameters %s", params);
   err = droid_media_camera_set_parameters (dev->cam, params);
-  g_free (params);
 
   if (!err) {
     GST_ERROR ("error setting parameters");
+    g_free (params);
     goto out;
   }
 
+  gst_droidcamsrc_params_mark_clean (dev->params);
+  g_free (params);
   ret = TRUE;
 
 out:

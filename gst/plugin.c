@@ -43,10 +43,19 @@ GST_DEBUG_CATEGORY (gst_droid_codec_debug);
 GST_DEBUG_CATEGORY (gst_droid_eglsink_debug);
 GST_DEBUG_CATEGORY (gst_droid_videotexturesink_debug);
 
+#define CAMERA_STARTUP_PLUGIN(format, ...) \
+  G_STMT_START { \
+    if (gst_droid_camera_startup_logging_enabled ()) \
+      g_message ("CAMERA_STARTUP gst-droid-plugin %" G_GINT64_FORMAT " ms " format, \
+          gst_droid_camera_startup_mono_ms (), ##__VA_ARGS__); \
+  } G_STMT_END
+
 static gboolean
 plugin_init (GstPlugin * plugin)
 {
   gboolean ok = TRUE;
+
+  CAMERA_STARTUP_PLUGIN ("plugin_init begin");
 
   GST_DEBUG_CATEGORY_INIT (gst_droid_camsrc_debug, "droidcamsrc",
       0, "Android HAL camera source");
@@ -72,12 +81,17 @@ plugin_init (GstPlugin * plugin)
   GST_DEBUG_CATEGORY_INIT (gst_droid_codec_debug, "droidcodec",
       0, "Android HAL codec");
 
+  CAMERA_STARTUP_PLUGIN ("debug categories done");
+
   ok &= gst_element_register (plugin, "droidcamsrc", GST_RANK_PRIMARY,
       GST_TYPE_DROIDCAMSRC);
+  CAMERA_STARTUP_PLUGIN ("registered droidcamsrc ok=%d", ok);
   ok &= gst_element_register (plugin, "droideglsink", GST_RANK_PRIMARY,
       GST_TYPE_DROIDEGLSINK);
   ok &= gst_element_register (plugin, "droidvideotexturesink", GST_RANK_PRIMARY,
       GST_TYPE_DROIDVIDEOTEXTURESINK);
+
+  CAMERA_STARTUP_PLUGIN ("registered sinks ok=%d", ok);
 
   ok &= gst_element_register (plugin, "droidvdec", GST_RANK_PRIMARY + 1,
       GST_TYPE_DROIDVDEC);
@@ -88,8 +102,15 @@ plugin_init (GstPlugin * plugin)
   ok &= gst_element_register (plugin, "droidaenc", GST_RANK_PRIMARY + 1,
       GST_TYPE_DROIDAENC);
 
-  if (ok)
+  CAMERA_STARTUP_PLUGIN ("registered codecs ok=%d", ok);
+
+  if (ok) {
+    CAMERA_STARTUP_PLUGIN ("droid_media_init begin");
     ok = droid_media_init ();
+    CAMERA_STARTUP_PLUGIN ("droid_media_init done ok=%d", ok);
+  }
+
+  CAMERA_STARTUP_PLUGIN ("plugin_init done ok=%d", ok);
 
   return ok;
 }
