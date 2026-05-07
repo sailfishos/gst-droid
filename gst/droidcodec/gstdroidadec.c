@@ -131,7 +131,7 @@ gst_droidadec_data_available (void *data, DroidMediaCodecData * encoded)
   GstDroidADec *dec = (GstDroidADec *) data;
   GstAudioDecoder *decoder = GST_AUDIO_DECODER (dec);
   GstBuffer *out;
-  GstMapInfo info;
+  GstMapInfo map;
 
   GST_DEBUG_OBJECT (dec, "data available of size %"G_GSSIZE_FORMAT, encoded->data.size);
 
@@ -145,8 +145,9 @@ gst_droidadec_data_available (void *data, DroidMediaCodecData * encoded)
     goto out;
   }
 
-  if (G_UNLIKELY (gst_audio_decoder_get_audio_info (GST_AUDIO_DECODER
-              (dec))->finfo->format == GST_AUDIO_FORMAT_UNKNOWN)) {
+  if (G_UNLIKELY (dec->output_format_dirty ||
+          gst_audio_decoder_get_audio_info (decoder)->finfo->format ==
+          GST_AUDIO_FORMAT_UNKNOWN)) {
     DroidMediaCodecMetaData md;
     DroidMediaRect crop;        /* TODO: get rid of that */
     GstAudioInfo audio_info;
@@ -166,13 +167,14 @@ gst_droidadec_data_available (void *data, DroidMediaCodecData * encoded)
     }
 
     dec->info = gst_audio_decoder_get_audio_info (GST_AUDIO_DECODER (dec));
+    dec->output_format_dirty = FALSE;
   }
 
   out = gst_audio_decoder_allocate_output_buffer (decoder, encoded->data.size);
 
-  gst_buffer_map (out, &info, GST_MAP_READWRITE);
-  orc_memcpy (info.data, encoded->data.data, encoded->data.size);
-  gst_buffer_unmap (out, &info);
+  gst_buffer_map (out, &map, GST_MAP_READWRITE);
+  orc_memcpy (map.data, encoded->data.data, encoded->data.size);
+  gst_buffer_unmap (out, &map);
 
   //  GST_WARNING_OBJECT (dec, "bpf %d, bps %d", dec->info->bpf, GST_AUDIO_INFO_BPS(dec->info));
   if (dec->spf == -1 || (encoded->data.size == dec->spf * dec->info->bpf
@@ -341,6 +343,7 @@ gst_droidadec_start (GstAudioDecoder * decoder)
   dec->dirty = TRUE;
   dec->spf = -1;
   dec->running = TRUE;
+  dec->output_format_dirty = TRUE;
 
   return TRUE;
 }
@@ -352,6 +355,7 @@ gst_droidadec_set_format (GstAudioDecoder * decoder, GstCaps * caps)
   GstStructure *str = gst_caps_get_structure (caps, 0);
   const GValue *value = gst_structure_get_value (str, "codec_data");
   GstBuffer *codec_data = value ? gst_value_get_buffer (value) : NULL;
+  gboolean needs_reconfigure = FALSE;
 
   /*
    * destroying the droidmedia codec here will cause stagefright to call abort.
@@ -361,20 +365,28 @@ gst_droidadec_set_format (GstAudioDecoder * decoder, GstCaps * caps)
   GST_DEBUG_OBJECT (dec, "set format %" GST_PTR_FORMAT, caps);
 
   if (dec->codec) {
-    /* If we get a format change then we stop */
     GstCaps *current =
         gst_pad_get_current_caps (GST_AUDIO_DECODER_SINK_PAD (decoder));
-    gboolean equal = gst_caps_is_equal_fixed (caps, current);
-    gst_caps_unref (current);
+    gboolean equal = FALSE;
+
+    if (current) {
+      equal = gst_caps_is_equal_fixed (caps, current);
+      gst_caps_unref (current);
+    }
 
     GST_DEBUG_OBJECT (dec, "new format is similar to old format? %d", equal);
 
-    if (!equal) {
-      GST_ELEMENT_ERROR (dec, LIBRARY, SETTINGS, (NULL),
-          ("codec already configured"));
+    if (equal) {
+      return TRUE;
     }
 
-    return equal;
+    GST_INFO_OBJECT (dec, "format changed, will reconfigure decoder");
+    needs_reconfigure = TRUE;
+  }
+
+  if (dec->codec_type) {
+    gst_droid_codec_unref (dec->codec_type);
+    dec->codec_type = NULL;
   }
 
   dec->codec_type =
@@ -403,6 +415,12 @@ gst_droidadec_set_format (GstAudioDecoder * decoder, GstCaps * caps)
   dec->spf = gst_droid_codec_get_samples_per_frane (caps);
 
   GST_INFO_OBJECT (dec, "samples per frame: %d", dec->spf);
+  dec->output_format_dirty = TRUE;
+
+  if (needs_reconfigure) {
+    GST_DEBUG_OBJECT (dec,
+        "decoder will be recreated before handling the next buffer");
+  }
 
   return TRUE;
 }
@@ -628,6 +646,7 @@ gst_droidadec_init (GstDroidADec * dec)
   dec->codec_data = NULL;
   dec->channels = 0;
   dec->rate = 0;
+  dec->output_format_dirty = TRUE;
 
   g_mutex_init (&dec->eos_lock);
   g_cond_init (&dec->eos_cond);
