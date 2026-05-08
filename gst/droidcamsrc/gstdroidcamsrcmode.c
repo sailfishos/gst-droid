@@ -92,13 +92,13 @@ gst_droidcamsrc_mode_activate (GstDroidCamSrcMode * mode)
 
   if (running) {
     ret = gst_droidcamsrc_dev_start (mode->src->dev, FALSE);
-  } else {
-    ret = gst_droidcamsrc_apply_params (mode->src);
-  }
 
-  /* now update max-zoom that we have a preview size */
-  gst_droidcamsrc_dev_update_params (mode->src->dev);
-  gst_droidcamsrc_update_max_zoom (mode->src);
+    /* now update max-zoom that we have a preview size */
+    gst_droidcamsrc_dev_update_params (mode->src->dev);
+    gst_droidcamsrc_update_max_zoom (mode->src);
+  } else {
+    ret = TRUE;
+  }
 
   g_rec_mutex_unlock (&mode->src->dev_lock);
 

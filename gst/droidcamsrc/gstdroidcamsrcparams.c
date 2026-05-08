@@ -271,8 +271,6 @@ gst_droidcamsrc_params_to_string (GstDroidCamSrcParams * params)
     }
   }
 
-  params->is_dirty = FALSE;
-
   g_mutex_unlock (&params->lock);
 
   return string;
@@ -288,6 +286,14 @@ gst_droidcamsrc_params_is_dirty (GstDroidCamSrcParams * params)
   g_mutex_unlock (&params->lock);
 
   return is_dirty;
+}
+
+void
+gst_droidcamsrc_params_mark_clean (GstDroidCamSrcParams * params)
+{
+  g_mutex_lock (&params->lock);
+  params->is_dirty = FALSE;
+  g_mutex_unlock (&params->lock);
 }
 
 static GstCaps *

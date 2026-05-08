@@ -25,6 +25,18 @@
 
 G_BEGIN_DECLS
 
+static inline gboolean
+gst_droid_camera_startup_logging_enabled (void)
+{
+  return g_getenv ("CAMERA_STARTUP_LOG") != NULL;
+}
+
+static inline gint64
+gst_droid_camera_startup_mono_ms (void)
+{
+  return g_get_monotonic_time () / G_TIME_SPAN_MILLISECOND;
+}
+
 G_END_DECLS
 
 #endif /* __PLUGIN_H__ */
