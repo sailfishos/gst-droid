@@ -141,6 +141,48 @@ gst_droidvec_copy_packed_planes (guint8 * out0, guint8 * out1, gint stride_out,
 #define ALIGN_SIZE(size, to) (((size) + to  - 1) & ~(to - 1))
 
 static gboolean
+gst_droidvdec_check_buffer_size (GstDroidVDec * dec, DroidMediaData * in,
+    gsize required)
+{
+  if (in->size < required) {
+    GST_ELEMENT_ERROR (dec, STREAM, DECODE, (NULL),
+        ("decoded buffer too small: got %" G_GSIZE_FORMAT
+            " bytes, need %" G_GSIZE_FORMAT, in->size, required));
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+static void
+gst_droidvdec_resolve_stride_slice_height (GstDroidVDec * dec,
+    DroidMediaData * in, gint width, gint height, gint padded_stride,
+    gint padded_slice_height, gint * stride, gint * slice_height)
+{
+  gsize padded_size = (gsize) padded_stride * padded_slice_height * 3 / 2;
+  gsize unpadded_size = (gsize) width * height * 3 / 2;
+
+  if (dec->codec_reported_stride > 0 && dec->codec_reported_slice_height > 0) {
+    *stride = dec->codec_reported_stride;
+    *slice_height = dec->codec_reported_slice_height;
+    return;
+  }
+
+  if (in->size < padded_size && in->size >= unpadded_size) {
+    GST_DEBUG_OBJECT (dec,
+        "padded geometry %dx%d doesn't fit reported buffer size, "
+        "falling back to unpadded %dx%d", padded_stride, padded_slice_height,
+        width, height);
+    *stride = width;
+    *slice_height = height;
+    return;
+  }
+
+  *stride = padded_stride;
+  *slice_height = padded_slice_height;
+}
+
+static gboolean
 gst_droidvdec_convert_native_to_i420 (GstDroidVDec * dec, GstMapInfo * out,
     DroidMediaData * in, GstVideoInfo * info, gsize width, gsize height)
 {
@@ -237,10 +279,16 @@ gst_droidvdec_convert_yuv420_semi_planar_to_i420 (GstDroidVDec * dec,
     gsize height)
 {
   GST_DEBUG_OBJECT (dec, "Converting from OMX_COLOR_FormatYUV420SemiPlanar");
-  gint stride = width;
-  gint slice_height = ALIGN_SIZE (height, 16);
+  gint stride, slice_height;
+  gst_droidvdec_resolve_stride_slice_height (dec, in, width, height, width,
+      ALIGN_SIZE (height, 16), &stride, &slice_height);
   gint top = dec->crop_rect.top;
   gint left = dec->crop_rect.left;
+
+  if (!gst_droidvdec_check_buffer_size (dec, in,
+          (gsize) stride * slice_height * 3 / 2)) {
+    return FALSE;
+  }
 
   guint8 *y = in->data + (top * stride) + left;
   guint8 *uv = in->data + (stride * slice_height) + (top * stride / 2) + left;
@@ -262,10 +310,17 @@ gst_droidvdec_convert_yuv420_packed_semi_planar_to_i420 (GstDroidVDec * dec,
   /* copy to the output buffer swapping the u and v planes and cropping if necessary */
   /* NV12 format with 128 byte alignment */
   GST_DEBUG_OBJECT (dec, "Converting from qcom NV12 semi planar");
-  gint stride = ALIGN_SIZE (width, 128);
-  gint slice_height = ALIGN_SIZE (height, 32);
+  gint stride, slice_height;
+  gst_droidvdec_resolve_stride_slice_height (dec, in, width, height,
+      ALIGN_SIZE (width, 128), ALIGN_SIZE (height, 32), &stride,
+      &slice_height);
   gint top = ALIGN_SIZE (dec->crop_rect.top, 2);
   gint left = ALIGN_SIZE (dec->crop_rect.left, 2);
+
+  if (!gst_droidvdec_check_buffer_size (dec, in,
+          (gsize) stride * slice_height * 3 / 2)) {
+    return FALSE;
+  }
 
   guint8 *y = in->data + (top * stride) + left;
   guint8 *uv = in->data + (stride * slice_height) + (top * stride / 2) + left;
@@ -822,12 +877,14 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
   droid_media_codec_get_output_info (dec->codec, &md, &rect);
 
   GST_INFO_OBJECT (dec,
-      "codec reported state: colour: %d, width: %d, height: %d, crop: %d,%d %d,%d",
-      md.hal_format, md.width, md.height, rect.left, rect.top, rect.right,
-      rect.bottom);
+      "codec reported state: colour: %d, width: %d, height: %d, stride: %d, slice_height: %d, crop: %d,%d %d,%d",
+      md.hal_format, md.width, md.height, md.stride, md.slice_height,
+      rect.left, rect.top, rect.right, rect.bottom);
 
   dec->codec_reported_height = md.height;
   dec->codec_reported_width = md.width;
+  dec->codec_reported_stride = md.stride;
+  dec->codec_reported_slice_height = md.slice_height;
   dec->hal_format = md.hal_format;
 
   if (!dec->use_hardware_buffers && !dec->convert) {
@@ -1127,6 +1184,8 @@ gst_droidvdec_start (GstVideoDecoder * decoder)
   dec->format = GST_VIDEO_FORMAT_UNKNOWN;
   dec->codec_reported_height = -1;
   dec->codec_reported_width = -1;
+  dec->codec_reported_stride = -1;
+  dec->codec_reported_slice_height = -1;
 
   return TRUE;
 }
@@ -1540,6 +1599,8 @@ gst_droidvdec_init (GstDroidVDec * dec)
   dec->codec_data = NULL;
   dec->codec_reported_height = -1;
   dec->codec_reported_width = -1;
+  dec->codec_reported_stride = -1;
+  dec->codec_reported_slice_height = -1;
 
   g_mutex_init (&dec->state_lock);
   g_cond_init (&dec->state_cond);

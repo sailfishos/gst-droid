@@ -79,6 +79,8 @@ struct _GstDroidVDec
 
   gsize codec_reported_height;
   gsize codec_reported_width;
+  gint codec_reported_stride;
+  gint codec_reported_slice_height;
   gsize bytes_per_pixel;
   gsize v_align;
   gsize h_align;
