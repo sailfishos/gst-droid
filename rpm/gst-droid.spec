@@ -18,8 +18,8 @@ BuildRequires:  pkgconfig(gstreamer-tag-1.0)
 BuildRequires:  pkgconfig(nemo-gstreamer-interfaces-1.0) >= 0.20200421.0
 BuildRequires:  pkgconfig(libexif)
 BuildRequires:  meson
-BuildRequires:  pkgconfig(droidmedia)
-Requires:       droidmedia
+BuildRequires:  pkgconfig(droidmedia) >= 0.20260902.0
+Requires:       droidmedia >= 0.20260902.0
 
 %description
 GStreamer droid plug-in contains elements using the Android HAL
