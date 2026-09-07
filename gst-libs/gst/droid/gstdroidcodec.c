@@ -1161,6 +1161,10 @@ gst_droid_codec_type_fill_quirks (GstDroidCodec * codec)
       codec->quirks |= USE_CODEC_SUPPLIED_WIDTH_VALUE;
     } else if (!g_strcmp0 (quirks_string[x], DONT_USE_DROID_CONVERT_NAME)) {
       codec->quirks |= DONT_USE_DROID_CONVERT_VALUE;
+    } else if (!g_strcmp0 (quirks_string[x], FORCE_MEDIA_BUFFERS_NAME)) {
+      codec->quirks |= FORCE_MEDIA_BUFFERS_VALUE;
+    } else if (!g_strcmp0 (quirks_string[x], NO_MEDIA_BUFFERS_NAME)) {
+      codec->quirks |= NO_MEDIA_BUFFERS_VALUE;
     }
   }
 

@@ -1197,6 +1197,8 @@ gst_droidvdec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
   GstCaps *caps, *template_caps;
   guint i, count;
   gboolean created_now = FALSE;
+  gboolean force_media_buffers = FALSE;
+  gboolean disable_media_buffers = FALSE;
 
   /*
    * destroying the droidmedia codec here will cause stagefright to call abort.
@@ -1234,14 +1236,26 @@ gst_droidvdec_set_format (GstVideoDecoder * decoder, GstVideoCodecState * state)
 
   GST_DEBUG_OBJECT (dec, "peer caps %" GST_PTR_FORMAT, caps);
 
-  dec->use_hardware_buffers = FALSE;
+  force_media_buffers =
+      !!(dec->codec_type->quirks & FORCE_MEDIA_BUFFERS_VALUE);
+  disable_media_buffers =
+      !!(dec->codec_type->quirks & NO_MEDIA_BUFFERS_VALUE);
 
   count = gst_caps_get_size (caps);
-  for (i = 0; i < count; ++i) {
-    GstCapsFeatures *features = gst_caps_get_features (caps, i);
-    if (gst_caps_features_contains
-        (features, GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER)) {
-      dec->use_hardware_buffers = TRUE;
+  if (force_media_buffers && !disable_media_buffers) {
+    dec->use_hardware_buffers = TRUE;
+    GST_INFO_OBJECT (dec, "forcing media-buffer output path via codec quirk");
+  } else if (disable_media_buffers) {
+    dec->use_hardware_buffers = FALSE;
+    GST_INFO_OBJECT (dec, "disabling media-buffer output path via codec quirk");
+  } else {
+    dec->use_hardware_buffers = FALSE;
+    for (i = 0; i < count; ++i) {
+      GstCapsFeatures *features = gst_caps_get_features (caps, i);
+      if (gst_caps_features_contains
+          (features, GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER)) {
+        dec->use_hardware_buffers = TRUE;
+      }
     }
   }
 

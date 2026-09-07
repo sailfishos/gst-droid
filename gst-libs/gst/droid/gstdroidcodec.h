@@ -35,8 +35,14 @@ G_BEGIN_DECLS
 #define USE_CODEC_SUPPLIED_WIDTH_NAME    "use-codec-supplied-width"
 #define USE_CODEC_SUPPLIED_WIDTH_VALUE   0x2
 
-#define DONT_USE_DROID_CONVERT_NAME    "dont-use-droid-convert"
-#define DONT_USE_DROID_CONVERT_VALUE   0x4
+#define DONT_USE_DROID_CONVERT_NAME      "dont-use-droid-convert"
+#define DONT_USE_DROID_CONVERT_VALUE     0x4
+
+#define FORCE_MEDIA_BUFFERS_NAME         "force-media-buffers"
+#define FORCE_MEDIA_BUFFERS_VALUE        0x8
+
+#define NO_MEDIA_BUFFERS_NAME            "no-media-buffers"
+#define NO_MEDIA_BUFFERS_VALUE           0x10
 
 typedef struct _GstDroidCodec GstDroidCodec;
 typedef struct _GstDroidCodecInfo GstDroidCodecInfo;
