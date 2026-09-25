@@ -56,18 +56,15 @@ rm -rf $RPM_BUILD_ROOT%{_sysconfdir}/gst-droid
 %postun -p /sbin/ldconfig
 
 %files
-%defattr(-,root,root,-)
 %license COPYING
 %{_libdir}/gstreamer-%{majorminor}/*.so
 %{_libdir}/*.so.*
 
 %files devel
-%defattr(-,root,root,-)
 %{_includedir}/gstreamer-%{majorminor}/gst/
 %{_libdir}/*.so
 %{_libdir}/pkgconfig/gstreamer-droid-1.0.pc
 
 %files tools
-%defattr(-,root,root,-)
 %{_bindir}/dump-camera-parameters
 %{_bindir}/dump-resolutions
