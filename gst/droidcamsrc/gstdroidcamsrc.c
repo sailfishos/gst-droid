@@ -120,7 +120,7 @@ static guint droidcamsrc_signals[LAST_SIGNAL];
 #define DEFAULT_TARGET_BITRATE         12000000
 #define DEFAULT_POST_PREVIEW           FALSE
 /* JPEG quality for photos in %, min 10% max 100% - safe values */
-#define DEFAULT_JPEG_QUALITY           90
+#define DEFAULT_JPEG_QUALITY           95
 #define DEFAULT_MIN_JPEG_QUALITY       10
 #define DEFAULT_MAX_JPEG_QUALITY       100
 
