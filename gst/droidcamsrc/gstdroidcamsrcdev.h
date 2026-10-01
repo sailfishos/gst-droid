@@ -65,6 +65,8 @@ struct _GstDroidCamSrcDev
 
   gboolean use_recorder;
   GstDroidCamSrcRecorder *recorder;
+
+  GstTaskPool *task_pool;
 };
 
 GstDroidCamSrcDev *gst_droidcamsrc_dev_new (GstDroidCamSrcPad *vfsrc,
