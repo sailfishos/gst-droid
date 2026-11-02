@@ -802,6 +802,12 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
 
   CAMERA_STARTUP_DEV ("dev_set_params from dev_start done");
 
+  /* Enable raw callbacks before starting preview. Changing the flag on a
+   * running camera can restart the HAL preview stream. */
+  if (dev->use_raw_data)
+    droid_media_camera_set_preview_callback_flags (dev->cam,
+        dev->c.CAMERA_FRAME_CALLBACK_FLAG_CAMERA);
+
   CAMERA_STARTUP_DEV ("droid_media_camera_start_preview begin");
   if (!droid_media_camera_start_preview (dev->cam)) {
     GST_ERROR_OBJECT (src, "error starting preview");
@@ -811,8 +817,9 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
 
   dev->running = TRUE;
 
-  /* Flag update is done here because the function checks for dev->running. */
-  gst_droidcamsrc_dev_update_preview_callback_flag (dev);
+  /* Raw callbacks were enabled before preview started. */
+  if (!dev->use_raw_data)
+    gst_droidcamsrc_dev_update_preview_callback_flag (dev);
 
   ret = TRUE;
 
