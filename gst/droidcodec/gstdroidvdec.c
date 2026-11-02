@@ -1358,35 +1358,26 @@ static GstFlowReturn
 gst_droidvdec_drain (GstVideoDecoder * decoder)
 {
   GstDroidVDec *dec = GST_DROIDVDEC (decoder);
-  GstFlowReturn ret;
 
   GST_DEBUG_OBJECT (dec, "drain");
-
-  GST_VIDEO_DECODER_STREAM_LOCK (decoder);
 
   GST_DROIDVDEC_STATE_LOCK (dec);
 
   if (G_UNLIKELY (!dec->running)) {
     GST_DEBUG_OBJECT (dec, "codec is not running");
     GST_DROIDVDEC_STATE_UNLOCK (dec);
-    GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
     return GST_FLOW_FLUSHING;
   }
 
   if (dec->state == GST_DROID_VDEC_STATE_WAITING_FOR_EOS) {
     GST_DEBUG_OBJECT (dec, "already draining");
     GST_DROIDVDEC_STATE_UNLOCK (dec);
-    GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
     return GST_FLOW_EOS;
   }
 
   GST_DROIDVDEC_STATE_UNLOCK (dec);
 
-  ret = gst_droidvdec_finish (decoder);
-
-  GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
-
-  return ret;
+  return gst_droidvdec_finish (decoder);
 }
 
 static GstFlowReturn
