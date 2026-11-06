@@ -60,6 +60,8 @@ struct _GstDroidVEnc
   /* protected by decoder stream lock */
   GstFlowReturn downstream_flow_ret;
   gboolean dirty;
+  /* raw input: the row stride and plane height the frames are copied to; 0 for the camera's metadata */
+  gsize raw_stride, raw_slice_height;
 };
 
 struct _GstDroidVEncClass

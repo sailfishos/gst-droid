@@ -28,6 +28,7 @@
 #include "gst/droid/gstdroidquery.h"
 #include "plugin.h"
 #include <string.h>
+#include "droidmediaconstants.h"
 
 #define gst_droidvenc_parent_class parent_class
 G_DEFINE_TYPE (GstDroidVEnc, gst_droidvenc, GST_TYPE_VIDEO_ENCODER);
@@ -42,7 +43,8 @@ GST_STATIC_PAD_TEMPLATE (GST_VIDEO_ENCODER_SINK_NAME,
     GST_PAD_SINK,
     GST_PAD_ALWAYS,
     GST_STATIC_CAPS (GST_VIDEO_CAPS_MAKE_WITH_FEATURES
-        (GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA, "{YV12}")));
+        (GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA, "{YV12}") ";"
+        GST_VIDEO_CAPS_MAKE ("NV12")));
 
 enum
 {
@@ -56,6 +58,7 @@ typedef struct
 {
   GstMapInfo info;
   GstVideoCodecFrame *frame;
+  guint8 *copy;               /* raw input: the padded copy queued instead of the buffer */
 } GstDroidVEncFrameReleaseData;
 
 static GstVideoCodecState *gst_droidvenc_configure_state (GstDroidVEnc * enc,
@@ -72,7 +75,10 @@ gst_droidvenc_release_input_frame (void *data)
   GstDroidVEncFrameReleaseData *release_data =
       (GstDroidVEncFrameReleaseData *) data;
 
-  gst_buffer_unmap (release_data->frame->input_buffer, &release_data->info);
+  if (release_data->copy)
+    g_free (release_data->copy);
+  else
+    gst_buffer_unmap (release_data->frame->input_buffer, &release_data->info);
 
   /* We need to release the input buffer */
   gst_buffer_unref (release_data->frame->input_buffer);
@@ -81,6 +87,61 @@ gst_droidvenc_release_input_frame (void *data)
   gst_video_codec_frame_unref (release_data->frame);
 
   g_slice_free (GstDroidVEncFrameReleaseData, release_data);
+}
+
+/* The bytes of a raw frame in that layout, up to the end of its last chroma
+ * row: the codec's input buffers end there (sargo, 480x640: 491488 bytes, 32
+ * less than the padded planes), and a frame any longer is refused. */
+static gsize
+gst_droidvenc_raw_size (GstDroidVEnc * enc)
+{
+  gsize width = (gsize) GST_VIDEO_INFO_WIDTH (&enc->in_state->info);
+  gsize height = (gsize) GST_VIDEO_INFO_HEIGHT (&enc->in_state->info);
+
+  return enc->raw_stride * (enc->raw_slice_height + (height + 1) / 2 - 1)
+      + GST_ROUND_UP_2 (width);
+}
+
+/* Copies an NV12 frame into the layout the hardware reads (raw_stride bytes a
+ * row, the chroma after raw_slice_height rows of luma), zero padded. */
+static gboolean
+gst_droidvenc_copy_raw (GstDroidVEnc * enc, GstBuffer * buffer,
+    GstDroidVEncFrameReleaseData * release_data)
+{
+  GstVideoFrame vf;
+  const GstVideoInfo *vinfo = &enc->in_state->info;
+  gsize width = (gsize) GST_VIDEO_INFO_WIDTH (vinfo);
+  gsize height = (gsize) GST_VIDEO_INFO_HEIGHT (vinfo);
+  gsize stride = enc->raw_stride, plane = enc->raw_slice_height;
+  guint8 *dst;
+  gsize y;
+
+  if (GST_VIDEO_INFO_FORMAT (vinfo) != GST_VIDEO_FORMAT_NV12 || width > stride
+      || height > plane) {
+    GST_ERROR_OBJECT (enc, "raw input is not NV12 within %" G_GSIZE_FORMAT "x%"
+        G_GSIZE_FORMAT, stride, plane);
+    return FALSE;
+  }
+
+  if (!gst_video_frame_map (&vf, vinfo, buffer, GST_MAP_READ)) {
+    GST_ERROR_OBJECT (enc, "failed to map the input frame");
+    return FALSE;
+  }
+
+  dst = g_malloc0 (stride * plane * 3 / 2);
+  for (y = 0; y < height; y++) {
+    memcpy (dst + y * stride, (const guint8 *) GST_VIDEO_FRAME_PLANE_DATA (&vf, 0)
+        + y * (gsize) GST_VIDEO_FRAME_PLANE_STRIDE (&vf, 0), width);
+  }
+  for (y = 0; y < (height + 1) / 2; y++) {
+    memcpy (dst + stride * plane + y * stride,
+        (const guint8 *) GST_VIDEO_FRAME_PLANE_DATA (&vf, 1)
+        + y * (gsize) GST_VIDEO_FRAME_PLANE_STRIDE (&vf, 1), GST_ROUND_UP_2 (width));
+  }
+  gst_video_frame_unmap (&vf);
+
+  release_data->copy = dst;
+  return TRUE;
 }
 
 static gboolean
@@ -141,8 +202,36 @@ gst_droidvenc_create_codec (GstDroidVEnc * enc)
   md.stride = enc->in_state->info.width;
   md.slice_height = enc->in_state->info.height;
 
-  /* TODO: get this from caps */
+  /* Frames in system memory (NV12, for instance a camera picture turned before
+   * encoding) are copied into the codec's own input buffers; the camera's buffers
+   * are handed over as metadata. */
+  {
+    GstCapsFeatures *features = gst_caps_get_features (enc->in_state->caps, 0);
+    if (!features || !gst_caps_features_contains (features,
+            GST_CAPS_FEATURE_MEMORY_DROID_VIDEO_META_DATA)) {
+      DroidMediaColourFormatConstants constants;
+
+      droid_media_colour_format_constants_init (&constants);
+      md.meta_data = false;
+      md.color_format = constants.OMX_COLOR_FormatYUV420SemiPlanar;
+      /* The hardware reads its input with rows of a multiple of 128 bytes and
+       * the chroma after a luma plane of a multiple of 32 rows, whatever stride
+       * it is given (sargo's c2.qti.avc.encoder: 512 and 384 wide encode, 480,
+       * 448, 416 and 496 come out green and striped): frames are copied into
+       * that layout, and the stride and plane height are passed on as well. */
+      enc->raw_stride = GST_ROUND_UP_N ((gsize) enc->in_state->info.width, 128);
+      enc->raw_slice_height = GST_ROUND_UP_N ((gsize) enc->in_state->info.height, 32);
+      md.stride = (int32_t) enc->raw_stride;
+      md.slice_height = (int32_t) enc->raw_slice_height;
+      GST_INFO_OBJECT (enc, "raw NV12 input, colour format 0x%x, stride %d, plane height %d",
+          md.color_format, md.stride, md.slice_height);
+      goto create;
+    }
+  }
+
   md.meta_data = true;
+  enc->raw_stride = 0;
+  enc->raw_slice_height = 0;
 
   query = gst_droid_query_new_video_color_format ();
   if (!gst_pad_peer_query (GST_VIDEO_ENCODER_SINK_PAD (GST_VIDEO_ENCODER (enc)),
@@ -162,6 +251,7 @@ gst_droidvenc_create_codec (GstDroidVEnc * enc)
 
   gst_query_unref (query);
 
+create:
   enc->codec = droid_media_codec_create_encoder (&md);
 
   if (!enc->codec) {
@@ -586,14 +676,28 @@ gst_droidvenc_handle_frame (GstVideoEncoder * encoder,
     enc->dirty = FALSE;
   }
 
-  gst_buffer_map (frame->input_buffer, &info, GST_MAP_READ);
-  data.data.size = info.size;
-  data.data.data = info.data;
+  release_data = g_slice_new0 (GstDroidVEncFrameReleaseData);
+
+  if (enc->raw_stride) {
+    if (!gst_droidvenc_copy_raw (enc, frame->input_buffer, release_data)) {
+      g_slice_free (GstDroidVEncFrameReleaseData, release_data);
+      goto error;
+    }
+    data.data.size = (ssize_t) gst_droidvenc_raw_size (enc);
+    data.data.data = release_data->copy;
+  } else {
+    if (!gst_buffer_map (frame->input_buffer, &info, GST_MAP_READ)) {
+      GST_ERROR_OBJECT (enc, "failed to map the input frame");
+      g_slice_free (GstDroidVEncFrameReleaseData, release_data);
+      goto error;
+    }
+    data.data.size = info.size;
+    data.data.data = info.data;
+    release_data->info = info;
+  }
   data.sync = false;
   data.ts = GST_TIME_AS_USECONDS (frame->pts);
 
-  release_data = g_slice_new (GstDroidVEncFrameReleaseData);
-  release_data->info = info;
   release_data->frame = gst_video_codec_frame_ref (frame);
 
   cb.unref = gst_droidvenc_release_input_frame;
