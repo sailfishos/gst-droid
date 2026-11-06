@@ -2356,6 +2356,25 @@ gst_droidcamsrc_apply_mode_settings (GstDroidCamSrc * src,
     gst_droidcamsrc_dev_enable_face_detection (src->dev, TRUE);
   }
 
+  /* recording hint
+   *
+   * QCOM's HAL1 only sets up the camera's recording stream when it has been
+   * told a recording session is coming. Without recording-hint=true,
+   * startRecording() is accepted and the vendor encoder is even created, but
+   * no CAMERA_MSG_VIDEO_FRAME ever arrives: Android's CameraSource sits in
+   * "Timed out waiting for incoming camera video frames", vidsrc pushes
+   * nothing and the recording ends up empty.
+   *
+   * The parameter has to be in place before the recorder is created, which is
+   * why it is set here - mode changes run through apply_mode_settings() with
+   * SET_AND_APPLY, well before start-capture - rather than next to the
+   * recorder itself. Only touch it when the HAL advertises it, so devices
+   * that do not know the parameter are left exactly as they were. */
+  if (gst_droidcamsrc_params_get_string (src->dev->params, "recording-hint")) {
+    gst_droidcamsrc_params_set_string (src->dev->params, "recording-hint",
+        src->mode == MODE_VIDEO ? "true" : "false");
+  }
+
   /* image noise reduction */
   gst_droidcamsrc_apply_quirk (src, "image-noise-reduction",
       src->image_noise_reduction);
