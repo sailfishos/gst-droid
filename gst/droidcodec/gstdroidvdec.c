@@ -146,6 +146,33 @@ gst_droidvec_copy_packed_planes (guint8 * out0, guint8 * out1, gint stride_out,
  * still be able to stop. */
 #define GST_DROIDVDEC_DRAIN_TIMEOUT (5 * G_TIME_SPAN_SECOND)
 
+/* The converters below read the codec's frame at offsets worked out from
+ * its width, height and crop rectangle, none of which the codec checks
+ * against the size of the frame it hands over: check that the last byte
+ * read, at "end", is in it. */
+static gboolean
+gst_droidvdec_input_holds (GstDroidVDec * dec, DroidMediaData * in,
+    guint64 end)
+{
+  if (in->size < 0 || end > (guint64) in->size) {
+    GST_ELEMENT_ERROR (dec, STREAM, DECODE, (NULL),
+        ("frame of %" G_GSSIZE_FORMAT " bytes is too short for its "
+            "format, %" G_GUINT64_FORMAT " bytes are needed", in->size, end));
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+/* the end of a plane of "rows" rows of "row" bytes, "stride" apart, from
+ * "start" */
+static guint64
+gst_droidvdec_plane_end (guint64 start, guint64 stride, guint64 row,
+    guint64 rows)
+{
+  return rows == 0 ? start : start + (rows - 1) * stride + row;
+}
+
 static gboolean
 gst_droidvdec_check_buffer_size (GstDroidVDec * dec, DroidMediaData * in,
     gsize required)
@@ -196,6 +223,17 @@ gst_droidvdec_convert_native_to_i420 (GstDroidVDec * dec, GstMapInfo * out,
   gboolean use_external_buffer = out->size != size;
   guint8 *data = NULL;
   gboolean ret = TRUE;
+
+  /* the fix up below copies an info->width x info->height frame out of a
+   * width x height one */
+  if (use_external_buffer && (width < (gsize) info->width
+          || height < (gsize) info->height)) {
+    GST_ELEMENT_ERROR (dec, STREAM, DECODE, (NULL),
+        ("converted frame of %" G_GSIZE_FORMAT "x%" G_GSIZE_FORMAT
+            " is smaller than the %dx%d output", width, height, info->width,
+            info->height));
+    return FALSE;
+  }
 
   if (use_external_buffer) {
     GST_DEBUG_OBJECT (dec, "using an external buffer for I420 conversion.");
@@ -263,11 +301,22 @@ gst_droidvdec_convert_yuv420_planar_to_i420 (GstDroidVDec * dec,
   gint crop_width = dec->crop_rect.right - left;
   gint crop_height = dec->crop_rect.bottom - top;
 
-  guint8 *y = in->data + (top * width) + left;
-  guint8 *u = in->data + (width * height) + (top * width / 2) + (left / 2);
-  guint8 *v =
-      in->data + (width * height) + (width * height / 4) +
-      (top * width / 2) + (left / 2);
+  guint8 *y, *u, *v;
+  guint64 y_start = (guint64) top * width + left;
+  guint64 v_start = (guint64) width * height + (guint64) width * height / 4 +
+      (guint64) top * width / 2 + left / 2;
+
+  if (crop_width < 0 || crop_height < 0
+      || !gst_droidvdec_input_holds (dec, in,
+          MAX (gst_droidvdec_plane_end (y_start, width, crop_width,
+                  crop_height), gst_droidvdec_plane_end (v_start, width / 2,
+                  crop_width / 2, crop_height / 2)))) {
+    return FALSE;
+  }
+
+  y = (guint8 *) in->data + y_start;
+  u = (guint8 *) in->data + (width * height) + (top * width / 2) + (left / 2);
+  v = (guint8 *) in->data + v_start;
 
   gst_droidvec_copy_plane (out->data + info->offset[0],
       info->stride[0], y, width, crop_width, crop_height);
@@ -296,8 +345,20 @@ gst_droidvdec_convert_yuv420_semi_planar_to_i420 (GstDroidVDec * dec,
     return FALSE;
   }
 
-  guint8 *y = in->data + (top * stride) + left;
-  guint8 *uv = in->data + (stride * slice_height) + (top * stride / 2) + left;
+  guint8 *y, *uv;
+  guint64 y_start = (guint64) top * stride + left;
+  guint64 uv_start = (guint64) stride * slice_height +
+      (guint64) top * stride / 2 + left;
+
+  if (!gst_droidvdec_input_holds (dec, in,
+          MAX (gst_droidvdec_plane_end (y_start, stride, info->width,
+                  info->height), gst_droidvdec_plane_end (uv_start, stride,
+                  (guint64) (info->width / 2) * 2, info->height / 2)))) {
+    return FALSE;
+  }
+
+  y = (guint8 *) in->data + y_start;
+  uv = (guint8 *) in->data + uv_start;
 
   gst_droidvec_copy_plane (out->data + info->offset[0],
       info->stride[0], y, stride, info->width, info->height);
@@ -328,8 +389,20 @@ gst_droidvdec_convert_yuv420_packed_semi_planar_to_i420 (GstDroidVDec * dec,
     return FALSE;
   }
 
-  guint8 *y = in->data + (top * stride) + left;
-  guint8 *uv = in->data + (stride * slice_height) + (top * stride / 2) + left;
+  guint8 *y, *uv;
+  guint64 y_start = (guint64) top * stride + left;
+  guint64 uv_start = (guint64) stride * slice_height +
+      (guint64) top * stride / 2 + left;
+
+  if (!gst_droidvdec_input_holds (dec, in,
+          MAX (gst_droidvdec_plane_end (y_start, stride, info->width,
+                  info->height), gst_droidvdec_plane_end (uv_start, stride,
+                  (guint64) (info->width / 2) * 2, info->height / 2)))) {
+    return FALSE;
+  }
+
+  y = (guint8 *) in->data + y_start;
+  uv = (guint8 *) in->data + uv_start;
 
   gst_droidvec_copy_plane (out->data + info->offset[0],
       info->stride[0], y, stride, info->width, info->height);
@@ -698,6 +771,12 @@ gst_droidvdec_data_available (void *data, DroidMediaCodecData * encoded)
   }
 
   buff = gst_video_decoder_allocate_output_buffer (decoder);
+  if (G_UNLIKELY (!buff)) {
+    /* the pool is not active: we are flushing or shutting down */
+    GST_DEBUG_OBJECT (dec, "no output buffer, dropping the decoded frame");
+    flow_ret = GST_FLOW_FLUSHING;
+    goto out;
+  }
 
   gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE,
       GST_VIDEO_FORMAT_I420, dec->out_state->info.width,
@@ -898,6 +977,19 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
       "codec reported state: colour: %d, width: %d, height: %d, stride: %d, slice_height: %d, crop: %d,%d %d,%d",
       md.hal_format, md.width, md.height, md.stride, md.slice_height,
       rect.left, rect.top, rect.right, rect.bottom);
+
+  /* the converters and the crop meta take the rectangle as it is */
+  if (rect.left < 0 || rect.top < 0 || rect.right <= rect.left
+      || rect.bottom <= rect.top || (md.width > 0 && rect.right > md.width)
+      || (md.height > 0 && rect.bottom > md.height)) {
+    GST_WARNING_OBJECT (dec, "codec reported a crop of %d,%d %d,%d outside "
+        "its %dx%d frame, not cropping", rect.left, rect.top, rect.right,
+        rect.bottom, md.width, md.height);
+    rect.left = 0;
+    rect.top = 0;
+    rect.right = md.width;
+    rect.bottom = md.height;
+  }
 
   dec->codec_reported_height = md.height;
   dec->codec_reported_width = md.width;

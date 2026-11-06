@@ -586,7 +586,10 @@ gst_droidvenc_handle_frame (GstVideoEncoder * encoder,
     enc->dirty = FALSE;
   }
 
-  gst_buffer_map (frame->input_buffer, &info, GST_MAP_READ);
+  if (!gst_buffer_map (frame->input_buffer, &info, GST_MAP_READ)) {
+    GST_ERROR_OBJECT (enc, "failed to map the input frame");
+    goto error;
+  }
   data.data.size = info.size;
   data.data.data = info.data;
   data.sync = false;

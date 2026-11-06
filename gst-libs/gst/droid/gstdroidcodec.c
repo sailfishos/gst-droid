@@ -771,7 +771,9 @@ create_h265dec_codec_data_from_codec_data (GstDroidCodec * codec,
     return FALSE;
   }
 
-  if (info.size < 7 || info.data[0] != 1) {
+  /* HEVCDecoderConfigurationRecord: lengthSizeMinusOne is in byte 21, and
+   * the record is at least 23 bytes long (up to numOfArrays) */
+  if (info.size < 23 || info.data[0] != 1) {
     GST_ERROR ("malformed codec_data");
     goto out;
   }
@@ -914,9 +916,15 @@ create_aacdec_codec_data_from_frame_data (GstDroidCodec * codec,
 
   GST_INFO ("constructing ADTS codec_data");
 
-  // TODO: size, TODO: error
   if (!gst_buffer_map (frame_data, &info, GST_MAP_READ)) {
     GST_ERROR ("failed to map buffer");
+    return FALSE;
+  }
+
+  /* the fields used below are in the first 4 bytes of the 7 byte header */
+  if (info.size < 7 || info.data[0] != 0xff || (info.data[1] & 0xf0) != 0xf0) {
+    GST_ERROR ("not an ADTS frame");
+    gst_buffer_unmap (frame_data, &info);
     return FALSE;
   }
 
@@ -1070,14 +1078,27 @@ process_aacdec_data (GstDroidCodec * codec, GstBuffer * buffer,
 
   if (!codec->data->aac_adts) {
     out->size = info.size;
-    out->data = g_malloc (info.size);
-    memcpy (out->data, info.data, info.size);
+    out->data = g_memdup2 (info.data, info.size);
   } else {
     /* stolen from gstaacparse.c */
-    guint header_size = (info.data[1] & 1) ? 7 : 9;     /* optional CRC */
+    guint header_size;
+
+    if (info.size < 2) {
+      GST_ERROR ("ADTS frame of %" G_GSIZE_FORMAT " bytes", info.size);
+      gst_buffer_unmap (buffer, &info);
+      return FALSE;
+    }
+
+    header_size = (info.data[1] & 1) ? 7 : 9;   /* optional CRC */
+    if (info.size < header_size) {
+      GST_ERROR ("ADTS frame of %" G_GSIZE_FORMAT " bytes, shorter than its "
+          "%u byte header", info.size, header_size);
+      gst_buffer_unmap (buffer, &info);
+      return FALSE;
+    }
+
     out->size = info.size - header_size;
-    out->data = g_malloc (out->size);
-    memcpy (out->data, info.data + header_size, out->size);
+    out->data = g_memdup2 (info.data + header_size, out->size);
     GST_LOG ("stripping %d bytes", header_size);
   }
 
