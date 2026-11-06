@@ -328,6 +328,23 @@ out:
   g_mutex_unlock (&enc->eos_lock);
 }
 
+/* The NAL unit types (bit n set for type n) in an Annex B H.264 buffer. */
+static guint32
+gst_droidvenc_h264_nal_types (const guint8 * d, gsize size)
+{
+  guint32 types = 0;
+  gsize i;
+
+  for (i = 0; i + 3 < size; i++) {
+    if (d[i] == 0 && d[i + 1] == 0 && d[i + 2] == 1) {
+      types |= 1u << (d[i + 3] & 0x1f);
+      i += 2;
+    }
+  }
+
+  return types;
+}
+
 static void
 gst_droidvenc_data_available (void *data, DroidMediaCodecData * encoded)
 {
@@ -339,6 +356,24 @@ gst_droidvenc_data_available (void *data, DroidMediaCodecData * encoded)
   GST_DEBUG_OBJECT (enc, "data available");
 
   GST_VIDEO_ENCODER_STREAM_LOCK (encoder);
+
+  if (!g_strcmp0 (gst_droid_codec_get_droid_type (enc->codec_type), "video/avc")) {
+    /* The Codec2 encoder fed raw frames (sargo) marks neither its SPS/PPS
+     * buffer as codec config nor its IDR frames as sync points: read both
+     * from the stream */
+    guint32 types = encoded->data.size > 0 ?
+        gst_droidvenc_h264_nal_types (encoded->data.data,
+        (gsize) encoded->data.size) : 0;
+    const guint32 slices = (1u << 1) | (1u << 2) | (1u << 3) | (1u << 4) |
+        (1u << 5);
+
+    if (!encoded->codec_config && (types & (1u << 7)) && !(types & slices)) {
+      encoded->codec_config = true;
+    }
+    if (types & (1u << 5)) {
+      encoded->sync = true;
+    }
+  }
 
   if (encoded->codec_config) {
     GstBuffer *codec_data = NULL;

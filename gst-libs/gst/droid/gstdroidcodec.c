@@ -1086,30 +1086,78 @@ process_aacdec_data (GstDroidCodec * codec, GstBuffer * buffer,
   return TRUE;
 }
 
+/* The offset of the next Annex B start code (00 00 01) at or after from, or size if none. */
+static gsize
+h264enc_find_start_code (const guint8 * d, gsize size, gsize from)
+{
+  gsize i;
+
+  for (i = from; i + 3 <= size; i++) {
+    if (d[i] == 0 && d[i + 1] == 0 && d[i + 2] == 1) {
+      return i;
+    }
+  }
+
+  return size;
+}
+
 static gboolean
 process_h264enc_data (DroidMediaData * in, DroidMediaData * out)
 {
-  guint32 size;
-  guint8 *data;
+  const guint8 *d = in->data;
+  gsize size, sc, i;
+  GByteArray *avc;
 
-  if (in->size >= 4 && memcmp (in->data, "\x00\x00\x00\x01", 4) == 0) {
-    /* We will replace the first 4 bytes with the NAL size */
-    out->size = in->size;
-    data = in->data + 4;
-  } else {
-    /* We don't have the NAL prefix so we add 4 bytes for the NAL size */
-    out->size = in->size + 4;
-    data = in->data;
-  }
-
-  size = GUINT32_TO_BE (out->size - 4);
-  out->data = g_malloc (out->size);
-  if (!out->data) {
+  /* the sizes below go into guint32 NAL sizes and a GByteArray */
+  if (in->size < 0 || (guint64) in->size > G_MAXUINT32 - 20u) {
     return FALSE;
   }
+  size = (gsize) in->size;
+  sc = h264enc_find_start_code (d, size, 0);
 
-  memcpy (out->data, &size, sizeof (size));
-  memcpy (out->data + 4, data, out->size - 4);
+  for (i = 0; i < sc && sc < size; i++) {
+    if (d[i] != 0) {
+      sc = size;
+    }
+  }
+
+  if (sc >= size) {
+    /* We don't have the NAL prefix so we add 4 bytes for the NAL size */
+    guint32 nal_size = GUINT32_TO_BE ((guint32) size);
+
+    out->size = (ssize_t) (size + 4);
+    out->data = g_malloc (size + 4);
+    memcpy (out->data, &nal_size, sizeof (nal_size));
+    memcpy ((guint8 *) out->data + 4, d, size);
+    return TRUE;
+  }
+
+  /* Annex B, maybe several NAL units (some encoders put SPS and PPS in front
+   * of each IDR): each start code becomes the size of the unit that follows */
+  avc = g_byte_array_sized_new ((guint) size + 16u);
+  while (sc < size) {
+    gsize start = sc + 3;
+    gsize next = h264enc_find_start_code (d, size, start);
+    gsize end = next;
+
+    /* the zero byte of a 4-byte start code, or trailing_zero_8bits */
+    while (end > start && d[end - 1] == 0) {
+      end--;
+    }
+
+    if (end > start) {
+      guint32 nal_size;
+
+      nal_size = GUINT32_TO_BE ((guint32) (end - start));
+      g_byte_array_append (avc, (const guint8 *) &nal_size, sizeof (nal_size));
+      g_byte_array_append (avc, d + start, (guint) (end - start));
+    }
+
+    sc = next;
+  }
+
+  out->size = (ssize_t) avc->len;
+  out->data = g_byte_array_free (avc, FALSE);
 
   return TRUE;
 }
