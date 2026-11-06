@@ -171,14 +171,14 @@ gst_droidvenc_create_codec (GstDroidVEnc * enc)
   }
 
   {
-    DroidMediaCodecCallbacks cb;
+    DroidMediaCodecCallbacks cb = { 0 };
     cb.signal_eos = gst_droidvenc_signal_eos;
     cb.error = gst_droidvenc_error;
     droid_media_codec_set_callbacks (enc->codec, &cb, enc);
   }
 
   {
-    DroidMediaCodecDataCallbacks cb;
+    DroidMediaCodecDataCallbacks cb = { 0 };
     cb.data_available = gst_droidvenc_data_available;
     droid_media_codec_set_data_callbacks (enc->codec, &cb, enc);
   }

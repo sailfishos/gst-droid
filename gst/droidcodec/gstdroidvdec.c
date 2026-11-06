@@ -140,6 +140,12 @@ gst_droidvec_copy_packed_planes (guint8 * out0, guint8 * out1, gint stride_out,
 
 #define ALIGN_SIZE(size, to) (((size) + to  - 1) & ~(to - 1))
 
+/* How long _finish () waits for the codec to drain. A codec that runs out of
+ * buffers can stall without ever reporting EOS or an error (seen with
+ * c2.qti.avc.decoder when several decoders run at once), and the pipeline must
+ * still be able to stop. */
+#define GST_DROIDVDEC_DRAIN_TIMEOUT (5 * G_TIME_SPAN_SECOND)
+
 static gboolean
 gst_droidvdec_check_buffer_size (GstDroidVDec * dec, DroidMediaData * in,
     gsize required)
@@ -600,18 +606,28 @@ gst_droidvdec_frame_available (void *user, DroidMediaBuffer * buffer)
 
   gst_video_info_set_format (&video_info, dec->format, width, height);
 
-  crop_meta = gst_buffer_add_video_crop_meta (buff);
-  crop_meta->x = droid_info.crop_rect.left;
-  crop_meta->y = droid_info.crop_rect.top;
-  crop_meta->width = droid_info.crop_rect.right - droid_info.crop_rect.left;
-  crop_meta->height = droid_info.crop_rect.bottom - droid_info.crop_rect.top;
+  /* The pool hands back the GstBuffer that belongs to this droid buffer. After
+   * a flush (a seek, a change of audio track) the codec can fill a buffer whose
+   * GstBuffer the sink still holds - it keeps the frame on screen until the next
+   * one replaces it - and a buffer that is not writable takes no new metas:
+   * gst_buffer_add_video_crop_meta () returns NULL. Such a buffer still carries
+   * the metas of its last use, so leave them be. */
+  if (gst_buffer_is_writable (buff)) {
+    crop_meta = gst_buffer_add_video_crop_meta (buff);
+    crop_meta->x = droid_info.crop_rect.left;
+    crop_meta->y = droid_info.crop_rect.top;
+    crop_meta->width = droid_info.crop_rect.right - droid_info.crop_rect.left;
+    crop_meta->height = droid_info.crop_rect.bottom - droid_info.crop_rect.top;
 
-  GST_LOG_OBJECT (dec, "crop info: x=%d, y=%d, w=%d, h=%d", crop_meta->x,
-      crop_meta->y, crop_meta->width, crop_meta->height);
+    GST_LOG_OBJECT (dec, "crop info: x=%d, y=%d, w=%d, h=%d", crop_meta->x,
+        crop_meta->y, crop_meta->width, crop_meta->height);
 
-  gst_buffer_add_video_meta_full (buff, GST_VIDEO_FRAME_FLAG_NONE, dec->format,
-      droid_info.width, droid_info.height, video_info.finfo->n_planes,
-      video_info.offset, video_info.stride);
+    gst_buffer_add_video_meta_full (buff, GST_VIDEO_FRAME_FLAG_NONE,
+        dec->format, droid_info.width, droid_info.height,
+        video_info.finfo->n_planes, video_info.offset, video_info.stride);
+  } else {
+    GST_DEBUG_OBJECT (dec, "buffer still held downstream, keeping its metas");
+  }
 
   frame = gst_video_decoder_get_oldest_frame (decoder);
 
@@ -775,7 +791,9 @@ gst_droidvdec_error (void *data, int err)
   GST_DROIDVDEC_STATE_LOCK (dec);
 
   if (dec->state == GST_DROID_VDEC_STATE_WAITING_FOR_EOS) {
-    /* Gotta love Android. We will ignore errors if we are expecting EOS */
+    /* Gotta love Android. We will ignore errors if we are expecting EOS,
+     * but no EOS will follow: let _finish () stop waiting for one. */
+    dec->drain_failed = TRUE;
     g_cond_signal (&dec->state_cond);
     GST_DROIDVDEC_STATE_UNLOCK (dec);
     return;
@@ -1077,12 +1095,18 @@ gst_droidvdec_stop (GstVideoDecoder * decoder)
 
   GST_DEBUG_OBJECT (dec, "stop");
 
+  /* Stop the codec before the task: a task waiting in the codec for output
+   * only returns once the codec is stopped, and stopping the task waits for
+   * it to return. The codec itself must outlive the task. */
+  if (dec->codec) {
+    droid_media_codec_stop (dec->codec);
+  }
+
   if (dec->running) {
     gst_droidvdec_stop_loop (dec);
   }
 
   if (dec->codec) {
-    droid_media_codec_stop (dec->codec);
     droid_media_codec_destroy (dec->codec);
     dec->codec = NULL;
   }
@@ -1311,19 +1335,30 @@ gst_droidvdec_finish (GstVideoDecoder * decoder)
 
   if (dec->codec && dec->state == GST_DROID_VDEC_STATE_OK) {
     GstBufferPool *pool = gst_video_decoder_get_buffer_pool (decoder);
+    DroidMediaCodec *codec = dec->codec;
+    gint64 deadline;
 
     GST_INFO_OBJECT (dec, "draining");
     dec->state = GST_DROID_VDEC_STATE_WAITING_FOR_EOS;
-    droid_media_codec_drain (dec->codec);
+    dec->drain_failed = FALSE;
+    droid_media_codec_drain (codec);
 
     /* release the lock to allow _frame_available () to do its job */
     GST_LOG_OBJECT (dec, "releasing stream lock");
     GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
-    /* Now we wait for the codec to signal EOS */
-    g_cond_wait (&dec->state_cond, &dec->state_lock);
+    /* Now we wait for the codec to signal EOS, or an error */
+    deadline = g_get_monotonic_time () + GST_DROIDVDEC_DRAIN_TIMEOUT;
+    while (dec->state == GST_DROID_VDEC_STATE_WAITING_FOR_EOS
+        && !dec->drain_failed) {
+      if (!g_cond_wait_until (&dec->state_cond, &dec->state_lock, deadline)) {
+        GST_WARNING_OBJECT (dec, "the codec did not drain in %d s, stopping it",
+            (gint) (GST_DROIDVDEC_DRAIN_TIMEOUT / G_TIME_SPAN_SECOND));
+        break;
+      }
+    }
 
     droid_media_buffer_queue_set_callbacks (droid_media_codec_get_buffer_queue
-        (dec->codec), NULL, NULL);
+        (codec), NULL, NULL);
 
     GST_DROIDVDEC_STATE_UNLOCK (dec);
 
@@ -1332,12 +1367,20 @@ gst_droidvdec_finish (GstVideoDecoder * decoder)
       gst_object_unref (pool);
     }
 
+    /* The src pad task may still be inside the codec: it reports EOS from
+     * within droid_media_codec_loop () and returns from it only afterwards,
+     * and after a timeout it is still waiting there for output. Stopping the
+     * codec wakes it; pausing the task then waits for that iteration to end.
+     * Only then can the codec go. Neither lock may be held here: the
+     * iteration takes both (EOS, error and frame callbacks). */
+    droid_media_codec_stop (codec);
+    gst_pad_pause_task (GST_VIDEO_DECODER_SRC_PAD (decoder));
+
     GST_VIDEO_DECODER_STREAM_LOCK (decoder);
     GST_DROIDVDEC_STATE_LOCK (dec);
     GST_LOG_OBJECT (dec, "acquired stream lock");
 
     if (dec->codec) {
-      droid_media_codec_stop (dec->codec);
       droid_media_codec_destroy (dec->codec);
       dec->codec = NULL;
     }
