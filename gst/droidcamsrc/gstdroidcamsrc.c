@@ -351,7 +351,7 @@ gst_droidcamsrc_get_property (GObject * object, guint prop_id, GValue * value,
       break;
 
     case PROP_JPEG_QUALITY:
-      g_value_set_uint (value, src->jpeg_quality);
+      g_value_set_int (value, src->jpeg_quality);
       break;
 
     default:
@@ -502,7 +502,7 @@ gst_droidcamsrc_set_property (GObject * object, guint prop_id,
       break;
 
     case PROP_JPEG_QUALITY:
-      src->jpeg_quality = g_value_get_uint(value);
+      src->jpeg_quality = g_value_get_int (value);
       gst_droidcamsrc_apply_mode_settings (src, SET_AND_APPLY);
       break;
 
@@ -1625,7 +1625,8 @@ gst_droidcamsrc_pad_query (GstPad * pad, GstObject * parent, GstQuery * query)
 
     case GST_QUERY_LATENCY:
       /* TODO: this assummes 7 buffers @ 30 FPS. Query from either bufferpool or camera params */
-      gst_query_set_latency (query, TRUE, 33, 33 * 7);
+      gst_query_set_latency (query, TRUE, 33 * GST_MSECOND,
+          33 * 7 * GST_MSECOND);
       ret = TRUE;
       break;
 
@@ -1799,15 +1800,21 @@ gst_droidcamsrc_vfsrc_negotiate (GstDroidCamSrcPad * data)
     count = gst_query_get_n_allocation_pools (query);
 
     for (i = 0; i < count; ++i) {
-      GstAllocator *allocator;
+      GstAllocator *allocator = NULL;
       GstStructure *config;
+      gboolean droid;
 
       gst_query_parse_nth_allocation_pool (query, i, &pool, &size, &min, &max);
+      /* an entry may give only a size and no pool */
+      if (!pool)
+        continue;
       config = gst_buffer_pool_get_config (pool);
       gst_buffer_pool_config_get_allocator (config, &allocator, NULL);
-      if (allocator
+      droid = allocator
           && g_strcmp0 (allocator->mem_type,
-              GST_ALLOCATOR_DROID_MEDIA_BUFFER) == 0) {
+          GST_ALLOCATOR_DROID_MEDIA_BUFFER) == 0;
+      gst_structure_free (config);
+      if (droid) {
         break;
       } else {
         gst_object_unref (pool);
@@ -2608,52 +2615,55 @@ out:
   return ret;
 }
 
+struct GstDroidCamSrcVideoCapsData
+{
+  GstCaps *result;
+  GstStructure *encoded;
+};
+
+/* Given a structure from the template caps, adds Data::encoded with the
+ * template's fields, other than its format, to Data::result */
+static gboolean
+gst_droidcamsrc_add_encoded_video_caps (G_GNUC_UNUSED GstCapsFeatures *
+    features, GstStructure * structure, gpointer data_param)
+{
+  int i;
+  struct GstDroidCamSrcVideoCapsData *data = data_param;
+  GstStructure *s = gst_structure_copy (data->encoded);
+
+  for (i = 0; i < gst_structure_n_fields (structure); i++) {
+    const gchar *field = gst_structure_nth_field_name (structure, i);
+    /* skip format field */
+    if (g_strcmp0 (field, "format") != 0) {
+      gst_structure_set_value (s, field, gst_structure_get_value (structure,
+              field));
+    }
+  }
+
+  data->result = gst_caps_merge_structure (data->result, s);
+
+  return TRUE;
+}
+
 static GstCaps *
 gst_droidcamsrc_get_video_caps_locked (GstDroidCamSrc * src)
 {
-  struct Data
-  {
-    GstCaps *result;
-    GstStructure *encoded;
-  };
-
-  gboolean __map (GstCapsFeatures * features,
-      GstStructure * structure, gpointer data_param)
-  {
-
-    /* Given structure from template caps, we need to transform Data::encoded */
-    int i;
-    struct Data *data = data_param;
-    GstStructure *s = gst_structure_copy (data->encoded);
-    for (i = 0; i < gst_structure_n_fields (structure); i++) {
-      const gchar *field = gst_structure_nth_field_name (structure, i);
-      /* skip format field */
-      if (g_strcmp0 (field, "format") != 0) {
-        gst_structure_set_value (s, field, gst_structure_get_value (structure,
-                field));
-      }
-    }
-
-    data->result = gst_caps_merge_structure (data->result, s);
-
-    return TRUE;
-  }
-
   GstCaps *tpl = gst_droidcamsrc_params_get_video_caps (src->dev->params);
-  GstCaps *caps = gst_caps_new_empty ();
+  GstCaps *caps;
   GstCaps *encoded =
       gst_droid_codec_get_all_caps (GST_DROID_CODEC_ENCODER_VIDEO);
-  int x;
+  guint x;
 
-  struct Data data;
-  data.result = caps;
+  struct GstDroidCamSrcVideoCapsData data;
+  data.result = gst_caps_new_empty ();
 
   for (x = 0; x < gst_caps_get_size (encoded); x++) {
     data.encoded = gst_caps_get_structure (encoded, x);
-    gst_caps_foreach (tpl, __map, &data);
+    gst_caps_foreach (tpl, gst_droidcamsrc_add_encoded_video_caps, &data);
   }
 
-  caps = gst_caps_merge (caps, tpl);
+  /* gst_caps_merge_structure() may give back other caps than it was given */
+  caps = gst_caps_merge (data.result, tpl);
 
   caps = gst_caps_simplify (caps);
 

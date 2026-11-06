@@ -171,8 +171,19 @@ gst_droidadec_data_available (void *data, DroidMediaCodecData * encoded)
   }
 
   out = gst_audio_decoder_allocate_output_buffer (decoder, encoded->data.size);
+  if (G_UNLIKELY (!out)) {
+    GST_ERROR_OBJECT (dec, "failed to allocate %" G_GSSIZE_FORMAT " bytes",
+        encoded->data.size);
+    flow_ret = GST_FLOW_ERROR;
+    goto out;
+  }
 
-  gst_buffer_map (out, &map, GST_MAP_READWRITE);
+  if (!gst_buffer_map (out, &map, GST_MAP_WRITE)) {
+    GST_ERROR_OBJECT (dec, "failed to map the output buffer");
+    gst_buffer_unref (out);
+    flow_ret = GST_FLOW_ERROR;
+    goto out;
+  }
   orc_memcpy (map.data, encoded->data.data, encoded->data.size);
   gst_buffer_unmap (out, &map);
 

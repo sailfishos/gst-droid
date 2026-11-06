@@ -265,6 +265,12 @@ gst_droidaenc_data_available (void *data, DroidMediaCodecData * encoded)
   buffer =
       gst_audio_encoder_allocate_output_buffer (GST_AUDIO_ENCODER (enc),
       encoded->data.size);
+  if (G_UNLIKELY (!buffer)) {
+    GST_ERROR_OBJECT (enc, "failed to allocate %" G_GSSIZE_FORMAT " bytes",
+        encoded->data.size);
+    flow_ret = GST_FLOW_ERROR;
+    goto out;
+  }
   gst_buffer_fill (buffer, 0, encoded->data.data, encoded->data.size);
 
   GST_BUFFER_PTS (buffer) = encoded->ts;
@@ -511,7 +517,10 @@ gst_droidaenc_handle_frame (GstAudioEncoder * encoder, GstBuffer * buffer)
 
   enc->finished = FALSE;
 
-  gst_buffer_map (buffer, &info, GST_MAP_READ);
+  if (!gst_buffer_map (buffer, &info, GST_MAP_READ)) {
+    GST_ERROR_OBJECT (enc, "failed to map the input buffer");
+    goto error;
+  }
   data.data.size = info.size;
   data.data.data = g_malloc (info.size);
   data.sync = false;

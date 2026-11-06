@@ -63,6 +63,12 @@ subdir('gst-libs')
 subdir('gst')
 subdir('tools')
 
+gstcheck_dep = dependency('gstreamer-check-1.0', version : gst_req,
+  required : get_option('tests'))
+if gstcheck_dep.found()
+  subdir('tests/check')
+endif
+
 pkg = import('pkgconfig')
 
 pkgconf = configuration_data()

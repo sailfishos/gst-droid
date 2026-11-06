@@ -67,6 +67,8 @@ struct _GstDroidVDec
   GstDroidVDecState state;
   GMutex state_lock;
   GCond state_cond;
+  /* the codec failed while it was being drained: no EOS will come */
+  gboolean drain_failed;
 
   /* protected by decoder stream lock */
   GstFlowReturn downstream_flow_ret;

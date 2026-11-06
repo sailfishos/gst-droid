@@ -140,6 +140,39 @@ gst_droidvec_copy_packed_planes (guint8 * out0, guint8 * out1, gint stride_out,
 
 #define ALIGN_SIZE(size, to) (((size) + to  - 1) & ~(to - 1))
 
+/* How long _finish () waits for the codec to drain. A codec that runs out of
+ * buffers can stall without ever reporting EOS or an error (seen with
+ * c2.qti.avc.decoder when several decoders run at once), and the pipeline must
+ * still be able to stop. */
+#define GST_DROIDVDEC_DRAIN_TIMEOUT (5 * G_TIME_SPAN_SECOND)
+
+/* The converters below read the codec's frame at offsets worked out from
+ * its width, height and crop rectangle, none of which the codec checks
+ * against the size of the frame it hands over: check that the last byte
+ * read, at "end", is in it. */
+static gboolean
+gst_droidvdec_input_holds (GstDroidVDec * dec, DroidMediaData * in,
+    guint64 end)
+{
+  if (in->size < 0 || end > (guint64) in->size) {
+    GST_ELEMENT_ERROR (dec, STREAM, DECODE, (NULL),
+        ("frame of %" G_GSSIZE_FORMAT " bytes is too short for its "
+            "format, %" G_GUINT64_FORMAT " bytes are needed", in->size, end));
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
+/* the end of a plane of "rows" rows of "row" bytes, "stride" apart, from
+ * "start" */
+static guint64
+gst_droidvdec_plane_end (guint64 start, guint64 stride, guint64 row,
+    guint64 rows)
+{
+  return rows == 0 ? start : start + (rows - 1) * stride + row;
+}
+
 static gboolean
 gst_droidvdec_check_buffer_size (GstDroidVDec * dec, DroidMediaData * in,
     gsize required)
@@ -190,6 +223,17 @@ gst_droidvdec_convert_native_to_i420 (GstDroidVDec * dec, GstMapInfo * out,
   gboolean use_external_buffer = out->size != size;
   guint8 *data = NULL;
   gboolean ret = TRUE;
+
+  /* the fix up below copies an info->width x info->height frame out of a
+   * width x height one */
+  if (use_external_buffer && (width < (gsize) info->width
+          || height < (gsize) info->height)) {
+    GST_ELEMENT_ERROR (dec, STREAM, DECODE, (NULL),
+        ("converted frame of %" G_GSIZE_FORMAT "x%" G_GSIZE_FORMAT
+            " is smaller than the %dx%d output", width, height, info->width,
+            info->height));
+    return FALSE;
+  }
 
   if (use_external_buffer) {
     GST_DEBUG_OBJECT (dec, "using an external buffer for I420 conversion.");
@@ -257,11 +301,22 @@ gst_droidvdec_convert_yuv420_planar_to_i420 (GstDroidVDec * dec,
   gint crop_width = dec->crop_rect.right - left;
   gint crop_height = dec->crop_rect.bottom - top;
 
-  guint8 *y = in->data + (top * width) + left;
-  guint8 *u = in->data + (width * height) + (top * width / 2) + (left / 2);
-  guint8 *v =
-      in->data + (width * height) + (width * height / 4) +
-      (top * width / 2) + (left / 2);
+  guint8 *y, *u, *v;
+  guint64 y_start = (guint64) top * width + left;
+  guint64 v_start = (guint64) width * height + (guint64) width * height / 4 +
+      (guint64) top * width / 2 + left / 2;
+
+  if (crop_width < 0 || crop_height < 0
+      || !gst_droidvdec_input_holds (dec, in,
+          MAX (gst_droidvdec_plane_end (y_start, width, crop_width,
+                  crop_height), gst_droidvdec_plane_end (v_start, width / 2,
+                  crop_width / 2, crop_height / 2)))) {
+    return FALSE;
+  }
+
+  y = (guint8 *) in->data + y_start;
+  u = (guint8 *) in->data + (width * height) + (top * width / 2) + (left / 2);
+  v = (guint8 *) in->data + v_start;
 
   gst_droidvec_copy_plane (out->data + info->offset[0],
       info->stride[0], y, width, crop_width, crop_height);
@@ -290,8 +345,20 @@ gst_droidvdec_convert_yuv420_semi_planar_to_i420 (GstDroidVDec * dec,
     return FALSE;
   }
 
-  guint8 *y = in->data + (top * stride) + left;
-  guint8 *uv = in->data + (stride * slice_height) + (top * stride / 2) + left;
+  guint8 *y, *uv;
+  guint64 y_start = (guint64) top * stride + left;
+  guint64 uv_start = (guint64) stride * slice_height +
+      (guint64) top * stride / 2 + left;
+
+  if (!gst_droidvdec_input_holds (dec, in,
+          MAX (gst_droidvdec_plane_end (y_start, stride, info->width,
+                  info->height), gst_droidvdec_plane_end (uv_start, stride,
+                  (guint64) (info->width / 2) * 2, info->height / 2)))) {
+    return FALSE;
+  }
+
+  y = (guint8 *) in->data + y_start;
+  uv = (guint8 *) in->data + uv_start;
 
   gst_droidvec_copy_plane (out->data + info->offset[0],
       info->stride[0], y, stride, info->width, info->height);
@@ -322,8 +389,20 @@ gst_droidvdec_convert_yuv420_packed_semi_planar_to_i420 (GstDroidVDec * dec,
     return FALSE;
   }
 
-  guint8 *y = in->data + (top * stride) + left;
-  guint8 *uv = in->data + (stride * slice_height) + (top * stride / 2) + left;
+  guint8 *y, *uv;
+  guint64 y_start = (guint64) top * stride + left;
+  guint64 uv_start = (guint64) stride * slice_height +
+      (guint64) top * stride / 2 + left;
+
+  if (!gst_droidvdec_input_holds (dec, in,
+          MAX (gst_droidvdec_plane_end (y_start, stride, info->width,
+                  info->height), gst_droidvdec_plane_end (uv_start, stride,
+                  (guint64) (info->width / 2) * 2, info->height / 2)))) {
+    return FALSE;
+  }
+
+  y = (guint8 *) in->data + y_start;
+  uv = (guint8 *) in->data + uv_start;
 
   gst_droidvec_copy_plane (out->data + info->offset[0],
       info->stride[0], y, stride, info->width, info->height);
@@ -600,18 +679,28 @@ gst_droidvdec_frame_available (void *user, DroidMediaBuffer * buffer)
 
   gst_video_info_set_format (&video_info, dec->format, width, height);
 
-  crop_meta = gst_buffer_add_video_crop_meta (buff);
-  crop_meta->x = droid_info.crop_rect.left;
-  crop_meta->y = droid_info.crop_rect.top;
-  crop_meta->width = droid_info.crop_rect.right - droid_info.crop_rect.left;
-  crop_meta->height = droid_info.crop_rect.bottom - droid_info.crop_rect.top;
+  /* The pool hands back the GstBuffer that belongs to this droid buffer. After
+   * a flush (a seek, a change of audio track) the codec can fill a buffer whose
+   * GstBuffer the sink still holds - it keeps the frame on screen until the next
+   * one replaces it - and a buffer that is not writable takes no new metas:
+   * gst_buffer_add_video_crop_meta () returns NULL. Such a buffer still carries
+   * the metas of its last use, so leave them be. */
+  if (gst_buffer_is_writable (buff)) {
+    crop_meta = gst_buffer_add_video_crop_meta (buff);
+    crop_meta->x = droid_info.crop_rect.left;
+    crop_meta->y = droid_info.crop_rect.top;
+    crop_meta->width = droid_info.crop_rect.right - droid_info.crop_rect.left;
+    crop_meta->height = droid_info.crop_rect.bottom - droid_info.crop_rect.top;
 
-  GST_LOG_OBJECT (dec, "crop info: x=%d, y=%d, w=%d, h=%d", crop_meta->x,
-      crop_meta->y, crop_meta->width, crop_meta->height);
+    GST_LOG_OBJECT (dec, "crop info: x=%d, y=%d, w=%d, h=%d", crop_meta->x,
+        crop_meta->y, crop_meta->width, crop_meta->height);
 
-  gst_buffer_add_video_meta_full (buff, GST_VIDEO_FRAME_FLAG_NONE, dec->format,
-      droid_info.width, droid_info.height, video_info.finfo->n_planes,
-      video_info.offset, video_info.stride);
+    gst_buffer_add_video_meta_full (buff, GST_VIDEO_FRAME_FLAG_NONE,
+        dec->format, droid_info.width, droid_info.height,
+        video_info.finfo->n_planes, video_info.offset, video_info.stride);
+  } else {
+    GST_DEBUG_OBJECT (dec, "buffer still held downstream, keeping its metas");
+  }
 
   frame = gst_video_decoder_get_oldest_frame (decoder);
 
@@ -682,6 +771,12 @@ gst_droidvdec_data_available (void *data, DroidMediaCodecData * encoded)
   }
 
   buff = gst_video_decoder_allocate_output_buffer (decoder);
+  if (G_UNLIKELY (!buff)) {
+    /* the pool is not active: we are flushing or shutting down */
+    GST_DEBUG_OBJECT (dec, "no output buffer, dropping the decoded frame");
+    flow_ret = GST_FLOW_FLUSHING;
+    goto out;
+  }
 
   gst_buffer_add_video_meta (buff, GST_VIDEO_FRAME_FLAG_NONE,
       GST_VIDEO_FORMAT_I420, dec->out_state->info.width,
@@ -775,7 +870,9 @@ gst_droidvdec_error (void *data, int err)
   GST_DROIDVDEC_STATE_LOCK (dec);
 
   if (dec->state == GST_DROID_VDEC_STATE_WAITING_FOR_EOS) {
-    /* Gotta love Android. We will ignore errors if we are expecting EOS */
+    /* Gotta love Android. We will ignore errors if we are expecting EOS,
+     * but no EOS will follow: let _finish () stop waiting for one. */
+    dec->drain_failed = TRUE;
     g_cond_signal (&dec->state_cond);
     GST_DROIDVDEC_STATE_UNLOCK (dec);
     return;
@@ -880,6 +977,19 @@ gst_droidvdec_configure_state (GstVideoDecoder * decoder, guint width,
       "codec reported state: colour: %d, width: %d, height: %d, stride: %d, slice_height: %d, crop: %d,%d %d,%d",
       md.hal_format, md.width, md.height, md.stride, md.slice_height,
       rect.left, rect.top, rect.right, rect.bottom);
+
+  /* the converters and the crop meta take the rectangle as it is */
+  if (rect.left < 0 || rect.top < 0 || rect.right <= rect.left
+      || rect.bottom <= rect.top || (md.width > 0 && rect.right > md.width)
+      || (md.height > 0 && rect.bottom > md.height)) {
+    GST_WARNING_OBJECT (dec, "codec reported a crop of %d,%d %d,%d outside "
+        "its %dx%d frame, not cropping", rect.left, rect.top, rect.right,
+        rect.bottom, md.width, md.height);
+    rect.left = 0;
+    rect.top = 0;
+    rect.right = md.width;
+    rect.bottom = md.height;
+  }
 
   dec->codec_reported_height = md.height;
   dec->codec_reported_width = md.width;
@@ -1012,15 +1122,21 @@ gst_droidvdec_decide_allocation (GstVideoDecoder * decoder, GstQuery * query)
     gint count = gst_query_get_n_allocation_pools (query);
 
     for (i = 0; i < count; ++i) {
-      GstAllocator *allocator;
+      GstAllocator *allocator = NULL;
       GstStructure *config;
+      gboolean droid;
 
       gst_query_parse_nth_allocation_pool (query, i, &pool, &size, &min, &max);
+      /* an entry may give only a size and no pool */
+      if (!pool)
+        continue;
       config = gst_buffer_pool_get_config (pool);
       gst_buffer_pool_config_get_allocator (config, &allocator, NULL);
-      if (allocator
+      droid = allocator
           && g_strcmp0 (allocator->mem_type,
-              GST_ALLOCATOR_DROID_MEDIA_BUFFER) == 0) {
+          GST_ALLOCATOR_DROID_MEDIA_BUFFER) == 0;
+      gst_structure_free (config);
+      if (droid) {
         break;
       } else {
         gst_object_unref (pool);
@@ -1052,8 +1168,7 @@ gst_droidvdec_decide_allocation (GstVideoDecoder * decoder, GstQuery * query)
         GST_ERROR_OBJECT (decoder, "Failed to set buffer pool configuration");
       }
 
-      gint count = gst_query_get_n_allocation_pools (query);
-      if (count == 0) {
+      if (gst_query_get_n_allocation_pools (query) == 0) {
         gst_query_add_allocation_pool(query, pool, size, min, max);
       }
     }
@@ -1077,12 +1192,18 @@ gst_droidvdec_stop (GstVideoDecoder * decoder)
 
   GST_DEBUG_OBJECT (dec, "stop");
 
+  /* Stop the codec before the task: a task waiting in the codec for output
+   * only returns once the codec is stopped, and stopping the task waits for
+   * it to return. The codec itself must outlive the task. */
+  if (dec->codec) {
+    droid_media_codec_stop (dec->codec);
+  }
+
   if (dec->running) {
     gst_droidvdec_stop_loop (dec);
   }
 
   if (dec->codec) {
-    droid_media_codec_stop (dec->codec);
     droid_media_codec_destroy (dec->codec);
     dec->codec = NULL;
   }
@@ -1311,19 +1432,30 @@ gst_droidvdec_finish (GstVideoDecoder * decoder)
 
   if (dec->codec && dec->state == GST_DROID_VDEC_STATE_OK) {
     GstBufferPool *pool = gst_video_decoder_get_buffer_pool (decoder);
+    DroidMediaCodec *codec = dec->codec;
+    gint64 deadline;
 
     GST_INFO_OBJECT (dec, "draining");
     dec->state = GST_DROID_VDEC_STATE_WAITING_FOR_EOS;
-    droid_media_codec_drain (dec->codec);
+    dec->drain_failed = FALSE;
+    droid_media_codec_drain (codec);
 
     /* release the lock to allow _frame_available () to do its job */
     GST_LOG_OBJECT (dec, "releasing stream lock");
     GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
-    /* Now we wait for the codec to signal EOS */
-    g_cond_wait (&dec->state_cond, &dec->state_lock);
+    /* Now we wait for the codec to signal EOS, or an error */
+    deadline = g_get_monotonic_time () + GST_DROIDVDEC_DRAIN_TIMEOUT;
+    while (dec->state == GST_DROID_VDEC_STATE_WAITING_FOR_EOS
+        && !dec->drain_failed) {
+      if (!g_cond_wait_until (&dec->state_cond, &dec->state_lock, deadline)) {
+        GST_WARNING_OBJECT (dec, "the codec did not drain in %d s, stopping it",
+            (gint) (GST_DROIDVDEC_DRAIN_TIMEOUT / G_TIME_SPAN_SECOND));
+        break;
+      }
+    }
 
     droid_media_buffer_queue_set_callbacks (droid_media_codec_get_buffer_queue
-        (dec->codec), NULL, NULL);
+        (codec), NULL, NULL);
 
     GST_DROIDVDEC_STATE_UNLOCK (dec);
 
@@ -1332,12 +1464,20 @@ gst_droidvdec_finish (GstVideoDecoder * decoder)
       gst_object_unref (pool);
     }
 
+    /* The src pad task may still be inside the codec: it reports EOS from
+     * within droid_media_codec_loop () and returns from it only afterwards,
+     * and after a timeout it is still waiting there for output. Stopping the
+     * codec wakes it; pausing the task then waits for that iteration to end.
+     * Only then can the codec go. Neither lock may be held here: the
+     * iteration takes both (EOS, error and frame callbacks). */
+    droid_media_codec_stop (codec);
+    gst_pad_pause_task (GST_VIDEO_DECODER_SRC_PAD (decoder));
+
     GST_VIDEO_DECODER_STREAM_LOCK (decoder);
     GST_DROIDVDEC_STATE_LOCK (dec);
     GST_LOG_OBJECT (dec, "acquired stream lock");
 
     if (dec->codec) {
-      droid_media_codec_stop (dec->codec);
       droid_media_codec_destroy (dec->codec);
       dec->codec = NULL;
     }
