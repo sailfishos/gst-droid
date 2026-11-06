@@ -1122,15 +1122,21 @@ gst_droidvdec_decide_allocation (GstVideoDecoder * decoder, GstQuery * query)
     gint count = gst_query_get_n_allocation_pools (query);
 
     for (i = 0; i < count; ++i) {
-      GstAllocator *allocator;
+      GstAllocator *allocator = NULL;
       GstStructure *config;
+      gboolean droid;
 
       gst_query_parse_nth_allocation_pool (query, i, &pool, &size, &min, &max);
+      /* an entry may give only a size and no pool */
+      if (!pool)
+        continue;
       config = gst_buffer_pool_get_config (pool);
       gst_buffer_pool_config_get_allocator (config, &allocator, NULL);
-      if (allocator
+      droid = allocator
           && g_strcmp0 (allocator->mem_type,
-              GST_ALLOCATOR_DROID_MEDIA_BUFFER) == 0) {
+          GST_ALLOCATOR_DROID_MEDIA_BUFFER) == 0;
+      gst_structure_free (config);
+      if (droid) {
         break;
       } else {
         gst_object_unref (pool);
@@ -1162,8 +1168,7 @@ gst_droidvdec_decide_allocation (GstVideoDecoder * decoder, GstQuery * query)
         GST_ERROR_OBJECT (decoder, "Failed to set buffer pool configuration");
       }
 
-      gint count = gst_query_get_n_allocation_pools (query);
-      if (count == 0) {
+      if (gst_query_get_n_allocation_pools (query) == 0) {
         gst_query_add_allocation_pool(query, pool, size, min, max);
       }
     }

@@ -176,12 +176,15 @@ gst_droideglsink_propose_allocation (GstBaseSink * bsink, GstQuery * query)
               NULL) && gst_caps_is_equal (caps, pool_caps)) {
         gst_buffer_pool_config_set_params (config, caps, size, min, max);
 
+        /* takes the config, also when it fails */
         if (gst_buffer_pool_set_config (previous_pool, config)) {
           pool = previous_pool;
           sink->invalidated_signal_id = previous_pool_signal_id;
 
           previous_pool = NULL;
         }
+      } else if (config) {
+        gst_structure_free (config);
       }
     }
 
