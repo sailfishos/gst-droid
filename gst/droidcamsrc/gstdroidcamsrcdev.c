@@ -56,6 +56,13 @@ GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
       gst_droid_camera_startup_mono_ms (), ##__VA_ARGS__)
 
 #define VIDEO_RECORDING_STOP_TIMEOUT                 100000     /* us */
+/* How long stopping a recording waits for the camera: for the first frames
+ * of a recording that has only just started, and for downstream to give the
+ * camera's frames back. Without a limit a camera that stops delivering, or an
+ * element that keeps its buffers, hangs the stop, and with it everything else
+ * that wants the capture lock. */
+#define VIDEO_RECORDING_FIRST_FRAMES_WAIT            (2 * G_TIME_SPAN_SECOND)
+#define VIDEO_RECORDING_QUEUED_FRAMES_WAIT           (3 * G_TIME_SPAN_SECOND)
 #define GST_DROIDCAMSRC_NUM_BUFFERS                  2
 
 struct _GstDroidCamSrcImageCaptureState
@@ -1044,14 +1051,21 @@ out:
 void
 gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
 {
+  gint64 deadline;
+
   GST_DEBUG ("dev stop video recording");
 
   gst_buffer_pool_set_flushing (dev->pool, TRUE);
 
   /* We need to make sure that some buffers have been pushed */
   g_mutex_lock (&dev->vid->lock);
+  deadline = g_get_monotonic_time () + VIDEO_RECORDING_FIRST_FRAMES_WAIT;
   while (dev->vid->video_frames <= 4) {
-    g_cond_wait (&dev->vid->cond, &dev->vid->lock);
+    if (!g_cond_wait_until (&dev->vid->cond, &dev->vid->lock, deadline)) {
+      GST_WARNING ("stopping the recording after %lu frames: no more came",
+          dev->vid->video_frames);
+      break;
+    }
   }
   g_mutex_unlock (&dev->vid->lock);
 
@@ -1081,7 +1095,13 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
 
     GST_INFO ("waiting for queued frames %i", dev->vid->queued_frames);
 
+    deadline = g_get_monotonic_time () + VIDEO_RECORDING_QUEUED_FRAMES_WAIT;
     while (dev->vid->queued_frames > 0) {
+      if (g_get_monotonic_time () > deadline) {
+        GST_WARNING ("stopping the recording with %i frames still held "
+            "downstream", dev->vid->queued_frames);
+        break;
+      }
       GST_INFO ("waiting for queued frames to reach 0 from %i",
           dev->vid->queued_frames);
       g_rec_mutex_unlock (dev->lock);
