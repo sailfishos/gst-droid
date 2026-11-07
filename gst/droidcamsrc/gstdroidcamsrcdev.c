@@ -206,6 +206,7 @@ gst_droidcamsrc_dev_compressed_image_callback (void *user, DroidMediaData * mem)
   GstTagList *tags;
   GstEvent *event = NULL;
   void *d;
+  gboolean captured;
 
   GST_DEBUG_OBJECT (src, "dev compressed image callback");
 
@@ -233,6 +234,29 @@ gst_droidcamsrc_dev_compressed_image_callback (void *user, DroidMediaData * mem)
     event = gst_event_new_tag (tags);
   }
 
+  /* Finish the capture before the picture goes out. A client that takes
+   * the next picture as soon as it has this one would otherwise find the
+   * capture still counted, and its start-capture would be refused.
+   *
+   * A JPEG that comes in after the capture was given up (the camera was
+   * stopped or the mode changed, which reset the count) must not restart
+   * the preview or take the count below zero. */
+  g_mutex_lock (&src->capture_lock);
+  captured = src->captures > 0;
+  if (captured)
+    --src->captures;
+
+  /* we need to restart the preview but only if we are not in ZSL mode.
+   * android demands this but GStreamer does not know about it.
+   */
+  if (captured && !(src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_ZSL)) {
+    g_rec_mutex_lock (dev->lock);
+    dev->running = FALSE;
+    g_rec_mutex_unlock (dev->lock);
+    gst_droidcamsrc_dev_start (dev, TRUE);
+  }
+  g_mutex_unlock (&src->capture_lock);
+
   g_mutex_lock (&dev->imgsrc->lock);
 
   // TODO: get the correct lock
@@ -245,21 +269,8 @@ gst_droidcamsrc_dev_compressed_image_callback (void *user, DroidMediaData * mem)
   g_cond_signal (&dev->imgsrc->cond);
   g_mutex_unlock (&dev->imgsrc->lock);
 
-  /* we need to restart the preview but only if we are not in ZSL mode.
-   * android demands this but GStreamer does not know about it.
-   */
-  if (!(src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_ZSL)) {
-    g_rec_mutex_lock (dev->lock);
-    dev->running = FALSE;
-    g_rec_mutex_unlock (dev->lock);
-    gst_droidcamsrc_dev_start (dev, TRUE);
-  }
-
-  g_mutex_lock (&src->capture_lock);
-  --src->captures;
-  g_mutex_unlock (&src->capture_lock);
-
-  g_object_notify (G_OBJECT (src), "ready-for-capture");
+  if (captured)
+    g_object_notify (G_OBJECT (src), "ready-for-capture");
 }
 
 static void

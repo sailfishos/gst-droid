@@ -747,7 +747,9 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         gst_droidcamsrc_update_max_zoom (src);
       }
 
+      g_mutex_lock (&src->capture_lock);
       src->captures = 0;
+      g_mutex_unlock (&src->capture_lock);
       g_object_notify (G_OBJECT (src), "ready-for-capture");
 
       break;
@@ -779,9 +781,14 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       gst_pad_push_event (src->vfsrc->pad, gst_event_new_flush_start ());
       g_mutex_unlock (&src->vfsrc->lock);
 
+      /* Give up a pending capture before stopping, so that a JPEG which
+       * comes in while the camera stops does not start the preview again. */
+      g_mutex_lock (&src->capture_lock);
+      src->captures = 0;
+      g_mutex_unlock (&src->capture_lock);
+
       /* TODO: stop recording if we are recording */
       gst_droidcamsrc_dev_stop (src->dev);
-      src->captures = 0;
 
       /* deactivate mode */
       if (src->active_mode) {
