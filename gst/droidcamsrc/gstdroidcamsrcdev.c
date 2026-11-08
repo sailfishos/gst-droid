@@ -858,6 +858,8 @@ out:
 void
 gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev)
 {
+  DroidMediaCamera *cam = NULL;
+
   g_rec_mutex_lock (dev->lock);
 
   GST_DEBUG ("dev stop");
@@ -867,8 +869,18 @@ gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev)
     if (dev->pool) {
       gst_buffer_pool_set_active (dev->pool, FALSE);
     }
-    droid_media_camera_stop_preview (dev->cam);
+    cam = dev->cam;
     dev->running = FALSE;
+  }
+
+  /* Not under dev->lock: a HAL can finish a picture that is still being
+   * taken before its stopPreview() returns (the Exynos HAL1 HAL waits for
+   * its picture thread there), and the shutter and JPEG callbacks of that
+   * picture take dev->lock. dev->running is already FALSE for them. */
+  if (cam) {
+    g_rec_mutex_unlock (dev->lock);
+    droid_media_camera_stop_preview (cam);
+    g_rec_mutex_lock (dev->lock);
     GST_DEBUG ("stopped preview");
   }
 
