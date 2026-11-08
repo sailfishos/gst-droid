@@ -679,28 +679,20 @@ gst_droidvdec_frame_available (void *user, DroidMediaBuffer * buffer)
 
   gst_video_info_set_format (&video_info, dec->format, width, height);
 
-  /* The pool hands back the GstBuffer that belongs to this droid buffer. After
-   * a flush (a seek, a change of audio track) the codec can fill a buffer whose
-   * GstBuffer the sink still holds - it keeps the frame on screen until the next
-   * one replaces it - and a buffer that is not writable takes no new metas:
-   * gst_buffer_add_video_crop_meta () returns NULL. Such a buffer still carries
-   * the metas of its last use, so leave them be. */
-  if (gst_buffer_is_writable (buff)) {
-    crop_meta = gst_buffer_add_video_crop_meta (buff);
-    crop_meta->x = droid_info.crop_rect.left;
-    crop_meta->y = droid_info.crop_rect.top;
-    crop_meta->width = droid_info.crop_rect.right - droid_info.crop_rect.left;
-    crop_meta->height = droid_info.crop_rect.bottom - droid_info.crop_rect.top;
+  /* The pool hands out only a buffer nobody else holds, with the reference
+   * its bound list held: it is writable, and takes the metas. */
+  crop_meta = gst_buffer_add_video_crop_meta (buff);
+  crop_meta->x = droid_info.crop_rect.left;
+  crop_meta->y = droid_info.crop_rect.top;
+  crop_meta->width = droid_info.crop_rect.right - droid_info.crop_rect.left;
+  crop_meta->height = droid_info.crop_rect.bottom - droid_info.crop_rect.top;
 
-    GST_LOG_OBJECT (dec, "crop info: x=%d, y=%d, w=%d, h=%d", crop_meta->x,
-        crop_meta->y, crop_meta->width, crop_meta->height);
+  GST_LOG_OBJECT (dec, "crop info: x=%d, y=%d, w=%d, h=%d", crop_meta->x,
+      crop_meta->y, crop_meta->width, crop_meta->height);
 
-    gst_buffer_add_video_meta_full (buff, GST_VIDEO_FRAME_FLAG_NONE,
-        dec->format, droid_info.width, droid_info.height,
-        video_info.finfo->n_planes, video_info.offset, video_info.stride);
-  } else {
-    GST_DEBUG_OBJECT (dec, "buffer still held downstream, keeping its metas");
-  }
+  gst_buffer_add_video_meta_full (buff, GST_VIDEO_FRAME_FLAG_NONE,
+      dec->format, droid_info.width, droid_info.height,
+      video_info.finfo->n_planes, video_info.offset, video_info.stride);
 
   frame = gst_video_decoder_get_oldest_frame (decoder);
 

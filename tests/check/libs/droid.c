@@ -683,6 +683,94 @@ GST_START_TEST (test_pool_rebind_without_buffer_drops_memory_once)
 
 GST_END_TEST;
 
+/* A frame for a buffer whose GstBuffer is still held downstream: droidmedia
+ * cannot give such a buffer back, so a reference was lost somewhere. The pool
+ * does not hand the held buffer out a second time, without a reference: that
+ * would let go of the holder's, and release the buffer to the codec while it
+ * is still on screen. */
+GST_START_TEST (test_pool_held_buffer_is_not_handed_out_again)
+{
+  FakeQueueBuffer qb = { NULL };
+  DroidMediaBuffer *dbuf = (DroidMediaBuffer *) & qb;
+  GstBufferPool *pool;
+  GstBuffer *held;
+
+  g_atomic_int_set (&fake_format, FAKE_HAL_RGBA);
+  g_atomic_int_set (&destroyed, 0);
+  g_atomic_int_set (&released, 0);
+  pool = queue_pool_new ();
+
+  fail_unless (gst_droid_buffer_pool_bind_media_buffer (pool, dbuf));
+  held = gst_droid_buffer_pool_acquire_media_buffer (pool, dbuf);
+  fail_unless (held != NULL);
+
+  fail_unless (gst_droid_buffer_pool_acquire_media_buffer (pool, dbuf) == NULL);
+  ASSERT_MINI_OBJECT_REFCOUNT (held, "held buffer", 1);
+  fail_unless_equals_int (g_atomic_int_get (&released), 0);
+
+  /* the holder is done with it: back to the queue, once */
+  gst_buffer_unref (held);
+  fail_unless_equals_int (g_atomic_int_get (&released), 1);
+  fail_unless_equals_int (g_atomic_int_get (&destroyed), 0);
+
+  gst_droid_buffer_pool_media_buffers_invalidated (pool);
+  fail_unless_equals_int (g_atomic_int_get (&destroyed), 1);
+  queue_pool_free (pool);
+}
+
+GST_END_TEST;
+
+/* The decoder renegotiates while the sink holds a frame of the earlier pool.
+ * A frame for that buffer in the new pool takes nothing from the holder: its
+ * buffer keeps its memory and its one reference, and the queue buffer goes
+ * back to the codec only when the holder lets go of it. Then it moves. */
+GST_START_TEST (test_pool_renegotiation_leaves_held_buffer_alone)
+{
+  FakeQueueBuffer qb = { NULL };
+  DroidMediaBuffer *dbuf = (DroidMediaBuffer *) & qb;
+  GstBufferPool *first, *second;
+  GstBuffer *held, *buffer;
+
+  g_atomic_int_set (&fake_format, FAKE_HAL_RGBA);
+  g_atomic_int_set (&destroyed, 0);
+  g_atomic_int_set (&released, 0);
+  first = queue_pool_new ();
+  second = queue_pool_new ();
+
+  fail_unless (gst_droid_buffer_pool_bind_media_buffer (first, dbuf));
+  held = gst_droid_buffer_pool_acquire_media_buffer (first, dbuf);
+  fail_unless (held != NULL);
+
+  fail_unless (gst_droid_buffer_pool_acquire_media_buffer (second,
+          dbuf) == NULL);
+  ASSERT_MINI_OBJECT_REFCOUNT (held, "held buffer", 1);
+  fail_unless_equals_int (gst_buffer_n_memory (held), 1);
+  fail_unless (gst_droid_media_buffer_memory_get_buffer_from_gst_buffer (held)
+      == dbuf);
+  fail_unless (qb.user_data == held);
+  fail_unless_equals_int (g_atomic_int_get (&released), 0);
+  fail_unless_equals_int (g_atomic_int_get (&destroyed), 0);
+
+  gst_buffer_unref (held);
+  fail_unless_equals_int (g_atomic_int_get (&released), 1);
+
+  buffer = gst_droid_buffer_pool_acquire_media_buffer (second, dbuf);
+  fail_unless (buffer != NULL);
+  fail_unless (buffer->pool == second);
+  gst_buffer_unref (buffer);
+  fail_unless_equals_int (g_atomic_int_get (&released), 2);
+  fail_unless_equals_int (g_atomic_int_get (&destroyed), 0);
+
+  gst_droid_buffer_pool_media_buffers_invalidated (second);
+  gst_droid_buffer_pool_media_buffers_invalidated (first);
+  fail_unless_equals_int (g_atomic_int_get (&destroyed), 1);
+
+  queue_pool_free (second);
+  queue_pool_free (first);
+}
+
+GST_END_TEST;
+
 static Suite *
 droid_suite (void)
 {
@@ -705,6 +793,8 @@ droid_suite (void)
   tcase_add_test (tc, test_pool_unbound_buffer_is_not_taken);
   tcase_add_test (tc, test_pool_bind_without_buffer_keeps_reference);
   tcase_add_test (tc, test_pool_rebind_without_buffer_drops_memory_once);
+  tcase_add_test (tc, test_pool_held_buffer_is_not_handed_out_again);
+  tcase_add_test (tc, test_pool_renegotiation_leaves_held_buffer_alone);
 
   return s;
 }

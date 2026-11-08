@@ -340,10 +340,20 @@ gst_droid_buffer_pool_acquire_media_buffer (GstBufferPool * pool,
     gst_buffer = (GstBuffer *) droid_media_buffer_get_user_data (buffer);
   }
 
+  /* The caller gets the reference the bound list holds. A buffer that is not
+   * in that list is out already, held downstream: droidmedia gives a queue
+   * buffer back only once it was released, so its frame means a reference
+   * to it was lost on the way. Handing it out again, without a reference of
+   * its own, would let go of the holder's when the frame is done with, and
+   * the codec would fill the buffer the sink still shows. */
   if (gst_buffer && g_ptr_array_find (dpool->bound_buffers, gst_buffer, &index)) {
     g_ptr_array_remove_index_fast (dpool->bound_buffers, index);
 
     g_ptr_array_add (dpool->acquired_buffers, gst_buffer);
+  } else if (gst_buffer) {
+    GST_ERROR_OBJECT (pool, "droid buffer %p came back while its buffer %p "
+        "is still held", buffer, gst_buffer);
+    gst_buffer = NULL;
   }
 
   g_mutex_unlock (&dpool->binding_lock);
