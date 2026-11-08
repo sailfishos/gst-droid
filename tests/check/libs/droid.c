@@ -609,6 +609,80 @@ GST_START_TEST (test_pool_unbound_buffer_is_not_taken)
 
 GST_END_TEST;
 
+/* A pool that is not active refuses to hand out buffers, as it does while
+ * it flushes. */
+static GstBufferPool *
+queue_pool_new_inactive (void)
+{
+  GstBufferPool *pool = queue_pool_new ();
+
+  fail_unless (gst_buffer_pool_set_active (pool, FALSE));
+  return pool;
+}
+
+/* buffer_created when the pool has no buffer to give: the bind fails before
+ * any memory is made for the queue buffer, so nothing is destroyed here and
+ * the reference stays droidmedia's, which it lets go of itself when the bind
+ * returns FALSE. A memory made first and freed on the failure destroyed the
+ * buffer once here, and droidmedia released it a second time. */
+GST_START_TEST (test_pool_bind_without_buffer_keeps_reference)
+{
+  FakeQueueBuffer qb = { NULL };
+  DroidMediaBuffer *dbuf = (DroidMediaBuffer *) & qb;
+  GstBufferPool *pool;
+
+  g_atomic_int_set (&fake_format, FAKE_HAL_RGBA);
+  g_atomic_int_set (&destroyed, 0);
+  pool = queue_pool_new_inactive ();
+
+  fail_if (gst_droid_buffer_pool_bind_media_buffer (pool, dbuf));
+  fail_unless_equals_int (g_atomic_int_get (&destroyed), 0);
+  fail_unless (qb.user_data == NULL);
+
+  gst_droid_buffer_pool_media_buffers_invalidated (pool);
+  fail_unless_equals_int (g_atomic_int_get (&destroyed), 0);
+
+  gst_object_unref (pool);
+}
+
+GST_END_TEST;
+
+/* A frame for a buffer bound in one pool, taken by another that has no buffer
+ * to give: the memory, which came along from the first pool and holds the
+ * reference, is let go of once, and nothing is left bound. */
+GST_START_TEST (test_pool_rebind_without_buffer_drops_memory_once)
+{
+  FakeQueueBuffer qb = { NULL };
+  DroidMediaBuffer *dbuf = (DroidMediaBuffer *) & qb;
+  GstBufferPool *first, *second;
+  GstBuffer *buffer;
+
+  g_atomic_int_set (&fake_format, FAKE_HAL_RGBA);
+  g_atomic_int_set (&destroyed, 0);
+  g_atomic_int_set (&released, 0);
+  first = queue_pool_new ();
+  second = queue_pool_new_inactive ();
+
+  fail_unless (gst_droid_buffer_pool_bind_media_buffer (first, dbuf));
+  buffer = gst_droid_buffer_pool_acquire_media_buffer (first, dbuf);
+  fail_unless (buffer != NULL);
+  gst_buffer_unref (buffer);
+
+  fail_unless (gst_droid_buffer_pool_acquire_media_buffer (second,
+          dbuf) == NULL);
+  fail_unless_equals_int (g_atomic_int_get (&destroyed), 1);
+  fail_unless (qb.user_data == NULL);
+
+  gst_droid_buffer_pool_media_buffers_invalidated (second);
+  gst_droid_buffer_pool_media_buffers_invalidated (first);
+  fail_unless_equals_int (g_atomic_int_get (&destroyed), 1);
+
+  gst_object_unref (second);
+  queue_pool_free (first);
+}
+
+GST_END_TEST;
+
 static Suite *
 droid_suite (void)
 {
@@ -629,6 +703,8 @@ droid_suite (void)
   tcase_add_test (tc, test_media_buffer_threads);
   tcase_add_test (tc, test_pool_rebind_keeps_one_reference);
   tcase_add_test (tc, test_pool_unbound_buffer_is_not_taken);
+  tcase_add_test (tc, test_pool_bind_without_buffer_keeps_reference);
+  tcase_add_test (tc, test_pool_rebind_without_buffer_drops_memory_once);
 
   return s;
 }
