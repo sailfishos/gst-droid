@@ -63,8 +63,11 @@ gst_droid_buffer_pool_set_config (GstBufferPool * bpool, GstStructure * config)
         (features, GST_CAPS_FEATURE_MEMORY_DROID_MEDIA_QUEUE_BUFFER);
 
     GST_DEBUG_OBJECT (pool, "Configured pool. caps: %" GST_PTR_FORMAT, caps);
-    pool->allocator = gst_droid_media_buffer_allocator_new ();
-    gst_object_ref (pool->allocator);
+    /* (the allocator of an earlier configuration stays with its memory) */
+    if (pool->allocator)
+      gst_object_unref (pool->allocator);
+    /* new, it is floating: the pool takes that reference, and frees it */
+    pool->allocator = gst_object_ref_sink (gst_droid_media_buffer_allocator_new ());
     gst_buffer_pool_config_set_allocator (config,
         (GstAllocator *) pool->allocator, &params);
     GST_OBJECT_UNLOCK (pool);
@@ -174,6 +177,27 @@ gst_droid_buffer_pool_set_egl_display (GstBufferPool * pool, EGLDisplay display)
   }
 }
 
+/* Binds @buffer to @gst_buffer, a buffer just acquired from @pool, through
+ * @mem (transfer full): the memory that holds the reference to @buffer that
+ * droidmedia handed to buffer_created. That reference is let go when the
+ * memory is freed, so there must be no more than one such memory for it. */
+static void
+gst_droid_buffer_pool_bind_memory (GstBufferPool * pool,
+    DroidMediaBuffer * buffer, GstBuffer * gst_buffer, GstMemory * mem)
+{
+  GstDroidBufferPool *dpool = GST_DROID_BUFFER_POOL (pool);
+
+  gst_buffer_insert_memory (gst_buffer, 0, mem);
+
+  g_mutex_lock (&dpool->binding_lock);
+
+  droid_media_buffer_set_user_data (buffer, gst_buffer);
+
+  g_ptr_array_add (dpool->bound_buffers, gst_buffer);
+
+  g_mutex_unlock (&dpool->binding_lock);
+}
+
 gboolean
 gst_droid_buffer_pool_bind_media_buffer (GstBufferPool * pool,
     DroidMediaBuffer * buffer)
@@ -186,11 +210,14 @@ gst_droid_buffer_pool_bind_media_buffer (GstBufferPool * pool,
     return FALSE;
   }
 
+  dpool = GST_DROID_BUFFER_POOL (pool);
+
+  /* The buffer first: when there is none, returning FALSE leaves droidmedia
+   * to let go of the reference it handed over, and no memory may have been
+   * made for it yet - freeing that memory would let go of it as well. */
   if (gst_buffer_pool_acquire_buffer (pool, &gst_buffer, NULL) != GST_FLOW_OK) {
     return FALSE;
   }
-
-  dpool = GST_DROID_BUFFER_POOL (pool);
 
   mem =
       gst_droid_media_buffer_allocator_alloc_from_buffer (dpool->allocator,
@@ -202,17 +229,43 @@ gst_droid_buffer_pool_bind_media_buffer (GstBufferPool * pool,
     return FALSE;
   }
 
-  gst_buffer_insert_memory (gst_buffer, 0, mem);
+  gst_droid_buffer_pool_bind_memory (pool, buffer, gst_buffer, mem);
+
+  return TRUE;
+}
+
+/* Takes the memory of @buffer out of @gst_buffer, the buffer of another pool
+ * it is bound to, when that buffer is still bound there and not out in the
+ * pipeline; NULL otherwise. */
+static GstMemory *
+gst_droid_buffer_pool_take_bound_memory (GstBufferPool * pool,
+    GstBuffer * gst_buffer, DroidMediaBuffer * buffer)
+{
+  GstDroidBufferPool *dpool = GST_DROID_BUFFER_POOL (pool);
+  GstMemory *mem = NULL;
+  guint index;
 
   g_mutex_lock (&dpool->binding_lock);
 
-  droid_media_buffer_set_user_data (buffer, gst_buffer);
+  if (droid_media_buffer_get_user_data (buffer) == gst_buffer
+      && gst_droid_media_buffer_memory_get_buffer_from_gst_buffer (gst_buffer)
+      == buffer && gst_buffer_is_writable (gst_buffer)
+      && g_ptr_array_find (dpool->bound_buffers, gst_buffer, &index)) {
+    g_ptr_array_remove_index_fast (dpool->bound_buffers, index);
 
-  g_ptr_array_add (dpool->bound_buffers, gst_buffer);
+    mem = gst_buffer_get_memory (gst_buffer, 0);
+    gst_buffer_remove_all_memory (gst_buffer);
+    droid_media_buffer_set_user_data (buffer, NULL);
+  }
 
   g_mutex_unlock (&dpool->binding_lock);
 
-  return TRUE;
+  if (mem) {
+    /* the reference the bound list held: the buffer goes back to its pool */
+    gst_buffer_unref (gst_buffer);
+  }
+
+  return mem;
 }
 
 static void
@@ -248,27 +301,59 @@ gst_droid_buffer_pool_acquire_media_buffer (GstBufferPool * pool,
   gst_buffer = (GstBuffer *) droid_media_buffer_get_user_data (buffer);
 
   if (!gst_buffer || gst_buffer->pool != pool) {
-    droid_media_buffer_set_user_data (buffer, NULL);
+    /* droidmedia hands over one reference to the buffer, with
+     * buffer_created, and it is held by the memory made then. Another
+     * memory for the buffer here would let go of a reference it was never
+     * given: droidmedia's own, and the buffer would be freed while its
+     * queue slot still points at it (and freed again when the queue is
+     * emptied). So the memory moves along with the buffer to this pool,
+     * after a renegotiation; a buffer that has none any more (the pool's
+     * buffers were invalidated) is not taken: droidmedia gives it a new
+     * reference, through buffer_created, with its next frame. */
+    GstBufferPool *other = gst_buffer ? gst_buffer->pool : NULL;
+    GstMemory *mem = NULL;
 
     g_mutex_unlock (&dpool->binding_lock);
 
-    if (!gst_droid_buffer_pool_bind_media_buffer (pool, buffer)) {
+    if (other && GST_IS_DROID_BUFFER_POOL (other)) {
+      mem = gst_droid_buffer_pool_take_bound_memory (other, gst_buffer, buffer);
+    }
+
+    if (!mem) {
+      GST_DEBUG_OBJECT (pool, "droid buffer %p has no memory to bind", buffer);
       return NULL;
     }
 
-    if (gst_buffer) {
-      gst_buffer_unref (gst_buffer);
+    /* The memory came along from the other pool and owns droidmedia's
+     * reference: without a buffer to put it in, it is let go of here. */
+    if (gst_buffer_pool_acquire_buffer (pool, &gst_buffer,
+            NULL) != GST_FLOW_OK) {
+      gst_memory_unref (mem);
+
+      return NULL;
     }
+
+    gst_droid_buffer_pool_bind_memory (pool, buffer, gst_buffer, mem);
 
     g_mutex_lock (&dpool->binding_lock);
 
     gst_buffer = (GstBuffer *) droid_media_buffer_get_user_data (buffer);
   }
 
+  /* The caller gets the reference the bound list holds. A buffer that is not
+   * in that list is out already, held downstream: droidmedia gives a queue
+   * buffer back only once it was released, so its frame means a reference
+   * to it was lost on the way. Handing it out again, without a reference of
+   * its own, would let go of the holder's when the frame is done with, and
+   * the codec would fill the buffer the sink still shows. */
   if (gst_buffer && g_ptr_array_find (dpool->bound_buffers, gst_buffer, &index)) {
     g_ptr_array_remove_index_fast (dpool->bound_buffers, index);
 
     g_ptr_array_add (dpool->acquired_buffers, gst_buffer);
+  } else if (gst_buffer) {
+    GST_ERROR_OBJECT (pool, "droid buffer %p came back while its buffer %p "
+        "is still held", buffer, gst_buffer);
+    gst_buffer = NULL;
   }
 
   g_mutex_unlock (&dpool->binding_lock);

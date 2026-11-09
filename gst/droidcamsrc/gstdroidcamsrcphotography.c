@@ -1338,7 +1338,9 @@ gst_droidcamsrc_set_zoom (GstDroidCamSrc * src, gfloat zoom)
   src->photo->settings.zoom = zoom;
   GST_OBJECT_UNLOCK (src);
 
-  value = g_strdup_printf ("%f", zoom);
+  /* Android's "zoom" is an index into "zoom-ratios" starting at 0, while
+   * ours starts at 1; see gst_droidcamsrc_photography_set_zoom_to_droid(). */
+  value = g_strdup_printf ("%d", MAX ((int) zoom - 1, 0));
   ret = gst_droidcamsrc_set_and_apply (src, "zoom", value);
 
   GST_DEBUG_OBJECT (src, "zoom set to %s", value);

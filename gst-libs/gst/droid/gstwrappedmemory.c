@@ -120,6 +120,10 @@ gst_wrapped_memory_allocator_wrap (GstAllocator * allocator,
 {
   GstMemory *mem = gst_wrapped_memory_allocator_memory_new (allocator, size);
 
+  if (!mem) {
+    return NULL;
+  }
+
   gst_wrapped_memory_allocator_memory_set_data (mem, data, cb, user_data);
 
   return mem;
