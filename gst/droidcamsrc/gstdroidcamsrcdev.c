@@ -56,6 +56,13 @@ GST_DEBUG_CATEGORY_EXTERN (gst_droid_camsrc_debug);
       gst_droid_camera_startup_mono_ms (), ##__VA_ARGS__)
 
 #define VIDEO_RECORDING_STOP_TIMEOUT                 100000     /* us */
+/* How long stopping a recording waits for the camera: for the first frames
+ * of a recording that has only just started, and for downstream to give the
+ * camera's frames back. Without a limit a camera that stops delivering, or an
+ * element that keeps its buffers, hangs the stop, and with it everything else
+ * that wants the capture lock. */
+#define VIDEO_RECORDING_FIRST_FRAMES_WAIT            (2 * G_TIME_SPAN_SECOND)
+#define VIDEO_RECORDING_QUEUED_FRAMES_WAIT           (3 * G_TIME_SPAN_SECOND)
 #define GST_DROIDCAMSRC_NUM_BUFFERS                  2
 
 struct _GstDroidCamSrcImageCaptureState
@@ -206,6 +213,7 @@ gst_droidcamsrc_dev_compressed_image_callback (void *user, DroidMediaData * mem)
   GstTagList *tags;
   GstEvent *event = NULL;
   void *d;
+  gboolean captured;
 
   GST_DEBUG_OBJECT (src, "dev compressed image callback");
 
@@ -233,6 +241,29 @@ gst_droidcamsrc_dev_compressed_image_callback (void *user, DroidMediaData * mem)
     event = gst_event_new_tag (tags);
   }
 
+  /* Finish the capture before the picture goes out. A client that takes
+   * the next picture as soon as it has this one would otherwise find the
+   * capture still counted, and its start-capture would be refused.
+   *
+   * A JPEG that comes in after the capture was given up (the camera was
+   * stopped or the mode changed, which reset the count) must not restart
+   * the preview or take the count below zero. */
+  g_mutex_lock (&src->capture_lock);
+  captured = src->captures > 0;
+  if (captured)
+    --src->captures;
+
+  /* we need to restart the preview but only if we are not in ZSL mode.
+   * android demands this but GStreamer does not know about it.
+   */
+  if (captured && !(src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_ZSL)) {
+    g_rec_mutex_lock (dev->lock);
+    dev->running = FALSE;
+    g_rec_mutex_unlock (dev->lock);
+    gst_droidcamsrc_dev_start (dev, TRUE);
+  }
+  g_mutex_unlock (&src->capture_lock);
+
   g_mutex_lock (&dev->imgsrc->lock);
 
   // TODO: get the correct lock
@@ -245,21 +276,8 @@ gst_droidcamsrc_dev_compressed_image_callback (void *user, DroidMediaData * mem)
   g_cond_signal (&dev->imgsrc->cond);
   g_mutex_unlock (&dev->imgsrc->lock);
 
-  /* we need to restart the preview but only if we are not in ZSL mode.
-   * android demands this but GStreamer does not know about it.
-   */
-  if (!(src->image_mode & GST_DROIDCAMSRC_IMAGE_MODE_ZSL)) {
-    g_rec_mutex_lock (dev->lock);
-    dev->running = FALSE;
-    g_rec_mutex_unlock (dev->lock);
-    gst_droidcamsrc_dev_start (dev, TRUE);
-  }
-
-  g_mutex_lock (&src->capture_lock);
-  --src->captures;
-  g_mutex_unlock (&src->capture_lock);
-
-  g_object_notify (G_OBJECT (src), "ready-for-capture");
+  if (captured)
+    g_object_notify (G_OBJECT (src), "ready-for-capture");
 }
 
 static void
@@ -356,7 +374,8 @@ gst_droidcamsrc_dev_video_frame_callback (void *user,
   /* unlikely but just in case */
   if (G_UNLIKELY (!data)) {
     GST_ERROR ("invalid memory from camera HAL");
-    droid_media_camera_release_recording_frame (dev->cam, video_data);
+    if (dev->cam)
+      droid_media_camera_release_recording_frame (dev->cam, video_data);
     goto unlock_and_out;
   }
 
@@ -656,17 +675,22 @@ gst_droidcamsrc_dev_open (GstDroidCamSrcDev * dev, GstDroidCamSrcCamInfo * info)
 void
 gst_droidcamsrc_dev_close (GstDroidCamSrcDev * dev)
 {
+  DroidMediaCamera *cam;
+
   GST_DEBUG ("dev close");
 
   g_rec_mutex_lock (dev->lock);
-
-  if (dev->cam) {
-    droid_media_camera_disconnect (dev->cam);
-    dev->cam = NULL;
-    dev->queue = NULL;
-  }
-
+  cam = dev->cam;
+  dev->cam = NULL;
+  dev->queue = NULL;
   g_rec_mutex_unlock (dev->lock);
+
+  /* Not under dev->lock: droidmedia waits for camera callbacks that are
+   * still running before it frees the camera, and those take dev->lock.
+   * dev->cam is already NULL for any of them that look. */
+  if (cam) {
+    droid_media_camera_disconnect (cam);
+  }
 }
 
 void
@@ -773,6 +797,11 @@ gst_droidcamsrc_dev_start (GstDroidCamSrcDev * dev, gboolean apply_settings)
     goto out;
   }
 
+  if (!dev->cam) {
+    GST_WARNING_OBJECT (src, "camera is closed");
+    goto out;
+  }
+
   GST_DEBUG_OBJECT (src, "dev start");
 
   if (!dev->use_raw_data) {
@@ -829,6 +858,8 @@ out:
 void
 gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev)
 {
+  DroidMediaCamera *cam = NULL;
+
   g_rec_mutex_lock (dev->lock);
 
   GST_DEBUG ("dev stop");
@@ -838,8 +869,18 @@ gst_droidcamsrc_dev_stop (GstDroidCamSrcDev * dev)
     if (dev->pool) {
       gst_buffer_pool_set_active (dev->pool, FALSE);
     }
-    droid_media_camera_stop_preview (dev->cam);
+    cam = dev->cam;
     dev->running = FALSE;
+  }
+
+  /* Not under dev->lock: a HAL can finish a picture that is still being
+   * taken before its stopPreview() returns (the Exynos HAL1 HAL waits for
+   * its picture thread there), and the shutter and JPEG callbacks of that
+   * picture take dev->lock. dev->running is already FALSE for them. */
+  if (cam) {
+    g_rec_mutex_unlock (dev->lock);
+    droid_media_camera_stop_preview (cam);
+    g_rec_mutex_lock (dev->lock);
     GST_DEBUG ("stopped preview");
   }
 
@@ -1022,14 +1063,21 @@ out:
 void
 gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
 {
+  gint64 deadline;
+
   GST_DEBUG ("dev stop video recording");
 
   gst_buffer_pool_set_flushing (dev->pool, TRUE);
 
   /* We need to make sure that some buffers have been pushed */
   g_mutex_lock (&dev->vid->lock);
+  deadline = g_get_monotonic_time () + VIDEO_RECORDING_FIRST_FRAMES_WAIT;
   while (dev->vid->video_frames <= 4) {
-    g_cond_wait (&dev->vid->cond, &dev->vid->lock);
+    if (!g_cond_wait_until (&dev->vid->cond, &dev->vid->lock, deadline)) {
+      GST_WARNING ("stopping the recording after %lu frames: no more came",
+          dev->vid->video_frames);
+      break;
+    }
   }
   g_mutex_unlock (&dev->vid->lock);
 
@@ -1059,7 +1107,13 @@ gst_droidcamsrc_dev_stop_video_recording (GstDroidCamSrcDev * dev)
 
     GST_INFO ("waiting for queued frames %i", dev->vid->queued_frames);
 
+    deadline = g_get_monotonic_time () + VIDEO_RECORDING_QUEUED_FRAMES_WAIT;
     while (dev->vid->queued_frames > 0) {
+      if (g_get_monotonic_time () > deadline) {
+        GST_WARNING ("stopping the recording with %i frames still held "
+            "downstream", dev->vid->queued_frames);
+        break;
+      }
       GST_INFO ("waiting for queued frames to reach 0 from %i",
           dev->vid->queued_frames);
       g_rec_mutex_unlock (dev->lock);
@@ -1098,7 +1152,9 @@ gst_droidcamsrc_dev_release_recording_frame (void *data,
   g_rec_mutex_lock (dev->lock);
   --dev->vid->queued_frames;
 
-  droid_media_camera_release_recording_frame (dev->cam, video_data->data);
+  /* downstream can hold a frame past the close of the camera */
+  if (dev->cam)
+    droid_media_camera_release_recording_frame (dev->cam, video_data->data);
 
   g_slice_free (GstDroidCamSrcDevVideoData, video_data);
   g_rec_mutex_unlock (dev->lock);

@@ -82,6 +82,7 @@ static gboolean gst_droidcamsrc_imgsrc_negotiate (GstDroidCamSrcPad * data);
 static gboolean gst_droidcamsrc_vidsrc_negotiate (GstDroidCamSrcPad * data);
 static void gst_droidcamsrc_start_capture (GstDroidCamSrc * src);
 static void gst_droidcamsrc_stop_capture (GstDroidCamSrc * src);
+static void gst_droidcamsrc_stop_video_recording_locked (GstDroidCamSrc * src);
 static void gst_droidcamsrc_update_ev_compensation_bounds (GstDroidCamSrc *
     src);
 static void gst_droidcamsrc_add_vfsrc_orientation_tag (GstDroidCamSrc * src);
@@ -747,7 +748,9 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
         gst_droidcamsrc_update_max_zoom (src);
       }
 
+      g_mutex_lock (&src->capture_lock);
       src->captures = 0;
+      g_mutex_unlock (&src->capture_lock);
       g_object_notify (G_OBJECT (src), "ready-for-capture");
 
       break;
@@ -779,9 +782,22 @@ gst_droidcamsrc_change_state (GstElement * element, GstStateChange transition)
       gst_pad_push_event (src->vfsrc->pad, gst_event_new_flush_start ());
       g_mutex_unlock (&src->vfsrc->lock);
 
-      /* TODO: stop recording if we are recording */
-      gst_droidcamsrc_dev_stop (src->dev);
+      /* Give up a pending capture before stopping, so that a JPEG which
+       * comes in while the camera stops does not start the preview again.
+       *
+       * A recording that is still running is stopped first: the recorder
+       * works on the camera from its own thread, and the camera is about to
+       * stop and close under it (an application switching between cameras
+       * while recording tears the source down). */
+      g_mutex_lock (&src->capture_lock);
+      if (src->mode != MODE_IMAGE && src->captures > 0) {
+        GST_WARNING_OBJECT (src, "stopping the recording that is still running");
+        gst_droidcamsrc_stop_video_recording_locked (src);
+      }
       src->captures = 0;
+      g_mutex_unlock (&src->capture_lock);
+
+      gst_droidcamsrc_dev_stop (src->dev);
 
       /* deactivate mode */
       if (src->active_mode) {
