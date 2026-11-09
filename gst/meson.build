@@ -9,12 +9,13 @@ libgstdroid_headers = [
 subdir('droidcodec')
 subdir('droideglsink')
 subdir('droidcamsrc')
+subdir('droidscreencapsrc')
 
 libgstdroid = library('gstdroid',
   libgstdroid_sources + libgstdroid_headers,
   c_args : gstdroid_args + ['-DGST_USE_UNSTABLE_API'],
-  include_directories : [configinc, libsinc, 'droidcamsrc', 'droidcodec', 'droideglsink'],
-  dependencies : [ gst_dep, gstdroidcamsrc_dep, gstdroidcodec_dep, gstdroideglsink_dep, droidmedia_dep ],
+  include_directories : [configinc, libsinc, 'droidcamsrc', 'droidcodec', 'droideglsink', 'droidscreencapsrc'],
+  dependencies : [ gst_dep, gstdroidcamsrc_dep, gstdroidcodec_dep, gstdroideglsink_dep, gstdroidscreencapsrc_dep, droidmedia_dep ],
   install : true,
   install_dir : plugins_install_dir,
 )

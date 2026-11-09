@@ -32,6 +32,7 @@
 #include "gstdroidvenc.h"
 #include "gstdroidadec.h"
 #include "gstdroidaenc.h"
+#include "gstdroidscreencapsrc.h"
 #include "droidmedia.h"
 
 GST_DEBUG_CATEGORY (gst_droid_camsrc_debug);
@@ -42,6 +43,7 @@ GST_DEBUG_CATEGORY (gst_droid_venc_debug);
 GST_DEBUG_CATEGORY (gst_droid_codec_debug);
 GST_DEBUG_CATEGORY (gst_droid_eglsink_debug);
 GST_DEBUG_CATEGORY (gst_droid_videotexturesink_debug);
+GST_DEBUG_CATEGORY (gst_droid_screencapsrc_debug);
 
 #define CAMERA_STARTUP_PLUGIN(format, ...) \
   G_STMT_START { \
@@ -81,6 +83,9 @@ plugin_init (GstPlugin * plugin)
   GST_DEBUG_CATEGORY_INIT (gst_droid_codec_debug, "droidcodec",
       0, "Android HAL codec");
 
+  GST_DEBUG_CATEGORY_INIT (gst_droid_screencapsrc_debug, "droidscreencapsrc",
+      0, "Android screen capture source element");
+
   CAMERA_STARTUP_PLUGIN ("debug categories done");
 
   ok &= gst_element_register (plugin, "droidcamsrc", GST_RANK_PRIMARY,
@@ -101,6 +106,8 @@ plugin_init (GstPlugin * plugin)
       GST_TYPE_DROIDADEC);
   ok &= gst_element_register (plugin, "droidaenc", GST_RANK_PRIMARY + 1,
       GST_TYPE_DROIDAENC);
+  ok &= gst_element_register (plugin, "droidscreencapsrc", GST_RANK_NONE,
+      GST_TYPE_DROIDSCREENCAPSRC);
 
   CAMERA_STARTUP_PLUGIN ("registered codecs ok=%d", ok);
 
